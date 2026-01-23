@@ -1,36 +1,119 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Kanban Board with Nested Task Hierarchy
 
-## Getting Started
+A local-first, single-user Kanban TODO board with unlimited task nesting, drag-and-drop, and automatic archiving of old completed tasks.
 
-First, run the development server:
+## Quick Start
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Features
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- **Nested Tasks**: Unlimited hierarchy depth. Click a task to drill down into its subtasks.
+- **Breadcrumb Navigation**: Always see your path from Root and click to navigate up.
+- **Drag & Drop**: Reorder tasks within columns and move between status columns.
+- **Auto-hide Completed**: Tasks completed more than 7 days ago are hidden (not deleted).
+- **Completed Archive**: View all archived completed tasks in a searchable modal.
+- **Global Search**: Press `/` to search all tasks by title/description.
+- **Quick Add**: Top input bar for fast task creation.
+- **Import/Export**: Backup and restore your data as JSON.
 
-## Learn More
+## Data Model
 
-To learn more about Next.js, take a look at the following resources:
+```typescript
+interface Task {
+  id: string;           // UUID
+  parentId: string;     // Parent task ID ("root" for top-level)
+  title: string;        // Required
+  description?: string;
+  status: "NOT_STARTED" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED";
+  order: number;        // For sorting within column
+  createdAt: Date;
+  updatedAt: Date;
+  completedAt?: Date;   // Set when status becomes COMPLETED
+  dueDate?: Date;
+  tags?: string[];
+}
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- **Root Task**: The immutable root (id="root") is never stored. All tasks have `parentId` pointing to either "root" or another task.
+- **No Cycles**: parentId validation prevents circular references.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Project Structure
 
-## Deploy on Vercel
+```
+src/
+├── app/
+│   ├── page.tsx          # Main app entry
+│   ├── layout.tsx        # Root layout
+│   └── globals.css       # Tailwind + custom styles
+├── lib/
+│   ├── types.ts          # Task types and constants
+│   ├── task-context.tsx  # React context for state
+│   ├── store/
+│   │   ├── index.ts           # Store export
+│   │   └── indexeddb-store.ts # IndexedDB implementation
+│   └── tasks/
+│       ├── index.ts       # Task utils export
+│       ├── tree-utils.ts  # Path, cycle prevention, subtree helpers
+│       └── seed-data.ts   # Initial seed data
+└── components/
+    ├── Board.tsx          # Main board with DnD
+    ├── Column.tsx         # Status column
+    ├── TaskCard.tsx       # Draggable task card
+    ├── Breadcrumb.tsx     # Navigation breadcrumb
+    ├── TaskPanel.tsx      # Task detail side panel
+    ├── SearchModal.tsx    # Global search
+    ├── CompletedArchive.tsx # Archived tasks modal
+    └── ImportExport.tsx   # Backup/restore buttons
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 7-Day Completed Auto-Hide Logic
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+**Location**: `src/lib/task-context.tsx` → `getVisibleChildren()` method
+
+```typescript
+const getVisibleChildren = useCallback((): Task[] => {
+  return tasks
+    .filter(t => t.parentId === currentParentId)
+    .filter(t => {
+      // Hide completed tasks older than 7 days
+      if (t.status === 'COMPLETED' && isCompletedOlderThan(t, COMPLETED_HIDE_DAYS)) {
+        return false;
+      }
+      return true;
+    })
+    .sort((a, b) => a.order - b.order);
+}, [tasks, currentParentId]);
+```
+
+The `isCompletedOlderThan()` helper is in `src/lib/tasks/tree-utils.ts`:
+
+```typescript
+export function isCompletedOlderThan(task: Task, days: number): boolean {
+  if (!task.completedAt) return false;
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+  return new Date(task.completedAt) < cutoff;
+}
+```
+
+## Keyboard Shortcuts
+
+| Key | Action |
+|-----|--------|
+| `n` | Focus quick-add input |
+| `/` | Open search modal |
+| `Esc` | Close panel/modal |
+
+## Tech Stack
+
+- **Framework**: Next.js 14 (App Router)
+- **Language**: TypeScript
+- **Styling**: Tailwind CSS
+- **Persistence**: IndexedDB via `idb`
+- **Drag & Drop**: @dnd-kit
