@@ -5,15 +5,17 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useTaskContext } from '@/lib/task-context';
 import { Task } from '@/lib/types';
-import { getTaskPath, formatBreadcrumb, getCompletedAgoText, isOverdue } from '@/lib/tasks';
+import { getTaskPath, formatBreadcrumb, getCompletedAgoText } from '@/lib/tasks';
+import { formatCompactDate, getDateStatusColor } from '@/lib/color-utils';
 
 interface TaskCardProps {
   task: Task;
   isDragging?: boolean;
+  accentColor?: string; // e.g. "border-blue-500"
 }
 
-export function TaskCard({ task, isDragging }: TaskCardProps) {
-  const { tasks, navigateTo, selectTask, updateTask, deleteTask, createTask, currentParentId } = useTaskContext();
+export function TaskCard({ task, isDragging, accentColor }: TaskCardProps) {
+  const { tasks, navigateTo, selectTask, updateTask, deleteTask, createTask } = useTaskContext();
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(task.title);
   const [showMenu, setShowMenu] = useState(false);
@@ -42,9 +44,10 @@ export function TaskCard({ task, isDragging }: TaskCardProps) {
 
   // Check if task has children
   const hasChildren = tasks.some(t => t.parentId === task.id);
-
   const completedAgo = task.status === 'COMPLETED' ? getCompletedAgoText(task) : '';
-  const taskIsOverdue = isOverdue(task);
+
+  // Date logic
+  const dateColorClass = task.dueDate ? getDateStatusColor(new Date(task.dueDate)) : '';
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -68,16 +71,14 @@ export function TaskCard({ task, isDragging }: TaskCardProps) {
     if (trimmed && trimmed !== task.title) {
       await updateTask(task.id, { title: trimmed });
     }
-    setEditTitle(task.title);
+    setEditTitle(task.title || trimmed); // Sync back if change failed or was empty
     setIsEditing(false);
   };
 
   const handleCardClick = (e: React.MouseEvent) => {
-    // Don't navigate if clicking on interactive elements
     if ((e.target as HTMLElement).closest('button, input')) return;
     if (isEditing) return;
 
-    // If has children, drill down. Otherwise open panel
     if (hasChildren) {
       navigateTo(task.id);
     } else {
@@ -91,28 +92,14 @@ export function TaskCard({ task, isDragging }: TaskCardProps) {
       parentId: task.id,
       title: 'New Subtask',
       status: 'NOT_STARTED',
+      priority: 'MEDIUM',
     });
-    if (hasChildren || true) {
-      navigateTo(task.id);
-    }
+    // Optional: navigateTo(task.id);
   };
 
   const handleDelete = async () => {
     setShowMenu(false);
-    const subtreeCount = tasks.filter(t => {
-      let current: Task | undefined = t;
-      while (current && current.parentId !== task.id) {
-        current = tasks.find(p => p.id === current?.parentId);
-        if (current?.id === task.id) return true;
-      }
-      return t.parentId === task.id;
-    }).length;
-
-    const message = subtreeCount > 0
-      ? `Delete "${task.title}" and ${subtreeCount} subtask${subtreeCount > 1 ? 's' : ''}?`
-      : `Delete "${task.title}"?`;
-
-    if (confirm(message)) {
+    if (confirm(`Delete "${task.title}"?`)) {
       await deleteTask(task.id);
     }
   };
@@ -128,32 +115,24 @@ export function TaskCard({ task, isDragging }: TaskCardProps) {
       style={style}
       {...attributes}
       className={`
-        group relative bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 
-        p-3 shadow-sm hover:shadow-md transition-all cursor-pointer
+        group relative bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 
+        p-2.5 shadow-sm hover:shadow-md transition-all cursor-pointer
         ${isDragging ? 'opacity-50 shadow-lg' : ''}
-        ${taskIsOverdue ? 'border-l-4 border-l-red-500' : ''}
       `}
       onClick={handleCardClick}
     >
       {/* Drag handle */}
       <div
         {...listeners}
-        className="absolute left-0 top-0 bottom-0 w-6 flex items-center justify-center cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity"
+        className="absolute left-0 top-0 bottom-0 w-6 flex items-center justify-center cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity z-10"
       >
         <svg className="w-4 h-4 text-slate-400" fill="currentColor" viewBox="0 0 20 20">
           <path d="M7 2a2 2 0 11-4 0 2 2 0 014 0zM7 8a2 2 0 11-4 0 2 2 0 014 0zM7 14a2 2 0 11-4 0 2 2 0 014 0zM13 2a2 2 0 11-4 0 2 2 0 014 0zM13 8a2 2 0 11-4 0 2 2 0 014 0zM13 14a2 2 0 11-4 0 2 2 0 014 0z" />
         </svg>
       </div>
 
-      <div className="pl-4">
-        {/* Breadcrumb path (compact) */}
-        {breadcrumbText && (
-          <div className="text-xs text-slate-400 dark:text-slate-500 mb-1 truncate" title={breadcrumbText}>
-            {breadcrumbText}
-          </div>
-        )}
-
-        {/* Title */}
+      <div className="pl-1">
+        {/* Title & Edit */}
         {isEditing ? (
           <input
             ref={inputRef}
@@ -168,84 +147,110 @@ export function TaskCard({ task, isDragging }: TaskCardProps) {
                 setIsEditing(false);
               }
             }}
-            className="w-full text-sm font-medium bg-transparent border-b border-blue-500 outline-none"
+            className="w-full text-sm font-medium bg-transparent border-b border-blue-500 outline-none p-0"
           />
         ) : (
           <div className="flex items-start justify-between gap-2">
             <h3
-              className="text-sm font-medium text-slate-900 dark:text-white line-clamp-2"
-              onDoubleClick={() => setIsEditing(true)}
+              className={`text-sm font-medium leading-snug ${task.status === 'COMPLETED' ? 'text-slate-400 line-through' : 'text-slate-800 dark:text-slate-200'}`}
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                setIsEditing(true);
+              }}
             >
               {task.title}
             </h3>
-            {hasChildren && (
-              <span className="flex-shrink-0 text-xs text-slate-400 bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded">
-                {tasks.filter(t => t.parentId === task.id).length}
-              </span>
-            )}
+
+            {/* Context Menu Trigger */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowMenu(!showMenu);
+              }}
+              className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 transition-opacity"
+            >
+              <svg className="w-3.5 h-3.5 text-slate-400" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z" />
+              </svg>
+            </button>
           </div>
         )}
 
-        {/* Meta info */}
-        <div className="flex items-center gap-2 mt-2 flex-wrap">
-          {/* Due date badge */}
-          {task.dueDate && (
-            <span className={`text-xs px-1.5 py-0.5 rounded ${taskIsOverdue
-                ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400'
-              }`}>
-              {taskIsOverdue ? '⚠️ ' : '📅 '}
-              {new Date(task.dueDate).toLocaleDateString()}
+        {/* Footer Meta */}
+        <div className="flex items-center gap-3 mt-2.5">
+          {/* Priority Indicator */}
+          {task.status !== 'COMPLETED' && (
+            <div className="flex gap-0.5">
+              <div className={`w-1 h-3 rounded-full ${task.priority === 'HIGH' ? 'bg-red-400' : task.priority === 'MEDIUM' ? 'bg-amber-400' : 'bg-slate-300'}`} />
+              {task.priority === 'HIGH' && <div className="w-1 h-3 rounded-full bg-red-400" />}
+            </div>
+          )}
+
+          {/* Date Badge (minimal) */}
+          {task.dueDate && task.status !== 'COMPLETED' && (
+            <span className={`text-[10px] font-mono tracking-tighter ${dateColorClass.includes('text-red') ? 'text-red-500' : 'text-slate-400'}`}>
+              {formatCompactDate(new Date(task.dueDate))}
             </span>
           )}
 
-          {/* Completed ago text */}
-          {completedAgo && (
-            <span className="text-xs text-green-600 dark:text-green-400">
-              ✓ {completedAgo}
+          {/* Subtask Count */}
+          {hasChildren && (
+            <span className="flex items-center gap-1 text-[10px] text-slate-400 font-mono">
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              </svg>
+              {tasks.filter(t => t.parentId === task.id).length}
             </span>
           )}
         </div>
       </div>
 
-      {/* Context menu button */}
-      <div className="absolute top-2 right-2" ref={menuRef}>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            setShowMenu(!showMenu);
-          }}
-          className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 opacity-0 group-hover:opacity-100 transition-opacity"
+      {/* Popover Menu */}
+      {showMenu && (
+        <div
+          ref={menuRef}
+          className="absolute right-1 top-6 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 py-1 z-50 min-w-[140px]"
+          onClick={(e) => e.stopPropagation()}
         >
-          <svg className="w-4 h-4 text-slate-500" fill="currentColor" viewBox="0 0 20 20">
-            <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
-          </svg>
-        </button>
-
-        {showMenu && (
-          <div className="absolute right-0 top-8 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 py-1 z-50 min-w-[140px]">
-            <button
-              onClick={handleOpenDetails}
-              className="w-full px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-2"
-            >
-              <span>📝</span> Edit Details
-            </button>
-            <button
-              onClick={handleAddSubtask}
-              className="w-full px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-2"
-            >
-              <span>➕</span> Add Subtask
-            </button>
-            <hr className="my-1 border-slate-200 dark:border-slate-700" />
-            <button
-              onClick={handleDelete}
-              className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"
-            >
-              <span>🗑️</span> Delete
-            </button>
-          </div>
-        )}
-      </div>
+          <button
+            onClick={() => setIsEditing(true)}
+            className="w-full px-3 py-1.5 text-left text-xs hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-2"
+          >
+            <svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+            </svg>
+            Rename
+          </button>
+          <button
+            onClick={handleOpenDetails}
+            className="w-full px-3 py-1.5 text-left text-xs hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-2"
+          >
+            <svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+            Edit Details
+          </button>
+          <button
+            onClick={handleAddSubtask}
+            className="w-full px-3 py-1.5 text-left text-xs hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-2"
+          >
+            <svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Add Subtask
+          </button>
+          <hr className="my-1 border-slate-100" />
+          <button
+            onClick={handleDelete}
+            className="w-full px-3 py-1.5 text-left text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2 text-red-600"
+          >
+            <svg className="w-3.5 h-3.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            Delete
+          </button>
+        </div>
+      )}
     </div>
   );
 }

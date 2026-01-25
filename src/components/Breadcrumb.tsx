@@ -12,25 +12,35 @@ export function Breadcrumb() {
     ? []
     : getTaskPath(tasks, currentParentId);
 
-  const items = [
-    { id: ROOT_TASK_ID, title: 'Root' },
-    ...path.map(t => ({ id: t.id, title: t.title })),
-  ];
+  const isAtRoot = currentParentId === ROOT_TASK_ID;
 
   return (
-    <nav className="flex items-center gap-1 text-sm overflow-x-auto pb-1">
-      {items.map((item, index) => (
+    <nav className="flex items-center gap-2 text-sm font-light">
+      {/* Root / Home Link */}
+      <button
+        onClick={() => navigateTo(ROOT_TASK_ID)}
+        className="flex items-center gap-2 px-1.5 py-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors group"
+      >
+        <div className="w-5 h-5 bg-slate-900 dark:bg-slate-100 rounded flex items-center justify-center shrink-0">
+          <span className="text-[10px] text-white dark:text-slate-900 font-bold">R</span>
+        </div>
+        {!isAtRoot && (
+          <span className="text-slate-500 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-white">
+            Root
+          </span>
+        )}
+      </button>
+
+      {path.map((item, index) => (
         <React.Fragment key={item.id}>
-          {index > 0 && (
-            <span className="text-slate-400 flex-shrink-0">›</span>
-          )}
+          <span className="text-slate-300 dark:text-slate-600 select-none">/</span>
           <button
             onClick={() => navigateTo(item.id)}
             className={`
-              flex-shrink-0 px-2 py-1 rounded transition-colors
-              ${item.id === currentParentId
-                ? 'text-slate-900 dark:text-white font-medium bg-slate-100 dark:bg-slate-700'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-700'
+              px-1.5 py-1 rounded transition-colors whitespace-nowrap
+              ${index === path.length - 1
+                ? 'text-slate-900 dark:text-white font-medium'
+                : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-700'
               }
             `}
           >

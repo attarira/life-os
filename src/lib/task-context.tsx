@@ -26,7 +26,7 @@ interface TaskContextValue {
   deleteTask: (id: string) => Promise<void>;
 
   // Drag and drop
-  moveTask: (taskId: string, newStatus: TaskStatus, newOrder: number) => Promise<void>;
+  moveTask: (taskId: string, newStatus: TaskStatus, newOrder: number, newParentId?: string) => Promise<void>;
   reorderTasks: (taskIds: string[], status: TaskStatus) => Promise<void>;
 
   // Search and archive modals
@@ -122,8 +122,12 @@ export function TaskProvider({ children }: TaskProviderProps) {
     }
   }, [tasks, selectedTaskId, currentParentId]);
 
-  const moveTask = useCallback(async (taskId: string, newStatus: TaskStatus, newOrder: number): Promise<void> => {
-    const updated = await taskStore.updateTask(taskId, { status: newStatus, order: newOrder });
+  const moveTask = useCallback(async (taskId: string, newStatus: TaskStatus, newOrder: number, newParentId?: string): Promise<void> => {
+    const updates: UpdateTaskInput = { status: newStatus, order: newOrder };
+    if (newParentId) {
+      updates.parentId = newParentId;
+    }
+    const updated = await taskStore.updateTask(taskId, updates);
     setTasks(prev => prev.map(t => t.id === taskId ? updated : t));
   }, []);
 

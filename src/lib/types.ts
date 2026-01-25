@@ -1,6 +1,8 @@
 // Task status enum
 export type TaskStatus = "NOT_STARTED" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED";
 
+export type TaskPriority = "LOW" | "MEDIUM" | "HIGH";
+
 // Core Task interface
 export interface Task {
   id: string;
@@ -8,6 +10,7 @@ export interface Task {
   title: string;
   description?: string;
   status: TaskStatus;
+  priority: TaskPriority;
   createdAt: Date;
   updatedAt: Date;
   completedAt?: Date;
@@ -39,6 +42,16 @@ export interface TaskStore {
 
 // Root task constant
 export const ROOT_TASK_ID = "root";
+
+export type LifeAreaId = "career" | "health" | "finances" | "relationships" | "growth";
+
+export const LIFE_AREAS: { id: LifeAreaId; title: string; color: string; description: string }[] = [
+  { id: "career", title: "Career", color: "bg-blue-500", description: "Professional goals and projects" },
+  { id: "health", title: "Health", color: "bg-green-500", description: "Physical and mental well-being" },
+  { id: "finances", title: "Finances", color: "bg-emerald-600", description: "Financial planning and management" },
+  { id: "relationships", title: "Relationships", color: "bg-rose-500", description: "Family, friends, and networking" },
+  { id: "growth", title: "Personal Growth", color: "bg-indigo-500", description: "Learning, hobbies, and self-improvement" },
+];
 
 // Column configuration
 export const COLUMNS: { status: TaskStatus; label: string; color: string }[] = [
