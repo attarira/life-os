@@ -29,30 +29,30 @@ type AreaSnapshot = {
   dueSoon: boolean;
 };
 
-const LIFE_AREA_ICONS: Record<string, JSX.Element> = {
+const LIFE_AREA_ICONS: Record<string, React.JSX.Element> = {
   career: (
-    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <rect x="4" y="8" width="16" height="10" rx="2" />
       <path d="M9 8V6a2 2 0 012-2h2a2 2 0 012 2v2" />
       <path d="M10 13h4" />
     </svg>
   ),
   health: (
-    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M12 4v16" />
       <path d="M4 12h16" />
-      <path d="M6.5 6.5l11 11" opacity=".2" />
     </svg>
   ),
   finances: (
-    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-      <path d="M5 12a7 7 0 0014 0 7 7 0 10-14 0z" />
-      <path d="M12 7v10" />
-      <path d="M9 10h4.5a1.5 1.5 0 110 3H10" />
+    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="8" />
+      <path d="M12 6v12" />
+      <path d="M9 10h6" />
+      <path d="M9 14h6" />
     </svg>
   ),
   relationships: (
-    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M7 10a4 4 0 110-8 4 4 0 010 8z" />
       <path d="M17 12a3 3 0 110-6 3 3 0 010 6z" />
       <path d="M3 22v-1.5A5.5 5.5 0 018.5 15H10" />
@@ -60,13 +60,39 @@ const LIFE_AREA_ICONS: Record<string, JSX.Element> = {
     </svg>
   ),
   growth: (
-    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M5 20c3-6 5-9 7-9s3 2 7 9" />
       <path d="M12 11V4" />
       <path d="M10 6l2-2 2 2" />
     </svg>
   ),
+  recreation: (
+    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M5 19l7-14 7 14H5z" />
+      <path d="M9 15h6" />
+    </svg>
+  ),
 };
+
+const AREA_TONES: Record<string, { bg: string; text: string }> = {
+  career: { bg: 'bg-blue-900/40', text: 'text-blue-200' },
+  health: { bg: 'bg-emerald-900/40', text: 'text-emerald-200' },
+  finances: { bg: 'bg-cyan-900/40', text: 'text-cyan-200' },
+  relationships: { bg: 'bg-rose-900/40', text: 'text-rose-200' },
+  growth: { bg: 'bg-indigo-900/40', text: 'text-indigo-200' },
+  recreation: { bg: 'bg-amber-900/40', text: 'text-amber-200' },
+};
+
+function resolveAreaKey(id: string) {
+  const key = id.toLowerCase();
+  if (key.includes('health') || key.includes('well')) return 'health';
+  if (key.includes('finance') || key.includes('budget')) return 'finances';
+  if (key.includes('relation') || key.includes('family') || key.includes('social')) return 'relationships';
+  if (key.includes('career') || key.includes('work') || key.includes('job')) return 'career';
+  if (key.includes('grow') || key.includes('learn') || key.includes('personal')) return 'growth';
+  if (key.includes('recre') || key.includes('play') || key.includes('fun')) return 'recreation';
+  return id;
+}
 
 function isDueWithinThreeDays(task: Task): boolean {
   if (!task.dueDate || task.status === 'COMPLETED') return false;
@@ -102,27 +128,31 @@ function LifeAreaCard({
   muted?: boolean;
   isActive?: boolean;
 }) {
-  const icon = LIFE_AREA_ICONS[area.id] || (
+  const toneKey = resolveAreaKey(area.title || area.id || '');
+  const icon = LIFE_AREA_ICONS[toneKey] || (
     <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
       <path d="M4 9h6V4H4v5zM14 9h6V4h-6v5zM4 20h6v-5H4v5zM14 20h6v-5h-6v5z" />
     </svg>
   );
+  const tone = AREA_TONES[toneKey] || { bg: 'bg-slate-800/70', text: 'text-slate-200' };
 
   return (
     <div
       ref={cardRef}
-      style={style}
       onClick={onOpen}
-      className={`group relative flex flex-col gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 text-left shadow-sm transition-all ${
+      className={`group relative overflow-hidden flex flex-col gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 text-left shadow-sm transition-all ${
         isDragging ? 'ring-2 ring-slate-300 dark:ring-slate-700 shadow-lg' : 'hover:shadow-md hover:-translate-y-0.5'
       } ${isActive ? 'border-slate-300 dark:border-slate-600 shadow-md' : ''} ${muted ? 'pointer-events-none' : 'cursor-pointer'}`}
+      style={{ ...(style || {}), ['--tile-pad' as string]: '12px' }}
     >
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-start gap-3 relative" style={{ paddingRight: 'calc(var(--tile-pad) + 32px + 12px)' }}>
         <div className="flex items-start gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
-            {icon}
+          <div
+            className={`flex h-12 w-12 items-center justify-center rounded-xl ${tone.bg} ${tone.text}`}
+          >
+            <span className="flex items-center justify-center leading-none">{icon}</span>
           </div>
-          <div className="space-y-1">
+        <div className="space-y-1">
             <div className="flex items-center gap-2">
               <h3 className="text-lg font-semibold text-slate-900 dark:text-white leading-tight">{area.title}</h3>
               {dueSoon && (
@@ -141,34 +171,39 @@ function LifeAreaCard({
             ) : null}
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          {onEdit && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onEdit();
-              }}
-              className="p-2 rounded-lg text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
-            >
-              <svg className="w-4 h-4" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" fill="none">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-              </svg>
-            </button>
-          )}
-          {dragHandleProps && (
-            <button
-              ref={dragHandleProps.ref}
-              {...dragHandleProps.listeners}
-              {...dragHandleProps.attributes}
-              onClick={(e) => e.stopPropagation()}
-              className="h-8 w-8 rounded-lg text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center"
-            >
+      </div>
+
+      <div className="absolute flex items-center gap-3" style={{ top: 'var(--tile-pad)', right: 'var(--tile-pad)' }}>
+        {dragHandleProps && (
+          <button
+            ref={dragHandleProps.ref}
+            {...dragHandleProps.listeners}
+            {...dragHandleProps.attributes}
+            onClick={(e) => e.stopPropagation()}
+            className="h-8 w-8 rounded-lg text-slate-400 bg-transparent grid place-items-center transition-all duration-150 cursor-grab active:cursor-grabbing focus:outline-none focus:ring-1 focus:ring-white/30"
+            style={{ opacity: 0.55 }}
+            aria-label={`Reorder ${area.title}`}
+          >
+            <div className="h-full w-full rounded-lg hover:bg-white/5 dark:hover:bg-white/10 border border-transparent hover:border-white/10 grid place-items-center transition-colors duration-150">
               <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
                 <path d="M7 2a2 2 0 11-4 0 2 2 0 014 0zM7 8a2 2 0 11-4 0 2 2 0 014 0zM7 14a2 2 0 11-4 0 2 2 0 014 0zM13 2a2 2 0 11-4 0 2 2 0 014 0zM13 8a2 2 0 11-4 0 2 2 0 014 0zM13 14a2 2 0 11-4 0 2 2 0 014 0z" />
               </svg>
-            </button>
-          )}
-        </div>
+            </div>
+          </button>
+        )}
+        {onEdit && (
+          <button
+            onClick={(e) => {
+                e.stopPropagation();
+                onEdit();
+              }}
+            className="h-8 w-8 rounded-lg text-slate-500 hover:text-slate-100 dark:text-slate-400 dark:hover:text-white bg-transparent hover:bg-white/5 dark:hover:bg-white/10 grid place-items-center transition-colors duration-150"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" fill="none">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+            </svg>
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-3">
@@ -189,7 +224,7 @@ function LifeAreaCard({
         ) : (
           <span className="font-medium text-slate-700 dark:text-slate-200">{total} tasks</span>
         )}
-        <div className="opacity-0 group-hover:opacity-100 transition-opacity text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1">
+        <div className="opacity-0 group-hover:opacity-100 transition-opacity text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1 pl-3">
           <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
           </svg>
@@ -259,20 +294,19 @@ export function HomeDashboard() {
 
   const areaSnapshots: AreaSnapshot[] = useMemo(() => {
     return lifeAreas.map(area => {
-      const subtreeIds = getSubtreeIds(tasks, area.id);
-      const areaTasks = tasks.filter(t => subtreeIds.includes(t.id) && t.id !== area.id);
+      const immediateTasks = tasks.filter(t => t.parentId === area.id);
 
       const statusCounts = COLUMNS.reduce((acc, col) => {
-        acc[col.status] = areaTasks.filter(t => t.status === col.status).length;
+        acc[col.status] = immediateTasks.filter(t => t.status === col.status).length;
         return acc;
       }, {} as Record<TaskStatus, number>);
 
-      const dueSoon = areaTasks.some(isDueWithinThreeDays);
+      const dueSoon = immediateTasks.some(isDueWithinThreeDays);
 
       return {
         area,
         statusCounts,
-        total: areaTasks.length,
+        total: immediateTasks.length,
         dueSoon,
       };
     });

@@ -124,14 +124,14 @@ export function TaskCard({ task, isDragging, accentColor }: TaskCardProps) {
       {/* Drag handle */}
       <div
         {...listeners}
-        className="absolute left-0 top-0 bottom-0 w-6 flex items-center justify-center cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity z-10"
+        className="absolute top-1 right-1 flex items-center justify-center cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 hover:bg-slate-50 dark:hover:bg-slate-700 rounded p-0.5 transition-all z-10"
       >
-        <svg className="w-4 h-4 text-slate-400" fill="currentColor" viewBox="0 0 20 20">
+        <svg className="w-4 h-4 text-slate-400 hover:text-slate-600" fill="currentColor" viewBox="0 0 20 20">
           <path d="M7 2a2 2 0 11-4 0 2 2 0 014 0zM7 8a2 2 0 11-4 0 2 2 0 014 0zM7 14a2 2 0 11-4 0 2 2 0 014 0zM13 2a2 2 0 11-4 0 2 2 0 014 0zM13 8a2 2 0 11-4 0 2 2 0 014 0zM13 14a2 2 0 11-4 0 2 2 0 014 0z" />
         </svg>
       </div>
 
-      <div className="pl-1">
+      <div>
         {/* Title & Edit */}
         {isEditing ? (
           <input

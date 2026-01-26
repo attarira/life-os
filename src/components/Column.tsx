@@ -34,6 +34,7 @@ export function Column({ status, label, color, tasks }: ColumnProps) {
       parentId: currentParentId,
       title: trimmed,
       status,
+      priority: 'MEDIUM',
     });
 
     setNewTitle('');
