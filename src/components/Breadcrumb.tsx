@@ -16,19 +16,13 @@ export function Breadcrumb() {
 
   return (
     <nav className="flex items-center gap-2 text-sm font-light">
-      {/* Root / Home Link */}
       <button
         onClick={() => navigateTo(ROOT_TASK_ID)}
-        className="flex items-center gap-2 px-1.5 py-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors group"
+        className="flex items-center gap-2 px-2 py-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors group"
       >
-        <div className="w-5 h-5 bg-slate-900 dark:bg-slate-100 rounded flex items-center justify-center shrink-0">
-          <span className="text-[10px] text-white dark:text-slate-900 font-bold">R</span>
-        </div>
-        {!isAtRoot && (
-          <span className="text-slate-500 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-white">
-            Root
-          </span>
-        )}
+        <span className={`text-slate-600 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white ${isAtRoot ? 'font-semibold' : 'font-medium'}`}>
+          LifeOS
+        </span>
       </button>
 
       {path.map((item, index) => (

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
+import Link from 'next/link';
 import {
   DndContext,
   DragEndEvent,
@@ -27,6 +28,7 @@ type AreaSnapshot = {
   statusCounts: Record<TaskStatus, number>;
   total: number;
   dueSoon: boolean;
+  highlights: string[];
 };
 
 const LIFE_AREA_ICONS: Record<string, React.JSX.Element> = {
@@ -46,9 +48,8 @@ const LIFE_AREA_ICONS: Record<string, React.JSX.Element> = {
   finances: (
     <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <circle cx="12" cy="12" r="8" />
-      <path d="M12 6v12" />
-      <path d="M9 10h6" />
-      <path d="M9 14h6" />
+      <path d="M12 7v10" />
+      <path d="M10 10.5h3c1.5 0 1.8 1.8.2 2.3L11 13.6c-1.7.5-1.3 2.9.6 2.9h2.4" />
     </svg>
   ),
   relationships: (
@@ -106,6 +107,7 @@ function LifeAreaCard({
   statusCounts,
   total,
   dueSoon,
+  highlights = [],
   onOpen,
   onEdit,
   cardRef,
@@ -119,6 +121,7 @@ function LifeAreaCard({
   statusCounts: Record<TaskStatus, number>;
   total: number;
   dueSoon: boolean;
+  highlights?: string[];
   onOpen: () => void;
   onEdit?: () => void;
   cardRef?: (node: HTMLElement | null) => void;
@@ -140,6 +143,8 @@ function LifeAreaCard({
     <div
       ref={cardRef}
       onClick={onOpen}
+      {...(dragHandleProps?.attributes || {})}
+      {...(dragHandleProps?.listeners || {})}
       className={`group relative overflow-hidden flex flex-col gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 text-left shadow-sm transition-all ${
         isDragging ? 'ring-2 ring-slate-300 dark:ring-slate-700 shadow-lg' : 'hover:shadow-md hover:-translate-y-0.5'
       } ${isActive ? 'border-slate-300 dark:border-slate-600 shadow-md' : ''} ${muted ? 'pointer-events-none' : 'cursor-pointer'}`}
@@ -166,31 +171,11 @@ function LifeAreaCard({
                 </span>
               )}
             </div>
-            {area.description ? (
-              <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-2">{area.description}</p>
-            ) : null}
           </div>
         </div>
       </div>
 
       <div className="absolute flex items-center gap-3" style={{ top: 'var(--tile-pad)', right: 'var(--tile-pad)' }}>
-        {dragHandleProps && (
-          <button
-            ref={dragHandleProps.ref}
-            {...dragHandleProps.listeners}
-            {...dragHandleProps.attributes}
-            onClick={(e) => e.stopPropagation()}
-            className="h-8 w-8 rounded-lg text-slate-400 bg-transparent grid place-items-center transition-all duration-150 cursor-grab active:cursor-grabbing focus:outline-none focus:ring-1 focus:ring-white/30"
-            style={{ opacity: 0.55 }}
-            aria-label={`Reorder ${area.title}`}
-          >
-            <div className="h-full w-full rounded-lg hover:bg-white/5 dark:hover:bg-white/10 border border-transparent hover:border-white/10 grid place-items-center transition-colors duration-150">
-              <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M7 2a2 2 0 11-4 0 2 2 0 014 0zM7 8a2 2 0 11-4 0 2 2 0 014 0zM7 14a2 2 0 11-4 0 2 2 0 014 0zM13 2a2 2 0 11-4 0 2 2 0 014 0zM13 8a2 2 0 11-4 0 2 2 0 014 0zM13 14a2 2 0 11-4 0 2 2 0 014 0z" />
-              </svg>
-            </div>
-          </button>
-        )}
         {onEdit && (
           <button
             onClick={(e) => {
@@ -206,29 +191,25 @@ function LifeAreaCard({
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        {COLUMNS.map(col => (
-          <div
-            key={col.status}
-            className="flex items-center justify-between rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800 px-3 py-2"
-          >
-            <span className="text-[10px] uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500">{col.label}</span>
-            <span className="text-base font-semibold text-slate-900 dark:text-white">{statusCounts[col.status] || 0}</span>
+      <div className="py-1">
+        {Array.isArray(highlights) && highlights.length > 0 ? (
+          <div className="flex flex-col gap-1.5 text-sm text-slate-200 dark:text-slate-100 font-medium">
+            {highlights.map((item, idx) => (
+              <div key={idx} className="leading-snug truncate">{item}</div>
+            ))}
           </div>
-        ))}
+        ) : (
+          <p className="text-sm text-slate-500 dark:text-slate-400">No active focus.</p>
+        )}
       </div>
 
-      <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-        {total === 0 ? (
-          <span className="text-[11px] text-slate-400 dark:text-slate-500">No active work</span>
-        ) : (
-          <span className="font-medium text-slate-700 dark:text-slate-200">{total} tasks</span>
-        )}
-        <div className="opacity-0 group-hover:opacity-100 transition-opacity text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1 pl-3">
-          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-          </svg>
-        </div>
+      <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mt-1">
+        <span className="font-medium text-slate-700 dark:text-slate-200">
+          {Math.max(0, total - (statusCounts['COMPLETED'] || 0))} active
+        </span>
+        <span className="text-slate-500 dark:text-slate-400">
+          {(statusCounts['COMPLETED'] || 0)} completed
+        </span>
       </div>
     </div>
   );
@@ -245,7 +226,7 @@ function SortableLifeAreaCard({
   onEdit: () => void;
   isActive: boolean;
 }) {
-  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: snapshot.area.id,
   });
 
@@ -260,11 +241,12 @@ function SortableLifeAreaCard({
       statusCounts={snapshot.statusCounts}
       total={snapshot.total}
       dueSoon={snapshot.dueSoon}
+      highlights={snapshot.highlights}
       onOpen={onOpen}
       onEdit={onEdit}
       isActive={isActive}
       cardRef={setNodeRef}
-      dragHandleProps={{ ref: setActivatorNodeRef, listeners, attributes }}
+      dragHandleProps={{ listeners, attributes }}
       style={style}
       isDragging={isDragging}
     />
@@ -273,6 +255,7 @@ function SortableLifeAreaCard({
 
 export function HomeDashboard() {
   const { navigateTo, tasks, setSearchOpen, createTask, reorderTasks, updateTask, deleteTask } = useTaskContext();
+  const { selectTask } = useTaskContext();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingArea, setEditingArea] = useState<Task | null>(null);
@@ -303,11 +286,24 @@ export function HomeDashboard() {
 
       const dueSoon = immediateTasks.some(isDueWithinThreeDays);
 
+      const highlightCandidates = immediateTasks
+        .filter(t => t.status === 'IN_PROGRESS' || isDueWithinThreeDays(t))
+        .sort((a, b) => {
+          // In-progress first, then by due date
+          if (a.status === 'IN_PROGRESS' && b.status !== 'IN_PROGRESS') return -1;
+          if (b.status === 'IN_PROGRESS' && a.status !== 'IN_PROGRESS') return 1;
+          const ad = a.dueDate ? a.dueDate.getTime() : Number.MAX_SAFE_INTEGER;
+          const bd = b.dueDate ? b.dueDate.getTime() : Number.MAX_SAFE_INTEGER;
+          return ad - bd;
+        })
+        .slice(0, 2);
+
       return {
         area,
         statusCounts,
         total: immediateTasks.length,
         dueSoon,
+        highlights: highlightCandidates.map(t => t.title),
       };
     });
   }, [lifeAreas, tasks]);
@@ -322,6 +318,17 @@ export function HomeDashboard() {
       .sort((a, b) => b.score - a.score || lifeAreas.findIndex(l => l.id === a.id) - lifeAreas.findIndex(l => l.id === b.id));
     return scored[0]?.id || null;
   }, [areaSnapshots, lifeAreas]);
+
+  const todayTasks = useMemo(() => {
+    const now = new Date();
+    return tasks
+      .filter(t => t.dueDate && t.status !== 'COMPLETED')
+      .filter(t => {
+        const d = new Date(t.dueDate!);
+        return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+      })
+      .sort((a, b) => (a.dueDate?.getTime() || 0) - (b.dueDate?.getTime() || 0));
+  }, [tasks]);
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id as string);
@@ -399,35 +406,80 @@ export function HomeDashboard() {
     <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-900">
       <header className="flex-shrink-0 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-6 py-4">
         <div className="flex items-center justify-between max-w-7xl mx-auto">
-          <h1 className="text-xl font-semibold text-slate-900 dark:text-white leading-tight">LifeOS</h1>
+          <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+            <span className="font-semibold text-slate-900 dark:text-white">LifeOS</span>
+            <span className="text-slate-400 dark:text-slate-500">/</span>
+            <span className="text-slate-500 dark:text-slate-400">Dashboard</span>
+          </div>
           <div className="flex items-center gap-3">
             <span className="hidden md:inline text-xs text-slate-400 dark:text-slate-500">
               {new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
             </span>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setSearchOpen(true)}
-                className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-200 transition-colors"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </button>
-              <button
-                onClick={() => openEditor()}
-                className="p-2 rounded-lg bg-slate-900 text-white dark:bg-white dark:text-slate-900 hover:-translate-y-[1px] transition-transform"
-              >
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14m7-7H5" />
-                </svg>
-              </button>
-            </div>
+            <button
+              onClick={() => setSearchOpen(true)}
+              className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-200 transition-colors border border-transparent hover:border-slate-300 dark:hover:border-slate-500"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </button>
           </div>
         </div>
       </header>
 
       <main className="flex-1 overflow-auto p-6">
         <div className="max-w-7xl mx-auto space-y-6">
+          <div className="group bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm relative overflow-hidden">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="h-9 w-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-300">
+                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                    <path d="M8 3v3M16 3v3M4 11h16M5 20h14a1 1 0 001-1V7a1 1 0 00-1-1H5a1 1 0 00-1 1v12a1 1 0 001 1z" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Today</p>
+                  <h3 className="text-base font-semibold text-slate-900 dark:text-white">Scheduled</h3>
+                </div>
+              </div>
+              <Link
+                href="/calendar"
+                className="opacity-0 group-hover:opacity-100 transition-opacity text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1"
+              >
+                <span>Open</span>
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+              </Link>
+            </div>
+            {todayTasks.length === 0 ? (
+              <p className="text-sm text-slate-500 dark:text-slate-400">Nothing scheduled for today.</p>
+            ) : (
+              <div className="divide-y divide-slate-200 dark:divide-slate-800">
+                {todayTasks.map(task => {
+                  const area = lifeAreas.find(a => a.id === task.parentId);
+                  return (
+                    <button
+                      key={task.id}
+                      onClick={() => {
+                        navigateTo(task.parentId);
+                        selectTask(task.id);
+                      }}
+                      className="w-full text-left py-3 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 px-2 rounded-lg transition-colors"
+                    >
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium text-slate-900 dark:text-white">{task.title}</span>
+                        <span className="text-xs text-slate-500 dark:text-slate-400">{area ? area.title : 'Task'}</span>
+                      </div>
+                      <span className="text-xs text-slate-500 dark:text-slate-400">
+                        Due today
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
           <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
             <SortableContext items={lifeAreas.map(area => area.id)} strategy={rectSortingStrategy}>
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-x-4 gap-y-6">

@@ -48,6 +48,11 @@ export function TaskCard({ task, isDragging, accentColor }: TaskCardProps) {
 
   // Date logic
   const dateColorClass = task.dueDate ? getDateStatusColor(new Date(task.dueDate)) : '';
+  const dueDateObj = task.dueDate ? new Date(task.dueDate) : null;
+  const isOverdue = dueDateObj ? dueDateObj.getTime() < Date.now() && task.status !== 'COMPLETED' : false;
+  const dueLabel = dueDateObj
+    ? dueDateObj.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+    : '';
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -114,6 +119,7 @@ export function TaskCard({ task, isDragging, accentColor }: TaskCardProps) {
       ref={setNodeRef}
       style={style}
       {...attributes}
+      {...listeners}
       className={`
         group relative bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 
         p-2.5 shadow-sm hover:shadow-md transition-all cursor-pointer
@@ -121,18 +127,7 @@ export function TaskCard({ task, isDragging, accentColor }: TaskCardProps) {
       `}
       onClick={handleCardClick}
     >
-      {/* Drag handle */}
-      <div
-        {...listeners}
-        className="absolute top-1 right-1 flex items-center justify-center cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 hover:bg-slate-50 dark:hover:bg-slate-700 rounded p-0.5 transition-all z-10"
-      >
-        <svg className="w-4 h-4 text-slate-400 hover:text-slate-600" fill="currentColor" viewBox="0 0 20 20">
-          <path d="M7 2a2 2 0 11-4 0 2 2 0 014 0zM7 8a2 2 0 11-4 0 2 2 0 014 0zM7 14a2 2 0 11-4 0 2 2 0 014 0zM13 2a2 2 0 11-4 0 2 2 0 014 0zM13 8a2 2 0 11-4 0 2 2 0 014 0zM13 14a2 2 0 11-4 0 2 2 0 014 0z" />
-        </svg>
-      </div>
-
-      <div>
-        {/* Title & Edit */}
+      <div className="flex items-start justify-between gap-2">
         {isEditing ? (
           <input
             ref={inputRef}
@@ -150,7 +145,7 @@ export function TaskCard({ task, isDragging, accentColor }: TaskCardProps) {
             className="w-full text-sm font-medium bg-transparent border-b border-blue-500 outline-none p-0"
           />
         ) : (
-          <div className="flex items-start justify-between gap-2">
+          <>
             <h3
               className={`text-sm font-medium leading-snug ${task.status === 'COMPLETED' ? 'text-slate-400 line-through' : 'text-slate-800 dark:text-slate-200'}`}
               onDoubleClick={(e) => {
@@ -160,49 +155,63 @@ export function TaskCard({ task, isDragging, accentColor }: TaskCardProps) {
             >
               {task.title}
             </h3>
+            <div className="flex items-center gap-2">
+              <button
+                {...attributes}
+                {...listeners}
+                onClick={(e) => e.stopPropagation()}
+                className="h-7 w-7 rounded-md text-slate-400 bg-transparent grid place-items-center transition-all duration-150 cursor-grab active:cursor-grabbing opacity-50 group-hover:opacity-100 hover:bg-slate-100 dark:hover:bg-slate-800"
+                aria-label={`Reorder ${task.title}`}
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M7 2a2 2 0 11-4 0 2 2 0 014 0zM7 8a2 2 0 11-4 0 2 2 0 014 0zM7 14a2 2 0 11-4 0 2 2 0 014 0zM13 2a2 2 0 11-4 0 2 2 0 014 0zM13 8a2 2 0 11-4 0 2 2 0 014 0zM13 14a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowMenu(!showMenu);
+                }}
+                className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 transition-opacity"
+                aria-label="Task actions"
+              >
+                <svg className="w-3.5 h-3.5 text-slate-400" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z" />
+                </svg>
+              </button>
+            </div>
+          </>
+        )}
+      </div>
 
-            {/* Context Menu Trigger */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowMenu(!showMenu);
-              }}
-              className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 transition-opacity"
-            >
-              <svg className="w-3.5 h-3.5 text-slate-400" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z" />
-              </svg>
-            </button>
+      <div className="flex items-center gap-3 mt-2.5">
+        {task.status !== 'COMPLETED' && (
+          <div className="flex gap-0.5">
+            <div className={`w-1 h-3 rounded-full ${task.priority === 'HIGH' ? 'bg-red-400' : task.priority === 'MEDIUM' ? 'bg-amber-400' : 'bg-slate-300'}`} />
+            {task.priority === 'HIGH' && <div className="w-1 h-3 rounded-full bg-red-400" />}
           </div>
         )}
 
-        {/* Footer Meta */}
-        <div className="flex items-center gap-3 mt-2.5">
-          {/* Priority Indicator */}
-          {task.status !== 'COMPLETED' && (
-            <div className="flex gap-0.5">
-              <div className={`w-1 h-3 rounded-full ${task.priority === 'HIGH' ? 'bg-red-400' : task.priority === 'MEDIUM' ? 'bg-amber-400' : 'bg-slate-300'}`} />
-              {task.priority === 'HIGH' && <div className="w-1 h-3 rounded-full bg-red-400" />}
-            </div>
-          )}
+        {dueDateObj && task.status !== 'COMPLETED' && (
+          <span
+            className={`text-[11px] px-2 py-0.5 rounded-md border ${
+              isOverdue
+                ? 'text-red-400 border-red-400/40 bg-red-400/10'
+                : 'text-slate-400 border-slate-500/30 bg-slate-500/10'
+            }`}
+          >
+            Due {dueLabel}
+          </span>
+        )}
 
-          {/* Date Badge (minimal) */}
-          {task.dueDate && task.status !== 'COMPLETED' && (
-            <span className={`text-[10px] font-mono tracking-tighter ${dateColorClass.includes('text-red') ? 'text-red-500' : 'text-slate-400'}`}>
-              {formatCompactDate(new Date(task.dueDate))}
-            </span>
-          )}
-
-          {/* Subtask Count */}
-          {hasChildren && (
-            <span className="flex items-center gap-1 text-[10px] text-slate-400 font-mono">
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-              </svg>
-              {tasks.filter(t => t.parentId === task.id).length}
-            </span>
-          )}
-        </div>
+        {hasChildren && (
+          <span className="flex items-center gap-1 text-[10px] text-slate-400 font-mono">
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+            </svg>
+            {tasks.filter(t => t.parentId === task.id).length}
+          </span>
+        )}
       </div>
 
       {/* Popover Menu */}

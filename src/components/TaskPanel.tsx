@@ -31,6 +31,14 @@ export function TaskPanel() {
   }, [selectedTaskId, selectTask]);
 
   if (!task) return null;
+  const parseDateInput = (value: string) => {
+    const parts = value.split('-').map(Number);
+    if (parts.length === 3) {
+      const [y, m, d] = parts;
+      return new Date(y, m - 1, d, 12, 0, 0, 0); // local noon to avoid TZ rollover
+    }
+    return new Date(value);
+  };
 
   const handleDescriptionSave = async () => {
     if (description !== (task.description || '')) {
@@ -39,7 +47,7 @@ export function TaskPanel() {
   };
 
   const handleDueDateSave = async () => {
-    const newDate = dueDate ? new Date(dueDate) : undefined;
+    const newDate = dueDate ? parseDateInput(dueDate) : undefined;
     if (newDate?.toISOString() !== task.dueDate?.toISOString()) {
       await updateTask(task.id, { dueDate: newDate });
     }
