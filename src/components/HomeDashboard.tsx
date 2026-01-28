@@ -75,14 +75,40 @@ const LIFE_AREA_ICONS: Record<string, React.JSX.Element> = {
   ),
 };
 
-const AREA_TONES: Record<string, { bg: string; text: string }> = {
-  career: { bg: 'bg-blue-900/40', text: 'text-blue-200' },
-  health: { bg: 'bg-emerald-900/40', text: 'text-emerald-200' },
-  finances: { bg: 'bg-cyan-900/40', text: 'text-cyan-200' },
-  relationships: { bg: 'bg-rose-900/40', text: 'text-rose-200' },
-  growth: { bg: 'bg-indigo-900/40', text: 'text-indigo-200' },
-  recreation: { bg: 'bg-amber-900/40', text: 'text-amber-200' },
+const AREA_TONES: Record<string, { bg: string; text: string; accent: string }> = {
+  career: { bg: 'bg-blue-900/40', text: 'text-blue-200', accent: 'bg-blue-500' },
+  health: { bg: 'bg-emerald-900/40', text: 'text-emerald-200', accent: 'bg-emerald-500' },
+  finances: { bg: 'bg-cyan-900/40', text: 'text-cyan-200', accent: 'bg-cyan-500' },
+  relationships: { bg: 'bg-rose-900/40', text: 'text-rose-200', accent: 'bg-purple-500' },
+  growth: { bg: 'bg-indigo-900/40', text: 'text-indigo-200', accent: 'bg-indigo-500' },
+  recreation: { bg: 'bg-amber-900/40', text: 'text-amber-200', accent: 'bg-amber-500' },
 };
+
+const STATUS_RING = [
+  { status: 'NOT_STARTED' as TaskStatus, color: '#94a3b8' },
+  { status: 'IN_PROGRESS' as TaskStatus, color: '#38bdf8' },
+  { status: 'ON_HOLD' as TaskStatus, color: '#f59e0b' },
+  { status: 'COMPLETED' as TaskStatus, color: '#22c55e' },
+];
+
+function buildStatusRingSegments(
+  statusCounts: Record<TaskStatus, number>,
+  total: number,
+  circumference: number,
+  gapSize: number
+) {
+  if (!total) return [];
+
+  const segments = STATUS_RING.map(({ status, color }) => {
+    const count = statusCounts[status] || 0;
+    if (!count) return null;
+    const length = (count / total) * circumference;
+    const gap = Math.min(gapSize, length * 0.6);
+    return { color, length, gap };
+  }).filter(Boolean) as { color: string; length: number }[];
+
+  return segments;
+}
 
 function resolveAreaKey(id: string) {
   const key = id.toLowerCase();
@@ -137,7 +163,14 @@ function LifeAreaCard({
       <path d="M4 9h6V4H4v5zM14 9h6V4h-6v5zM4 20h6v-5H4v5zM14 20h6v-5h-6v5z" />
     </svg>
   );
-  const tone = AREA_TONES[toneKey] || { bg: 'bg-slate-800/70', text: 'text-slate-200' };
+  const tone = AREA_TONES[toneKey] || { bg: 'bg-slate-800/70', text: 'text-slate-200', accent: 'bg-slate-400' };
+  const ringSize = 84;
+  const ringTrackStroke = 10;
+  const ringSegmentStroke = 7;
+  const ringSegmentGap = 2.2;
+  const ringRadius = (ringSize - ringTrackStroke) / 2;
+  const ringCircumference = 2 * Math.PI * ringRadius;
+  const ringSegments = buildStatusRingSegments(statusCounts, total, ringCircumference, ringSegmentGap);
 
   return (
     <div
@@ -145,11 +178,12 @@ function LifeAreaCard({
       onClick={onOpen}
       {...(dragHandleProps?.attributes || {})}
       {...(dragHandleProps?.listeners || {})}
-      className={`group relative overflow-hidden flex flex-col gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 text-left shadow-sm transition-all ${
+      className={`group relative overflow-hidden flex flex-col gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 pb-12 text-left shadow-sm transition-all ${
         isDragging ? 'ring-2 ring-slate-300 dark:ring-slate-700 shadow-lg' : 'hover:shadow-md hover:-translate-y-0.5'
       } ${isActive ? 'border-slate-300 dark:border-slate-600 shadow-md' : ''} ${muted ? 'pointer-events-none' : 'cursor-pointer'}`}
       style={{ ...(style || {}), ['--tile-pad' as string]: '12px' }}
     >
+      <div className={`absolute left-0 top-0 bottom-0 w-1 rounded-l-2xl ${tone.accent}`} aria-hidden="true" />
       <div className="flex items-start gap-3 relative" style={{ paddingRight: 'calc(var(--tile-pad) + 32px + 12px)' }}>
         <div className="flex items-start gap-3">
           <div
@@ -191,26 +225,74 @@ function LifeAreaCard({
         )}
       </div>
 
-      <div className="py-1">
-        {Array.isArray(highlights) && highlights.length > 0 ? (
-          <div className="flex flex-col gap-1.5 text-sm text-slate-200 dark:text-slate-100 font-medium">
-            {highlights.map((item, idx) => (
-              <div key={idx} className="leading-snug truncate">{item}</div>
-            ))}
+      <div className="py-1 relative">
+        <div className="min-w-0 pr-24">
+          {Array.isArray(highlights) && highlights.length > 0 ? (
+            <div className="flex flex-col gap-1.5 text-sm text-slate-200 dark:text-slate-100 font-medium">
+              {highlights.map((item, idx) => (
+                <div key={idx} className="leading-snug truncate">{item}</div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-slate-500 dark:text-slate-400">No active focus.</p>
+          )}
+        </div>
+        <div className="absolute right-8 top-1/2 -translate-y-1/2">
+          <div className="relative" style={{ width: ringSize, height: ringSize }}>
+            <svg width={ringSize} height={ringSize} viewBox={`0 0 ${ringSize} ${ringSize}`} className="block">
+              <circle
+                cx={ringSize / 2}
+                cy={ringSize / 2}
+                r={ringRadius}
+                stroke="rgba(148,163,184,0.2)"
+                strokeWidth={ringTrackStroke}
+                fill="none"
+              />
+              {(() => {
+                let offset = 0;
+                const hasGaps = ringSegments.length > 1;
+                return ringSegments.map((segment, index) => {
+                  const visibleLength = hasGaps ? Math.max(segment.length - segment.gap, 0) : segment.length;
+                  const dashArray = `${visibleLength} ${ringCircumference - visibleLength}`;
+                  const dashOffset = ringCircumference - offset;
+                  offset += segment.length;
+                  return (
+                    <circle
+                      key={`${segment.color}-${index}`}
+                      cx={ringSize / 2}
+                      cy={ringSize / 2}
+                      r={ringRadius}
+                      stroke={segment.color}
+                      strokeWidth={ringSegmentStroke}
+                      strokeLinecap="round"
+                      strokeDasharray={dashArray}
+                      strokeDashoffset={dashOffset}
+                      fill="none"
+                      transform={`rotate(-90 ${ringSize / 2} ${ringSize / 2})`}
+                    />
+                  );
+                });
+              })()}
+            </svg>
+            <div className="absolute inset-[12px] rounded-full bg-slate-900/90 dark:bg-slate-900 flex items-center justify-center text-[14px] font-semibold text-white">
+              {total}
+            </div>
           </div>
-        ) : (
-          <p className="text-sm text-slate-500 dark:text-slate-400">No active focus.</p>
-        )}
+        </div>
       </div>
 
-      <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mt-1">
-        <span className="font-medium text-slate-700 dark:text-slate-200">
-          {Math.max(0, total - (statusCounts['COMPLETED'] || 0))} active
-        </span>
-        <span className="text-slate-500 dark:text-slate-400">
-          {(statusCounts['COMPLETED'] || 0)} completed
-        </span>
-      </div>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onOpen();
+        }}
+        className="absolute bottom-[var(--tile-pad)] right-[var(--tile-pad)] inline-flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400 opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 transition-all"
+      >
+        <span>Open</span>
+        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+        </svg>
+      </button>
     </div>
   );
 }
@@ -321,11 +403,26 @@ export function HomeDashboard() {
 
   const todayTasks = useMemo(() => {
     const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const tomorrowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
     return tasks
       .filter(t => t.dueDate && t.status !== 'COMPLETED')
       .filter(t => {
         const d = new Date(t.dueDate!);
-        return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+        return d >= todayStart && d < tomorrowStart;
+      })
+      .sort((a, b) => (a.dueDate?.getTime() || 0) - (b.dueDate?.getTime() || 0));
+  }, [tasks]);
+
+  const upcomingTasks = useMemo(() => {
+    const now = new Date();
+    const tomorrowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    const windowEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 8);
+    return tasks
+      .filter(t => t.dueDate && t.status !== 'COMPLETED')
+      .filter(t => {
+        const d = new Date(t.dueDate!);
+        return d >= tomorrowStart && d < windowEnd;
       })
       .sort((a, b) => (a.dueDate?.getTime() || 0) - (b.dueDate?.getTime() || 0));
   }, [tasks]);
@@ -429,56 +526,109 @@ export function HomeDashboard() {
 
       <main className="flex-1 overflow-auto p-6">
         <div className="max-w-7xl mx-auto space-y-6">
-          <div className="group bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm relative overflow-hidden">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-300">
-                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                    <path d="M8 3v3M16 3v3M4 11h16M5 20h14a1 1 0 001-1V7a1 1 0 00-1-1H5a1 1 0 00-1 1v12a1 1 0 001 1z" />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="group bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm relative overflow-hidden">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-9 w-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-300">
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                      <path d="M8 3v3M16 3v3M4 11h16M5 20h14a1 1 0 001-1V7a1 1 0 00-1-1H5a1 1 0 00-1 1v12a1 1 0 001 1z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Today</p>
+                  </div>
+                </div>
+                <Link
+                  href="/calendar"
+                  className="opacity-0 group-hover:opacity-100 transition-opacity text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1"
+                >
+                  <span>Open</span>
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                   </svg>
-                </div>
-                <div>
-                  <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Today</p>
-                  <h3 className="text-base font-semibold text-slate-900 dark:text-white">Scheduled</h3>
-                </div>
+                </Link>
               </div>
-              <Link
-                href="/calendar"
-                className="opacity-0 group-hover:opacity-100 transition-opacity text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1"
-              >
-                <span>Open</span>
-                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                </svg>
-              </Link>
+              {todayTasks.length === 0 ? (
+                <p className="text-sm text-slate-500 dark:text-slate-400">Nothing scheduled for today.</p>
+              ) : (
+                <div className="divide-y divide-slate-200 dark:divide-slate-800">
+                  {todayTasks.map(task => {
+                    const area = lifeAreas.find(a => a.id === task.parentId);
+                    return (
+                      <button
+                        key={task.id}
+                        onClick={() => {
+                          navigateTo(task.parentId);
+                          selectTask(task.id);
+                        }}
+                        className="w-full text-left py-3 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 px-2 rounded-lg transition-colors"
+                      >
+                        <div className="flex flex-col">
+                          <span className="text-sm font-medium text-slate-900 dark:text-white">{task.title}</span>
+                        </div>
+                        <span className="text-xs text-slate-500 dark:text-slate-400">
+                          Due today
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-            {todayTasks.length === 0 ? (
-              <p className="text-sm text-slate-500 dark:text-slate-400">Nothing scheduled for today.</p>
-            ) : (
-              <div className="divide-y divide-slate-200 dark:divide-slate-800">
-                {todayTasks.map(task => {
-                  const area = lifeAreas.find(a => a.id === task.parentId);
-                  return (
-                    <button
-                      key={task.id}
-                      onClick={() => {
-                        navigateTo(task.parentId);
-                        selectTask(task.id);
-                      }}
-                      className="w-full text-left py-3 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 px-2 rounded-lg transition-colors"
-                    >
-                      <div className="flex flex-col">
-                        <span className="text-sm font-medium text-slate-900 dark:text-white">{task.title}</span>
-                        <span className="text-xs text-slate-500 dark:text-slate-400">{area ? area.title : 'Task'}</span>
-                      </div>
-                      <span className="text-xs text-slate-500 dark:text-slate-400">
-                        Due today
-                      </span>
-                    </button>
-                  );
-                })}
+
+            <div className="group bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm relative overflow-hidden">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-9 w-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-300">
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                      <path d="M12 8v4l3 2M5 3v3M19 3v3M4 11h16M5 20h14a1 1 0 001-1V7a1 1 0 00-1-1H5a1 1 0 00-1 1v12a1 1 0 001 1z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Upcoming</p>
+                  </div>
+                </div>
+                <Link
+                  href="/calendar"
+                  className="opacity-0 group-hover:opacity-100 transition-opacity text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1"
+                >
+                  <span>Open</span>
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                </Link>
               </div>
-            )}
+              {upcomingTasks.length === 0 ? (
+                <p className="text-sm text-slate-500 dark:text-slate-400">No upcoming tasks in the next week.</p>
+              ) : (
+                <div className="divide-y divide-slate-200 dark:divide-slate-800">
+                  {upcomingTasks.map(task => {
+                    const area = lifeAreas.find(a => a.id === task.parentId);
+                    const dueLabel = task.dueDate
+                      ? new Date(task.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+                      : '';
+                    return (
+                      <button
+                        key={task.id}
+                        onClick={() => {
+                          navigateTo(task.parentId);
+                          selectTask(task.id);
+                        }}
+                        className="w-full text-left py-3 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 px-2 rounded-lg transition-colors"
+                      >
+                        <div className="flex flex-col">
+                          <span className="text-sm font-medium text-slate-900 dark:text-white">{task.title}</span>
+                        </div>
+                        <span className="text-xs text-slate-500 dark:text-slate-400">
+                          {dueLabel ? `Due ${dueLabel}` : 'Upcoming'}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
           <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
             <SortableContext items={lifeAreas.map(area => area.id)} strategy={rectSortingStrategy}>

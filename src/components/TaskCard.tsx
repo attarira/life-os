@@ -157,17 +157,6 @@ export function TaskCard({ task, isDragging, accentColor }: TaskCardProps) {
             </h3>
             <div className="flex items-center gap-2">
               <button
-                {...attributes}
-                {...listeners}
-                onClick={(e) => e.stopPropagation()}
-                className="h-7 w-7 rounded-md text-slate-400 bg-transparent grid place-items-center transition-all duration-150 cursor-grab active:cursor-grabbing opacity-50 group-hover:opacity-100 hover:bg-slate-100 dark:hover:bg-slate-800"
-                aria-label={`Reorder ${task.title}`}
-              >
-                <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M7 2a2 2 0 11-4 0 2 2 0 014 0zM7 8a2 2 0 11-4 0 2 2 0 014 0zM7 14a2 2 0 11-4 0 2 2 0 014 0zM13 2a2 2 0 11-4 0 2 2 0 014 0zM13 8a2 2 0 11-4 0 2 2 0 014 0zM13 14a2 2 0 11-4 0 2 2 0 014 0z" />
-                </svg>
-              </button>
-              <button
                 onClick={(e) => {
                   e.stopPropagation();
                   setShowMenu(!showMenu);
