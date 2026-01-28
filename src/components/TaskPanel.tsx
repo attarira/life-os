@@ -8,6 +8,7 @@ export function TaskPanel() {
   const { tasks, selectedTaskId, selectTask, updateTask, deleteTask, createTask, navigateTo } = useTaskContext();
   const [description, setDescription] = useState('');
   const [dueDate, setDueDate] = useState('');
+  const [scheduledDate, setScheduledDate] = useState('');
   const panelRef = useRef<HTMLDivElement>(null);
 
   const task = selectedTaskId ? tasks.find(t => t.id === selectedTaskId) : null;
@@ -16,6 +17,7 @@ export function TaskPanel() {
     if (task) {
       setDescription(task.description || '');
       setDueDate(task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : '');
+      setScheduledDate(task.scheduledDate ? new Date(task.scheduledDate).toISOString().split('T')[0] : '');
     }
   }, [task]);
 
@@ -53,6 +55,13 @@ export function TaskPanel() {
     }
   };
 
+  const handleScheduledDateSave = async () => {
+    const newDate = scheduledDate ? parseDateInput(scheduledDate) : undefined;
+    if (newDate?.toISOString() !== task.scheduledDate?.toISOString()) {
+      await updateTask(task.id, { scheduledDate: newDate });
+    }
+  };
+
   const handleAddSubtask = async () => {
     await createTask({
       parentId: task.id,
@@ -77,19 +86,19 @@ export function TaskPanel() {
 
   return (
     <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/20 z-40"
-        onClick={() => selectTask(null)}
-      />
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
+        <div
+          className="absolute inset-0 bg-black/30"
+          onClick={() => selectTask(null)}
+        />
 
-      {/* Panel */}
-      <div
-        ref={panelRef}
-        className="fixed right-0 top-0 bottom-0 w-full max-w-md bg-white dark:bg-slate-800 shadow-xl z-50 flex flex-col"
-      >
+        <div
+          ref={panelRef}
+          className="relative w-full max-w-2xl bg-white dark:bg-slate-800 shadow-2xl rounded-2xl border border-slate-200 dark:border-slate-700 flex flex-col max-h-[90vh]"
+          onClick={(e) => e.stopPropagation()}
+        >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">
+        <div className="flex items-center justify-between p-5 border-b border-slate-200 dark:border-slate-700">
           <h2 className="text-lg font-semibold text-slate-900 dark:text-white truncate">
             {task.title}
           </h2>
@@ -104,7 +113,7 @@ export function TaskPanel() {
         </div>
 
         {/* Content */}
-        <div className="flex-1 p-4 space-y-6 overflow-y-auto">
+        <div className="flex-1 p-5 space-y-6 overflow-y-auto">
           {/* Status */}
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
@@ -137,18 +146,56 @@ export function TaskPanel() {
             />
           </div>
 
-          {/* Due Date */}
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Due Date
-            </label>
-            <input
-              type="date"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-              onBlur={handleDueDateSave}
-              className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
-            />
+          {/* Dates */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                Scheduled Date
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  value={scheduledDate}
+                  onChange={(e) => setScheduledDate(e.target.value)}
+                  onBlur={handleScheduledDateSave}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setScheduledDate('');
+                    updateTask(task.id, { scheduledDate: undefined });
+                  }}
+                  className="px-3 py-2 text-xs font-semibold text-slate-500 hover:text-slate-700 border border-slate-300/70 rounded-lg hover:border-slate-400 dark:text-slate-300 dark:hover:text-white"
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                Due Date
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
+                  onBlur={handleDueDateSave}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDueDate('');
+                    updateTask(task.id, { dueDate: undefined });
+                  }}
+                  className="px-3 py-2 text-xs font-semibold text-slate-500 hover:text-slate-700 border border-slate-300/70 rounded-lg hover:border-slate-400 dark:text-slate-300 dark:hover:text-white"
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Actions */}
@@ -178,7 +225,7 @@ export function TaskPanel() {
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-slate-200 dark:border-slate-700">
+        <div className="p-5 border-t border-slate-200 dark:border-slate-700">
           <button
             onClick={handleDelete}
             className="w-full px-4 py-2 text-sm font-medium text-red-600 bg-red-50 dark:bg-red-900/20 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors flex items-center justify-center gap-2"
@@ -188,6 +235,7 @@ export function TaskPanel() {
             </svg>
             Delete Task
           </button>
+        </div>
         </div>
       </div>
     </>

@@ -25,6 +25,85 @@ body {
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
 
+/* FullCalendar theming */
+.calendar-shell .fc {
+  --fc-page-bg-color: #ffffff;
+  --fc-border-color: #e2e8f0;
+  --fc-neutral-bg-color: #f8fafc;
+  --fc-today-bg-color: rgba(56, 189, 248, 0.1);
+  --fc-button-bg-color: #0f172a;
+  --fc-button-border-color: #0f172a;
+  --fc-button-hover-bg-color: #1f2937;
+  --fc-button-hover-border-color: #1f2937;
+  --fc-button-active-bg-color: #0f172a;
+  --fc-button-active-border-color: #0f172a;
+  --fc-event-bg-color: transparent;
+  --fc-event-border-color: transparent;
+  --fc-event-text-color: inherit;
+}
+
+.calendar-shell .fc .fc-task-event {
+  background: rgba(15, 23, 42, 0.04);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  color: #0f172a;
+  border-radius: 8px;
+  padding: 2px 4px;
+}
+
+.calendar-shell .fc .fc-task-event.fc-task-event--scheduled {
+  background: rgba(100, 116, 139, 0.12);
+  border-color: rgba(100, 116, 139, 0.2);
+}
+
+.calendar-shell .fc .fc-task-event.fc-task-event--due {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.25);
+}
+
+.calendar-shell .fc .fc-task-event.fc-task-event--both {
+  background: rgba(99, 102, 241, 0.12);
+  border-color: rgba(99, 102, 241, 0.25);
+}
+
+@media (prefers-color-scheme: dark) {
+  .calendar-shell .fc {
+    --fc-page-bg-color: #0f172a;
+    --fc-border-color: #1f2937;
+    --fc-neutral-bg-color: #111827;
+    --fc-today-bg-color: rgba(56, 189, 248, 0.16);
+    --fc-button-bg-color: #f8fafc;
+    --fc-button-border-color: #f8fafc;
+    --fc-button-hover-bg-color: #e2e8f0;
+    --fc-button-hover-border-color: #e2e8f0;
+    --fc-button-active-bg-color: #cbd5f5;
+    --fc-button-active-border-color: #cbd5f5;
+    --fc-event-bg-color: transparent;
+    --fc-event-border-color: transparent;
+    --fc-event-text-color: inherit;
+  }
+
+  .calendar-shell .fc .fc-task-event {
+    background: rgba(148, 163, 184, 0.12);
+    border-color: rgba(148, 163, 184, 0.2);
+    color: #e2e8f0;
+  }
+
+  .calendar-shell .fc .fc-task-event.fc-task-event--scheduled {
+    background: rgba(148, 163, 184, 0.18);
+    border-color: rgba(148, 163, 184, 0.3);
+  }
+
+  .calendar-shell .fc .fc-task-event.fc-task-event--due {
+    background: rgba(251, 191, 36, 0.16);
+    border-color: rgba(251, 191, 36, 0.35);
+  }
+
+  .calendar-shell .fc .fc-task-event.fc-task-event--both {
+    background: rgba(129, 140, 248, 0.2);
+    border-color: rgba(129, 140, 248, 0.35);
+  }
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 8px;

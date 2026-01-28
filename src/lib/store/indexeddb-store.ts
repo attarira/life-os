@@ -52,6 +52,8 @@ function serializeTask(task: Task): Task {
       task.completedAt ? new Date(task.completedAt) : undefined,
     dueDate: task.dueDate instanceof Date ? task.dueDate :
       task.dueDate ? new Date(task.dueDate) : undefined,
+    scheduledDate: task.scheduledDate instanceof Date ? task.scheduledDate :
+      task.scheduledDate ? new Date(task.scheduledDate) : undefined,
   };
 }
 
@@ -63,6 +65,7 @@ function deserializeTask(task: Task): Task {
     updatedAt: new Date(task.updatedAt),
     completedAt: task.completedAt ? new Date(task.completedAt) : undefined,
     dueDate: task.dueDate ? new Date(task.dueDate) : undefined,
+    scheduledDate: task.scheduledDate ? new Date(task.scheduledDate) : undefined,
   };
 }
 

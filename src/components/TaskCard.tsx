@@ -53,6 +53,7 @@ export function TaskCard({ task, isDragging, accentColor }: TaskCardProps) {
   const dueLabel = dueDateObj
     ? dueDateObj.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
     : '';
+  const isOngoing = !dueDateObj && task.status !== 'COMPLETED';
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -190,6 +191,12 @@ export function TaskCard({ task, isDragging, accentColor }: TaskCardProps) {
             }`}
           >
             Due {dueLabel}
+          </span>
+        )}
+
+        {isOngoing && (
+          <span className="text-[11px] px-2 py-0.5 rounded-md border text-slate-400 border-slate-500/30 bg-slate-500/10">
+            Ongoing
           </span>
         )}
 

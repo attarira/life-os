@@ -49,7 +49,6 @@ const LIFE_AREA_ICONS: Record<string, React.JSX.Element> = {
     <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <circle cx="12" cy="12" r="8" />
       <path d="M12 7v10" />
-      <path d="M10 10.5h3c1.5 0 1.8 1.8.2 2.3L11 13.6c-1.7.5-1.3 2.9.6 2.9h2.4" />
     </svg>
   ),
   relationships: (
@@ -76,19 +75,19 @@ const LIFE_AREA_ICONS: Record<string, React.JSX.Element> = {
 };
 
 const AREA_TONES: Record<string, { bg: string; text: string; accent: string }> = {
-  career: { bg: 'bg-blue-900/40', text: 'text-blue-200', accent: 'bg-blue-500' },
-  health: { bg: 'bg-emerald-900/40', text: 'text-emerald-200', accent: 'bg-emerald-500' },
-  finances: { bg: 'bg-cyan-900/40', text: 'text-cyan-200', accent: 'bg-cyan-500' },
-  relationships: { bg: 'bg-rose-900/40', text: 'text-rose-200', accent: 'bg-purple-500' },
-  growth: { bg: 'bg-indigo-900/40', text: 'text-indigo-200', accent: 'bg-indigo-500' },
-  recreation: { bg: 'bg-amber-900/40', text: 'text-amber-200', accent: 'bg-amber-500' },
+  career: { bg: 'bg-blue-900/40', text: 'text-blue-200', accent: 'bg-blue-500/85' },
+  health: { bg: 'bg-emerald-900/40', text: 'text-emerald-200', accent: 'bg-emerald-500/85' },
+  finances: { bg: 'bg-cyan-900/40', text: 'text-cyan-200', accent: 'bg-cyan-500/85' },
+  relationships: { bg: 'bg-rose-900/40', text: 'text-rose-200', accent: 'bg-purple-500/85' },
+  growth: { bg: 'bg-indigo-900/40', text: 'text-indigo-200', accent: 'bg-indigo-500/85' },
+  recreation: { bg: 'bg-amber-900/40', text: 'text-amber-200', accent: 'bg-amber-500/70' },
 };
 
 const STATUS_RING = [
-  { status: 'NOT_STARTED' as TaskStatus, color: '#94a3b8' },
-  { status: 'IN_PROGRESS' as TaskStatus, color: '#38bdf8' },
-  { status: 'ON_HOLD' as TaskStatus, color: '#f59e0b' },
-  { status: 'COMPLETED' as TaskStatus, color: '#22c55e' },
+  { status: 'NOT_STARTED' as TaskStatus, color: 'rgba(148,163,184,0.75)' },
+  { status: 'IN_PROGRESS' as TaskStatus, color: 'rgba(56,189,248,0.75)' },
+  { status: 'ON_HOLD' as TaskStatus, color: 'rgba(245,158,11,0.75)' },
+  { status: 'COMPLETED' as TaskStatus, color: 'rgba(34,197,94,0.75)' },
 ];
 
 function buildStatusRingSegments(
