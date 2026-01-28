@@ -1,6 +1,6 @@
-# Kanban Board with Nested Task Hierarchy
+# LifeOS
 
-A local-first, single-user Kanban TODO board with unlimited task nesting, drag-and-drop, and automatic archiving of old completed tasks.
+A local-first life management app with life areas, nested tasks, kanban workflow, and a calendar for scheduled work vs due dates.
 
 ## Quick Start
 
@@ -13,13 +13,18 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## Features
 
+- **Life Areas Dashboard**: High-level cards (Career, Health, Finances, etc.) with status rings, highlights, and quick navigation.
 - **Nested Tasks**: Unlimited hierarchy depth. Click a task to drill down into its subtasks.
-- **Breadcrumb Navigation**: Always see your path from Root and click to navigate up.
-- **Drag & Drop**: Reorder tasks within columns and move between status columns.
+- **Kanban Workflow**: Status columns with drag-and-drop ordering and movement.
+- **Scheduled vs Due Dates**:
+  - `scheduledDate` = when you plan to work on it (calendar)
+  - `dueDate` = deadline (shown on task cards)
+  - If no due date, tasks show **Ongoing**
+- **Calendar View**: Month/week/day calendar with scheduled and due tags, click events to open tasks (`/calendar`).
+- **Task Details Modal**: Centered popup to edit status, description, scheduled date, due date, and actions.
 - **Auto-hide Completed**: Tasks completed more than 7 days ago are hidden (not deleted).
 - **Completed Archive**: View all archived completed tasks in a searchable modal.
 - **Global Search**: Press `/` to search all tasks by title/description.
-- **Quick Add**: Top input bar for fast task creation.
 - **Import/Export**: Backup and restore your data as JSON.
 
 ## Data Model
@@ -31,11 +36,13 @@ interface Task {
   title: string;        // Required
   description?: string;
   status: "NOT_STARTED" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED";
+  priority: "LOW" | "MEDIUM" | "HIGH";
   order: number;        // For sorting within column
   createdAt: Date;
   updatedAt: Date;
   completedAt?: Date;   // Set when status becomes COMPLETED
-  dueDate?: Date;
+  dueDate?: Date;       // Deadline
+  scheduledDate?: Date; // Planned work date (calendar)
   tags?: string[];
 }
 ```
@@ -48,9 +55,10 @@ interface Task {
 ```
 src/
 ├── app/
-│   ├── page.tsx          # Main app entry
-│   ├── layout.tsx        # Root layout
-│   └── globals.css       # Tailwind + custom styles
+│   ├── page.tsx            # Main app entry
+│   ├── calendar/page.tsx   # Calendar view (FullCalendar)
+│   ├── layout.tsx          # Root layout
+│   └── globals.css         # Tailwind + custom styles
 ├── lib/
 │   ├── types.ts          # Task types and constants
 │   ├── task-context.tsx  # React context for state
@@ -62,14 +70,15 @@ src/
 │       ├── tree-utils.ts  # Path, cycle prevention, subtree helpers
 │       └── seed-data.ts   # Initial seed data
 └── components/
-    ├── Board.tsx          # Main board with DnD
-    ├── Column.tsx         # Status column
-    ├── TaskCard.tsx       # Draggable task card
-    ├── Breadcrumb.tsx     # Navigation breadcrumb
-    ├── TaskPanel.tsx      # Task detail side panel
-    ├── SearchModal.tsx    # Global search
+    ├── Board.tsx            # App router (dashboard vs kanban)
+    ├── HomeDashboard.tsx    # Life areas dashboard
+    ├── KanbanBoard.tsx      # Kanban view for a life area
+    ├── Column.tsx           # Status column
+    ├── TaskCard.tsx         # Draggable task card
+    ├── TaskPanel.tsx        # Task detail modal
+    ├── SearchModal.tsx      # Global search
     ├── CompletedArchive.tsx # Archived tasks modal
-    └── ImportExport.tsx   # Backup/restore buttons
+    └── ImportExport.tsx     # Backup/restore buttons
 ```
 
 ## 7-Day Completed Auto-Hide Logic
@@ -117,3 +126,4 @@ export function isCompletedOlderThan(task: Task, days: number): boolean {
 - **Styling**: Tailwind CSS
 - **Persistence**: IndexedDB via `idb`
 - **Drag & Drop**: @dnd-kit
+- **Calendar**: FullCalendar (day/week/month views)
