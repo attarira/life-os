@@ -17,6 +17,7 @@ export interface Task {
   order: number;
   dueDate?: Date;
   scheduledDate?: Date;
+  calendarOnly?: boolean;
   tags?: string[];
 }
 

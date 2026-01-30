@@ -1,15 +1,20 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTaskContext } from '@/lib/task-context';
 import { Task } from '@/lib/types';
 
 export function TaskPanel() {
-  const { tasks, selectedTaskId, selectTask, updateTask, deleteTask, createTask, navigateTo } = useTaskContext();
+  const { tasks, selectedTaskId, selectTask, updateTask, deleteTask, createTask } = useTaskContext();
   const [description, setDescription] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [scheduledDate, setScheduledDate] = useState('');
+  const [editTitle, setEditTitle] = useState('');
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [subtasksOpen, setSubtasksOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
+  const titleInputRef = useRef<HTMLInputElement>(null);
+  const descriptionRef = useRef<HTMLTextAreaElement>(null);
 
   const task = selectedTaskId ? tasks.find(t => t.id === selectedTaskId) : null;
 
@@ -18,8 +23,24 @@ export function TaskPanel() {
       setDescription(task.description || '');
       setDueDate(task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : '');
       setScheduledDate(task.scheduledDate ? new Date(task.scheduledDate).toISOString().split('T')[0] : '');
+      setEditTitle(task.title || '');
+      setIsEditingTitle(false);
+      setSubtasksOpen(false);
     }
   }, [task]);
+
+  useEffect(() => {
+    if (isEditingTitle && titleInputRef.current) {
+      titleInputRef.current.focus();
+      titleInputRef.current.select();
+    }
+  }, [isEditingTitle]);
+
+  useEffect(() => {
+    if (!descriptionRef.current) return;
+    descriptionRef.current.style.height = 'auto';
+    descriptionRef.current.style.height = `${descriptionRef.current.scrollHeight}px`;
+  }, [description]);
 
   // Close on Escape
   useEffect(() => {
@@ -32,7 +53,17 @@ export function TaskPanel() {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [selectedTaskId, selectTask]);
 
+  const taskId = task?.id ?? null;
+  const subtasks = useMemo(
+    () => {
+      if (!taskId) return [];
+      return tasks.filter(t => t.parentId === taskId).sort((a, b) => a.order - b.order);
+    },
+    [tasks, taskId]
+  );
+
   if (!task) return null;
+
   const parseDateInput = (value: string) => {
     const parts = value.split('-').map(Number);
     if (parts.length === 3) {
@@ -46,6 +77,19 @@ export function TaskPanel() {
     if (description !== (task.description || '')) {
       await updateTask(task.id, { description: description || undefined });
     }
+  };
+
+  const handleTitleSave = async () => {
+    const trimmed = editTitle.trim();
+    if (!trimmed) {
+      setEditTitle(task.title || '');
+      setIsEditingTitle(false);
+      return;
+    }
+    if (trimmed !== task.title) {
+      await updateTask(task.id, { title: trimmed });
+    }
+    setIsEditingTitle(false);
   };
 
   const handleDueDateSave = async () => {
@@ -69,8 +113,12 @@ export function TaskPanel() {
       status: 'NOT_STARTED',
       priority: 'MEDIUM',
     });
-    navigateTo(task.id);
-    selectTask(null);
+    setSubtasksOpen(true);
+  };
+
+  const handleToggleSubtask = async (subtask: Task) => {
+    const nextStatus = subtask.status === 'COMPLETED' ? 'NOT_STARTED' : 'COMPLETED';
+    await updateTask(subtask.id, { status: nextStatus });
   };
 
   const handleDelete = async () => {
@@ -85,159 +133,269 @@ export function TaskPanel() {
   };
 
   return (
-    <>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
-        <div
-          className="absolute inset-0 bg-black/30"
-          onClick={() => selectTask(null)}
-        />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
+      <div
+        className="absolute inset-0 bg-black/40"
+        onClick={() => selectTask(null)}
+      />
 
-        <div
-          ref={panelRef}
-          className="relative w-full max-w-2xl bg-white dark:bg-slate-800 shadow-2xl rounded-2xl border border-slate-200 dark:border-slate-700 flex flex-col max-h-[90vh]"
-          onClick={(e) => e.stopPropagation()}
-        >
-        {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-slate-200 dark:border-slate-700">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-white truncate">
-            {task.title}
-          </h2>
-          <button
-            onClick={() => selectTask(null)}
-            className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+      <div
+        ref={panelRef}
+        className="relative w-full max-w-2xl bg-slate-900 text-slate-100 shadow-2xl rounded-2xl border border-slate-800/80 flex flex-col max-h-[90vh]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="px-5 pt-4 pb-2">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex-1">
+              {isEditingTitle ? (
+                <input
+                  ref={titleInputRef}
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  onBlur={handleTitleSave}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleTitleSave();
+                    if (e.key === 'Escape') {
+                      setEditTitle(task.title || '');
+                      setIsEditingTitle(false);
+                    }
+                  }}
+                  className="w-full bg-transparent text-lg font-semibold text-slate-100 border-b border-slate-700/60 focus:outline-none focus:border-slate-500/70"
+                />
+              ) : (
+                <h2
+                  className="text-lg font-semibold text-slate-100 truncate cursor-text"
+                  onClick={() => setIsEditingTitle(true)}
+                >
+                  {task.title}
+                </h2>
+              )}
+            </div>
+            <button
+              onClick={() => selectTask(null)}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/70 transition-colors"
+              aria-label="Close"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 p-5 space-y-6 overflow-y-auto">
-          {/* Status */}
+        <div className="flex-1 px-5 pb-4 space-y-5 overflow-y-auto">
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Status
-            </label>
-            <select
-              value={task.status}
-              onChange={(e) => updateTask(task.id, { status: e.target.value as Task['status'] })}
-              className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
-            >
-              <option value="NOT_STARTED">Not Started</option>
-              <option value="IN_PROGRESS">In Progress</option>
-              <option value="ON_HOLD">On Hold</option>
-              <option value="COMPLETED">Completed</option>
-            </select>
-          </div>
-
-          {/* Description */}
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Description
-            </label>
             <textarea
+              ref={descriptionRef}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               onBlur={handleDescriptionSave}
-              rows={4}
-              className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white resize-none"
-              placeholder="Add a description..."
+              onInput={(e) => {
+                const target = e.currentTarget;
+                target.style.height = 'auto';
+                target.style.height = `${target.scrollHeight}px`;
+              }}
+              rows={3}
+              className="w-full bg-slate-800/50 text-slate-100 rounded-xl px-3 py-2 text-sm leading-relaxed placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-600"
+              placeholder="What's this task about?"
             />
           </div>
 
-          {/* Dates */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                Scheduled Date
-              </label>
-              <div className="flex items-center gap-2">
+              <div className="text-[11px] uppercase tracking-[0.14em] text-slate-400 mb-2">Status</div>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { value: 'NOT_STARTED', label: 'Not Started' },
+                  { value: 'IN_PROGRESS', label: 'In Progress' },
+                  { value: 'ON_HOLD', label: 'On Hold' },
+                  { value: 'COMPLETED', label: 'Done' },
+                ].map((option) => {
+                  const isActive = task.status === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => updateTask(task.id, { status: option.value as Task['status'] })}
+                      className={`px-3 py-1 rounded-full text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500/70 ${
+                        isActive
+                          ? 'bg-slate-700/70 text-white ring-1 ring-slate-500/60'
+                          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/70'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div>
+              <div className="text-[11px] uppercase tracking-[0.14em] text-slate-400 mb-2">Priority</div>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { value: 'LOW', label: 'Low' },
+                  { value: 'MEDIUM', label: 'Medium' },
+                  { value: 'HIGH', label: 'High' },
+                ].map((option) => {
+                  const isActive = task.priority === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => updateTask(task.id, { priority: option.value as Task['priority'] })}
+                      className={`px-3 py-1 rounded-full text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500/70 ${
+                        isActive
+                          ? 'bg-slate-700/70 text-white ring-1 ring-slate-500/60'
+                          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/70'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div className="text-[11px] uppercase tracking-[0.14em] text-slate-400 mb-2">Dates</div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 3v3M16 3v3M4 11h16M5 20h14a1 1 0 001-1V7a1 1 0 00-1-1H5a1 1 0 00-1 1v12a1 1 0 001 1z" />
+                  </svg>
+                </span>
+                {!scheduledDate && (
+                  <span className="absolute left-9 top-1/2 -translate-y-1/2 text-xs text-slate-500 pointer-events-none">
+                    Start
+                  </span>
+                )}
                 <input
                   type="date"
                   value={scheduledDate}
                   onChange={(e) => setScheduledDate(e.target.value)}
                   onBlur={handleScheduledDateSave}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+                  className={`w-full rounded-xl bg-slate-800/50 px-9 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-slate-600 ${
+                    scheduledDate ? 'text-slate-100' : 'text-transparent'
+                  }`}
+                  aria-label="Scheduled date"
                 />
-                <button
-                  type="button"
-                  onClick={() => {
-                    setScheduledDate('');
-                    updateTask(task.id, { scheduledDate: undefined });
-                  }}
-                  className="px-3 py-2 text-xs font-semibold text-slate-500 hover:text-slate-700 border border-slate-300/70 rounded-lg hover:border-slate-400 dark:text-slate-300 dark:hover:text-white"
-                >
-                  Clear
-                </button>
+                {scheduledDate && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setScheduledDate('');
+                      updateTask(task.id, { scheduledDate: undefined });
+                    }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+                    aria-label="Clear scheduled date"
+                  >
+                    ×
+                  </button>
+                )}
               </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                Due Date
-              </label>
-              <div className="flex items-center gap-2">
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 3v3M16 3v3M4 11h16M5 20h14a1 1 0 001-1V7a1 1 0 00-1-1H5a1 1 0 00-1 1v12a1 1 0 001 1z" />
+                  </svg>
+                </span>
+                {!dueDate && (
+                  <span className="absolute left-9 top-1/2 -translate-y-1/2 text-xs text-slate-500 pointer-events-none">
+                    Due
+                  </span>
+                )}
                 <input
                   type="date"
                   value={dueDate}
                   onChange={(e) => setDueDate(e.target.value)}
                   onBlur={handleDueDateSave}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+                  className={`w-full rounded-xl bg-slate-800/50 px-9 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-slate-600 ${
+                    dueDate ? 'text-slate-100' : 'text-transparent'
+                  }`}
+                  aria-label="Due date"
                 />
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDueDate('');
-                    updateTask(task.id, { dueDate: undefined });
-                  }}
-                  className="px-3 py-2 text-xs font-semibold text-slate-500 hover:text-slate-700 border border-slate-300/70 rounded-lg hover:border-slate-400 dark:text-slate-300 dark:hover:text-white"
-                >
-                  Clear
-                </button>
+                {dueDate && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDueDate('');
+                      updateTask(task.id, { dueDate: undefined });
+                    }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+                    aria-label="Clear due date"
+                  >
+                    ×
+                  </button>
+                )}
               </div>
             </div>
           </div>
 
-          {/* Actions */}
-          <div className="space-y-2">
+          <div>
             <button
-              onClick={handleAddSubtask}
-              className="w-full px-4 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors flex items-center justify-center gap-2"
+              type="button"
+              onClick={() => setSubtasksOpen(!subtasksOpen)}
+              className="w-full flex items-center justify-between text-xs uppercase tracking-[0.16em] text-slate-400 hover:text-slate-200"
+              aria-expanded={subtasksOpen}
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              Add Subtask & View
+              <span>Subtasks</span>
+              <span className="text-[11px] normal-case tracking-normal text-slate-500">{subtasks.length}</span>
             </button>
-            <button
-              onClick={() => {
-                navigateTo(task.id);
-                selectTask(null);
-              }}
-              className="w-full px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-700/50 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors flex items-center justify-center gap-2"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-              </svg>
-              View Subtasks
-            </button>
+            {subtasksOpen && (
+              <div className="mt-3 space-y-2">
+                {subtasks.length === 0 ? (
+                  <p className="text-xs text-slate-500">No subtasks yet.</p>
+                ) : (
+                  <div className="space-y-1">
+                    {subtasks.map(subtask => (
+                      <div
+                        key={subtask.id}
+                        className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-800/60"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={subtask.status === 'COMPLETED'}
+                          onChange={() => handleToggleSubtask(subtask)}
+                          className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-slate-200 focus-visible:ring-2 focus-visible:ring-slate-500/70"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => selectTask(subtask.id)}
+                          className={`text-sm text-left ${
+                            subtask.status === 'COMPLETED'
+                              ? 'text-slate-500 line-through'
+                              : 'text-slate-100'
+                          }`}
+                        >
+                          {subtask.title}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={handleAddSubtask}
+                  className="text-xs text-slate-400 hover:text-slate-200"
+                >
+                  + Add subtask
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="p-5 border-t border-slate-200 dark:border-slate-700">
+        <div className="px-5 pb-4 pt-1 flex justify-end">
           <button
             onClick={handleDelete}
-            className="w-full px-4 py-2 text-sm font-medium text-red-600 bg-red-50 dark:bg-red-900/20 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors flex items-center justify-center gap-2"
+            className="text-xs font-semibold text-red-400 hover:text-red-300"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
-            Delete Task
+            Delete
           </button>
         </div>
-        </div>
       </div>
-    </>
+    </div>
   );
 }

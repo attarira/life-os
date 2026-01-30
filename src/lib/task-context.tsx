@@ -157,6 +157,7 @@ export function TaskProvider({ children }: TaskProviderProps) {
   const getVisibleChildren = useCallback((): Task[] => {
     return tasks
       .filter(t => t.parentId === currentParentId)
+      .filter(t => !t.calendarOnly)
       .filter(t => {
         // Hide completed tasks older than 7 days
         if (t.status === 'COMPLETED' && isCompletedOlderThan(t, COMPLETED_HIDE_DAYS)) {

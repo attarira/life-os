@@ -352,7 +352,7 @@ export function HomeDashboard() {
   );
 
   const lifeAreas = useMemo(
-    () => tasks.filter(t => t.parentId === ROOT_TASK_ID).sort((a, b) => a.order - b.order),
+    () => tasks.filter(t => t.parentId === ROOT_TASK_ID && !t.calendarOnly).sort((a, b) => a.order - b.order),
     [tasks]
   );
 
@@ -400,17 +400,31 @@ export function HomeDashboard() {
     return scored[0]?.id || null;
   }, [areaSnapshots, lifeAreas]);
 
-  const todayTasks = useMemo(() => {
+  const { todayTasks, todayCalendarItems } = useMemo(() => {
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const tomorrowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-    return tasks
-      .filter(t => t.dueDate && t.status !== 'COMPLETED')
+    const isToday = (d: Date) => d >= todayStart && d < tomorrowStart;
+    const getSortTime = (task: Task) => {
+      const dueDate = task.dueDate ? new Date(task.dueDate) : null;
+      const scheduled = task.scheduledDate ? new Date(task.scheduledDate) : null;
+      const dueTime = dueDate && isToday(dueDate) ? dueDate.getTime() : Number.MAX_SAFE_INTEGER;
+      const scheduledTime = scheduled && isToday(scheduled) ? scheduled.getTime() : Number.MAX_SAFE_INTEGER;
+      return Math.min(dueTime, scheduledTime);
+    };
+    const relevant = tasks
+      .filter(t => t.status !== 'COMPLETED')
       .filter(t => {
-        const d = new Date(t.dueDate!);
-        return d >= todayStart && d < tomorrowStart;
+        const dueDate = t.dueDate ? new Date(t.dueDate) : null;
+        const scheduled = t.scheduledDate ? new Date(t.scheduledDate) : null;
+        return (dueDate && isToday(dueDate)) || (scheduled && isToday(scheduled));
       })
-      .sort((a, b) => (a.dueDate?.getTime() || 0) - (b.dueDate?.getTime() || 0));
+      .sort((a, b) => getSortTime(a) - getSortTime(b));
+
+    return {
+      todayTasks: relevant.filter(t => !t.calendarOnly),
+      todayCalendarItems: relevant.filter(t => t.calendarOnly),
+    };
   }, [tasks]);
 
   const upcomingTasks = useMemo(() => {
@@ -418,7 +432,7 @@ export function HomeDashboard() {
     const tomorrowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
     const windowEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 8);
     return tasks
-      .filter(t => t.dueDate && t.status !== 'COMPLETED')
+      .filter(t => t.dueDate && t.status !== 'COMPLETED' && !t.calendarOnly)
       .filter(t => {
         const d = new Date(t.dueDate!);
         return d >= tomorrowStart && d < windowEnd;
@@ -548,30 +562,64 @@ export function HomeDashboard() {
                   </svg>
                 </Link>
               </div>
-              {todayTasks.length === 0 ? (
-                <p className="text-sm text-slate-500 dark:text-slate-400">Nothing scheduled for today.</p>
+              {todayTasks.length === 0 && todayCalendarItems.length === 0 ? (
+                <p className="text-sm text-slate-500 dark:text-slate-400">Nothing scheduled or due today.</p>
               ) : (
-                <div className="divide-y divide-slate-200 dark:divide-slate-800">
-                  {todayTasks.map(task => {
-                    const area = lifeAreas.find(a => a.id === task.parentId);
-                    return (
-                      <button
-                        key={task.id}
-                        onClick={() => {
-                          navigateTo(task.parentId);
-                          selectTask(task.id);
-                        }}
-                        className="w-full text-left py-3 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 px-2 rounded-lg transition-colors"
-                      >
-                        <div className="flex flex-col">
-                          <span className="text-sm font-medium text-slate-900 dark:text-white">{task.title}</span>
-                        </div>
-                        <span className="text-xs text-slate-500 dark:text-slate-400">
-                          Due today
-                        </span>
-                      </button>
-                    );
-                  })}
+                <div className="space-y-3">
+                  {todayTasks.length > 0 && (
+                    <div className="divide-y divide-slate-200 dark:divide-slate-800">
+                      {todayTasks.map(task => {
+                        const now = new Date();
+                        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                        const tomorrowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+                        const isToday = (d: Date) => d >= todayStart && d < tomorrowStart;
+                        const dueToday = task.dueDate ? isToday(new Date(task.dueDate)) : false;
+                        const scheduledToday = task.scheduledDate ? isToday(new Date(task.scheduledDate)) : false;
+                        return (
+                          <button
+                            key={task.id}
+                            onClick={() => {
+                              navigateTo(task.parentId);
+                              selectTask(task.id);
+                            }}
+                            className="w-full text-left py-3 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 px-2 rounded-lg transition-colors"
+                          >
+                            <div className="flex flex-col">
+                              <span className="text-sm font-medium text-slate-900 dark:text-white">{task.title}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {scheduledToday && (
+                                <span className="text-[11px] px-2 py-0.5 rounded-md border text-amber-600 border-amber-500/30 bg-amber-500/10">
+                                  Scheduled
+                                </span>
+                              )}
+                              {dueToday && (
+                                <span className="text-[11px] px-2 py-0.5 rounded-md border text-red-600 border-red-500/30 bg-red-500/10">
+                                  Due
+                                </span>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {todayCalendarItems.length > 0 && (
+                    <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/60 px-3 py-2">
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 mb-2">Calendar-only</p>
+                      <div className="flex flex-wrap gap-2">
+                        {todayCalendarItems.map(item => (
+                          <span
+                            key={item.id}
+                            className="text-[11px] px-2 py-1 rounded-md border border-slate-300/60 text-slate-600 dark:text-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-800/60"
+                          >
+                            {item.title}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
