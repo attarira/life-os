@@ -15,7 +15,7 @@ import { arrayMove, SortableContext, rectSortingStrategy, useSortable } from '@d
 import { CSS } from '@dnd-kit/utilities';
 import { useTaskContext } from '@/lib/task-context';
 import { COLUMNS, ROOT_TASK_ID, Task, TaskStatus } from '@/lib/types';
-import { getSubtreeIds } from '@/lib/tasks';
+import { getSubtreeIds, getTaskPath } from '@/lib/tasks';
 
 type DragHandleProps = {
   ref: (el: HTMLElement | null) => void;
@@ -81,6 +81,16 @@ const AREA_TONES: Record<string, { bg: string; text: string; accent: string }> =
   relationships: { bg: 'bg-rose-900/40', text: 'text-rose-200', accent: 'bg-purple-500/85' },
   growth: { bg: 'bg-indigo-900/40', text: 'text-indigo-200', accent: 'bg-indigo-500/85' },
   recreation: { bg: 'bg-amber-900/40', text: 'text-amber-200', accent: 'bg-amber-500/70' },
+};
+
+const AREA_BADGES: Record<string, string> = {
+  career: 'bg-blue-100/70 text-blue-700 dark:bg-blue-500/20 dark:text-blue-200',
+  health: 'bg-emerald-100/70 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200',
+  finances: 'bg-cyan-100/70 text-cyan-700 dark:bg-cyan-500/20 dark:text-cyan-200',
+  relationships: 'bg-rose-100/70 text-rose-700 dark:bg-rose-500/20 dark:text-rose-200',
+  growth: 'bg-indigo-100/70 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-200',
+  recreation: 'bg-amber-100/70 text-amber-700 dark:bg-amber-500/20 dark:text-amber-200',
+  default: 'bg-slate-100/70 text-slate-600 dark:bg-slate-800/60 dark:text-slate-300',
 };
 
 const STATUS_RING = [
@@ -427,6 +437,16 @@ export function HomeDashboard() {
     };
   }, [tasks]);
 
+  const handleCompleteToday = async (task: Task) => {
+    if (task.calendarOnly) {
+      await deleteTask(task.id);
+      return;
+    }
+    if (task.scheduledDate) {
+      await updateTask(task.id, { scheduledDate: undefined });
+    }
+  };
+
   const upcomingTasks = useMemo(() => {
     const now = new Date();
     const tomorrowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
@@ -574,7 +594,11 @@ export function HomeDashboard() {
                         const tomorrowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
                         const isToday = (d: Date) => d >= todayStart && d < tomorrowStart;
                         const dueToday = task.dueDate ? isToday(new Date(task.dueDate)) : false;
-                        const scheduledToday = task.scheduledDate ? isToday(new Date(task.scheduledDate)) : false;
+                        const areaPath = getTaskPath(tasks, task.id);
+                        const areaTask = areaPath[0];
+                        const areaKey = resolveAreaKey(areaTask?.title || areaTask?.id || '');
+                        const areaLabel = areaTask?.title || 'Task';
+                        const areaBadge = AREA_BADGES[areaKey] || AREA_BADGES.default;
                         return (
                           <button
                             key={task.id}
@@ -582,22 +606,33 @@ export function HomeDashboard() {
                               navigateTo(task.parentId);
                               selectTask(task.id);
                             }}
-                            className="w-full text-left py-3 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 px-2 rounded-lg transition-colors"
+                            className="group/row w-full text-left py-3 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 px-2 rounded-lg transition-colors"
                           >
                             <div className="flex flex-col">
                               <span className="text-sm font-medium text-slate-900 dark:text-white">{task.title}</span>
                             </div>
                             <div className="flex items-center gap-2">
-                              {scheduledToday && (
-                                <span className="text-[11px] px-2 py-0.5 rounded-md border text-amber-600 border-amber-500/30 bg-amber-500/10">
-                                  Scheduled
-                                </span>
-                              )}
+                              <span className={`text-[11px] px-2 py-0.5 rounded-md ${areaBadge}`}>
+                                {areaLabel}
+                              </span>
                               {dueToday && (
                                 <span className="text-[11px] px-2 py-0.5 rounded-md border text-red-600 border-red-500/30 bg-red-500/10">
                                   Due
                                 </span>
                               )}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCompleteToday(task);
+                                }}
+                                className="opacity-0 group-hover/row:opacity-100 transition-opacity text-slate-400 hover:text-emerald-500"
+                                aria-label="Complete for today"
+                              >
+                                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                </svg>
+                              </button>
                             </div>
                           </button>
                         );
@@ -610,12 +645,15 @@ export function HomeDashboard() {
                       <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 mb-2">Calendar-only</p>
                       <div className="flex flex-wrap gap-2">
                         {todayCalendarItems.map(item => (
-                          <span
+                          <button
                             key={item.id}
-                            className="text-[11px] px-2 py-1 rounded-md border border-slate-300/60 text-slate-600 dark:text-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-800/60"
+                            type="button"
+                            onClick={() => handleCompleteToday(item)}
+                            className="inline-flex items-center rounded-md border border-slate-300/60 text-slate-600 dark:text-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-800/60 px-2 py-1 text-[11px] hover:border-slate-400/70"
+                            aria-label={`Complete ${item.title} for today`}
                           >
                             {item.title}
-                          </span>
+                          </button>
                         ))}
                       </div>
                     </div>

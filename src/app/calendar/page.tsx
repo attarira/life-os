@@ -153,7 +153,7 @@ function CalendarContent() {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
       <header className="border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link href="/" className="text-sm text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
+          <Link href="/" replace className="text-sm text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
             ← Back to dashboard
           </Link>
           <h1 className="text-lg font-semibold text-slate-900 dark:text-white">Calendar</h1>

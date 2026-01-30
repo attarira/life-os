@@ -64,6 +64,9 @@ export function TaskProvider({ children }: TaskProviderProps) {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
+  const BACKUP_KEY = 'lifeos:autoBackups';
+  const LAST_BACKUP_KEY = 'lifeos:lastBackupDate';
+  const BACKUP_RETENTION_DAYS = 30;
 
   // Initialize on mount
   useEffect(() => {
@@ -86,6 +89,44 @@ export function TaskProvider({ children }: TaskProviderProps) {
     }
     init();
   }, []);
+
+  useEffect(() => {
+    if (isLoading) return;
+    try {
+      const todayKey = new Date().toISOString().split('T')[0];
+      const lastBackup = localStorage.getItem(LAST_BACKUP_KEY);
+      if (lastBackup === todayKey) return;
+
+      const now = new Date();
+      const cutoff = new Date(now);
+      cutoff.setDate(cutoff.getDate() - BACKUP_RETENTION_DAYS);
+      const existingRaw = localStorage.getItem(BACKUP_KEY);
+      const existing = existingRaw ? JSON.parse(existingRaw) : [];
+      const retained = Array.isArray(existing)
+        ? existing.filter((entry: { createdAt?: string }) => {
+            if (!entry?.createdAt) return false;
+            return new Date(entry.createdAt) >= cutoff;
+          })
+        : [];
+
+      const id = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+      const next = [
+        ...retained,
+        {
+          id,
+          createdAt: now.toISOString(),
+          tasks,
+        },
+      ];
+      localStorage.setItem(BACKUP_KEY, JSON.stringify(next));
+      localStorage.setItem(LAST_BACKUP_KEY, todayKey);
+    } catch (error) {
+      console.warn('Auto-backup failed:', error);
+    }
+  }, [tasks, isLoading]);
 
   const navigateTo = useCallback((taskId: string) => {
     setCurrentParentId(taskId);
