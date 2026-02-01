@@ -600,13 +600,22 @@ export function HomeDashboard() {
                         const areaLabel = areaTask?.title || 'Task';
                         const areaBadge = AREA_BADGES[areaKey] || AREA_BADGES.default;
                         return (
-                          <button
+                          <div
                             key={task.id}
+                            role="button"
+                            tabIndex={0}
                             onClick={() => {
                               navigateTo(task.parentId);
                               selectTask(task.id);
                             }}
-                            className="group/row w-full text-left py-3 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 px-2 rounded-lg transition-colors"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                navigateTo(task.parentId);
+                                selectTask(task.id);
+                              }
+                            }}
+                            className="group/row w-full text-left py-3 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 px-2 rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/50"
                           >
                             <div className="flex flex-col">
                               <span className="text-sm font-medium text-slate-900 dark:text-white">{task.title}</span>
@@ -634,7 +643,7 @@ export function HomeDashboard() {
                                 </svg>
                               </button>
                             </div>
-                          </button>
+                          </div>
                         );
                       })}
                     </div>

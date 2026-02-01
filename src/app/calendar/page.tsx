@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
@@ -17,17 +17,31 @@ function CalendarContent() {
   const [selectionPath, setSelectionPath] = useState<string[]>([]);
   const [calendarOnlyTitle, setCalendarOnlyTitle] = useState('');
   const [calendarOnlyDate, setCalendarOnlyDate] = useState('');
+  const calendarOnlyDateRef = useRef<HTMLInputElement>(null);
+  const existingDateRef = useRef<HTMLInputElement>(null);
+  const [calendarView, setCalendarView] = useState('dayGridMonth');
 
-  const lifeAreas = useMemo(
-    () => tasks.filter(t => t.parentId === ROOT_TASK_ID).sort((a, b) => a.order - b.order),
-    [tasks]
-  );
+  const todayKey = useMemo(() => new Date().toISOString().split('T')[0], []);
+
+  useEffect(() => {
+    if (!calendarOnlyDate) {
+      setCalendarOnlyDate(todayKey);
+    }
+  }, [calendarOnlyDate, todayKey]);
 
   const calendarEvents: EventInput[] = useMemo(() => {
-    const events: EventInput[] = [];
     const toDateKey = (date: Date) =>
       `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
     const normalizeDate = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0, 0);
+
+    const baseEvents: Array<{
+      id: string;
+      title: string;
+      date: Date;
+      dateKey: string;
+      classNames: string[];
+      extendedProps: Record<string, unknown>;
+    }> = [];
 
     tasks
       .filter(task => task.status !== 'COMPLETED')
@@ -37,12 +51,12 @@ function CalendarContent() {
         if (!scheduled && !due) return;
 
         if (scheduled && due && toDateKey(scheduled) === toDateKey(due)) {
-          const start = normalizeDate(scheduled);
-          events.push({
-            id: `${task.id}-both-${toDateKey(start)}`,
+          const date = normalizeDate(scheduled);
+          baseEvents.push({
+            id: `${task.id}-both-${toDateKey(date)}`,
             title: task.title,
-            start,
-            allDay: true,
+            date,
+            dateKey: toDateKey(date),
             classNames: ['fc-task-event', 'fc-task-event--both'],
             extendedProps: { taskId: task.id, scheduled: true, due: true },
           });
@@ -50,52 +64,85 @@ function CalendarContent() {
         }
 
         if (scheduled) {
-          const start = normalizeDate(scheduled);
-          events.push({
-            id: `${task.id}-scheduled-${toDateKey(start)}`,
+          const date = normalizeDate(scheduled);
+          baseEvents.push({
+            id: `${task.id}-scheduled-${toDateKey(date)}`,
             title: task.title,
-            start,
-            allDay: true,
+            date,
+            dateKey: toDateKey(date),
             classNames: ['fc-task-event', 'fc-task-event--scheduled'],
             extendedProps: { taskId: task.id, scheduled: true },
           });
         }
 
         if (due) {
-          const start = normalizeDate(due);
-          events.push({
-            id: `${task.id}-due-${toDateKey(start)}`,
+          const date = normalizeDate(due);
+          baseEvents.push({
+            id: `${task.id}-due-${toDateKey(date)}`,
             title: task.title,
-            start,
-            allDay: true,
+            date,
+            dateKey: toDateKey(date),
             classNames: ['fc-task-event', 'fc-task-event--due'],
             extendedProps: { taskId: task.id, due: true },
           });
         }
       });
 
-    return events;
+    const grouped = new Map<string, typeof baseEvents>();
+    baseEvents.forEach((event) => {
+      const list = grouped.get(event.dateKey) || [];
+      list.push(event);
+      grouped.set(event.dateKey, list);
+    });
+
+    const results: EventInput[] = [];
+    grouped.forEach((eventsForDay) => {
+      const total = eventsForDay.length;
+      const startHour = 8;
+      const endHour = 18;
+      const totalMinutes = (endHour - startHour) * 60;
+      const step = totalMinutes / (total + 1);
+
+      eventsForDay.forEach((event, index) => {
+        const start = new Date(event.date);
+        start.setHours(startHour, 0, 0, 0);
+        start.setMinutes(Math.round(step * (index + 1)));
+        const end = new Date(start);
+        end.setMinutes(start.getMinutes() + 45);
+        results.push({
+          id: event.id,
+          title: event.title,
+          start,
+          end,
+          allDay: false,
+          classNames: event.classNames,
+          extendedProps: event.extendedProps,
+        });
+      });
+    });
+
+    return results;
+  }, [tasks]);
+
+  const scheduledCountByDate = useMemo(() => {
+    const toDateKey = (date: Date) =>
+      `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    const counts = new Map<string, number>();
+    tasks
+      .filter(task => task.status !== 'COMPLETED' && task.scheduledDate)
+      .forEach(task => {
+        const date = new Date(task.scheduledDate as Date);
+        const key = toDateKey(date);
+        counts.set(key, (counts.get(key) || 0) + 1);
+      });
+    return counts;
   }, [tasks]);
 
   const renderEventContent = (eventInfo: EventContentArg) => {
     const { event } = eventInfo;
-    const scheduled = Boolean(event.extendedProps?.scheduled);
-    const due = Boolean(event.extendedProps?.due);
     return (
-      <div className="flex flex-col gap-1">
-        <div className="text-[11px] font-semibold leading-snug">{event.title}</div>
-        <div className="flex flex-wrap gap-1">
-          {scheduled && (
-            <span className="inline-flex items-center rounded-md border border-slate-300/50 bg-slate-500/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-slate-600 dark:text-slate-200">
-              Scheduled
-            </span>
-          )}
-          {due && (
-            <span className="inline-flex items-center rounded-md border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-amber-600 dark:text-amber-300">
-              Due
-            </span>
-          )}
-        </div>
+      <div className="fc-event-min">
+        <span className="fc-event-title">{event.title}</span>
       </div>
     );
   };
@@ -147,7 +194,14 @@ function CalendarContent() {
         .sort((a, b) => a.order - b.order),
     [tasks, currentParentId]
   );
-  const selectedTask = existingTaskId ? taskById.get(existingTaskId) ?? null : null;
+
+  const formatDateLabel = (value: string, fallback: string) => {
+    if (!value) return fallback;
+    if (value === todayKey) return 'Today';
+    const date = new Date(`${value}T12:00:00`);
+    if (Number.isNaN(date.getTime())) return fallback;
+    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
@@ -164,25 +218,65 @@ function CalendarContent() {
       </header>
 
       <main className="max-w-5xl mx-auto p-6 space-y-6">
-        <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-base font-semibold text-slate-900 dark:text-white">Calendar</h3>
-            <span className="text-xs text-slate-500 dark:text-slate-400">Month, week, and day views</span>
-          </div>
-          <div className="calendar-shell">
+        <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm">
+          <div className="calendar-shell calendar-shell--minimal">
             <FullCalendar
               plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
               initialView="dayGridMonth"
               headerToolbar={{
-                left: 'prev,next today',
+                left: 'prev',
                 center: 'title',
-                right: 'dayGridMonth,timeGridWeek,timeGridDay',
+                right: 'next',
               }}
+              footerToolbar={{
+                left: '',
+                center: '',
+                right: 'dayGridMonth,timeGridDay',
+              }}
+              buttonIcons={{
+                prev: 'chevron-left',
+                next: 'chevron-right',
+              }}
+              buttonText={{
+                dayGridMonth: 'Month',
+                timeGridDay: 'Day',
+              }}
+              views={{
+                dayGridMonth: { eventDisplay: 'none' },
+                timeGridDay: { titleFormat: { year: 'numeric', month: 'long', day: 'numeric' } },
+              }}
+              editable
+              eventStartEditable
+              eventDurationEditable={false}
               height="auto"
               expandRows
-              dayMaxEvents={3}
-              events={calendarEvents}
+              dayMaxEvents={7}
+              datesSet={(info) => setCalendarView(info.view.type)}
+              events={calendarView === 'dayGridMonth' ? [] : calendarEvents}
               eventContent={renderEventContent}
+              dayCellContent={(arg) => {
+                if (arg.view.type !== 'dayGridMonth') return arg.dayNumberText;
+                const key = `${arg.date.getFullYear()}-${String(arg.date.getMonth() + 1).padStart(2, '0')}-${String(arg.date.getDate()).padStart(2, '0')}`;
+                const count = scheduledCountByDate.get(key) || 0;
+                return (
+                  <div className="fc-daycell">
+                    <span className="fc-daycell-date">{arg.date.getDate()}</span>
+                    {count > 0 && <span className="fc-daycell-count">{count}</span>}
+                  </div>
+                );
+              }}
+              eventDrop={(info) => {
+                const taskId = info.event.extendedProps?.taskId as string | undefined;
+                if (!taskId || !info.event.start) return;
+                const hasScheduled = Boolean(info.event.extendedProps?.scheduled);
+                const hasDue = Boolean(info.event.extendedProps?.due);
+                const updates: Record<string, Date> = {};
+                if (hasScheduled) updates.scheduledDate = info.event.start;
+                if (hasDue && !hasScheduled) updates.dueDate = info.event.start;
+                if (Object.keys(updates).length > 0) {
+                  updateTask(taskId, updates);
+                }
+              }}
               eventClick={(info) => {
                 const taskId = info.event.extendedProps?.taskId as string | undefined;
                 if (!taskId) return;
@@ -195,142 +289,148 @@ function CalendarContent() {
           </div>
         </section>
 
-        <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
-          <h2 className="text-base font-semibold text-slate-900 dark:text-white mb-4">Add a calendar-only item</h2>
-          <form onSubmit={handleAddCalendarOnly} className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2 md:col-span-2">
-              <label className="text-xs uppercase tracking-[0.12em] text-slate-500">Title</label>
-              <input
-                value={calendarOnlyTitle}
-                onChange={(e) => setCalendarOnlyTitle(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-300 dark:focus:ring-slate-600"
-                placeholder="e.g. Get groceries"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs uppercase tracking-[0.12em] text-slate-500">Scheduled date</label>
-              <input
-                type="date"
-                value={calendarOnlyDate}
-                onChange={(e) => setCalendarOnlyDate(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-300 dark:focus:ring-slate-600"
-              />
-            </div>
-            <div className="md:col-span-3 flex justify-end">
-              <button
-                type="submit"
-                className="px-4 py-2 rounded-lg bg-slate-900 text-white dark:bg-white dark:text-slate-900 font-semibold hover:-translate-y-[1px] transition-transform disabled:opacity-50"
-                disabled={!calendarOnlyTitle.trim() || !calendarOnlyDate}
-              >
-                Add to calendar
-              </button>
-            </div>
-          </form>
-        </section>
-
-        <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
-          <h2 className="text-base font-semibold text-slate-900 dark:text-white mb-4">Schedule an existing task</h2>
-          <form onSubmit={handleScheduleExisting} className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2 md:col-span-2">
-              <label className="text-xs uppercase tracking-[0.12em] text-slate-500">Task</label>
-              <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-3 space-y-3">
-                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+        <section className="bg-slate-900 border border-white/10 rounded-2xl p-4 shadow-sm">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-[300px]">
+            <div className="h-full rounded-xl border border-white/10 bg-slate-900 p-3 flex flex-col">
+              <form onSubmit={handleAddCalendarOnly} className="flex items-center gap-2">
+                <input
+                  value={calendarOnlyTitle}
+                  onChange={(e) => setCalendarOnlyTitle(e.target.value)}
+                  className="flex-1 bg-transparent text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none"
+                  placeholder="Add new event..."
+                  aria-label="Add new event"
+                />
+                <div className="relative">
                   <button
                     type="button"
-                    onClick={() => setSelectionPath([])}
-                    className={`px-2 py-1 rounded-md border transition-colors ${
-                      selectionPath.length === 0
-                        ? 'border-slate-400 text-slate-700 dark:text-slate-200 bg-white/70 dark:bg-slate-700/60'
-                        : 'border-transparent hover:border-slate-300 hover:bg-white/70 dark:hover:bg-slate-700/40'
-                    }`}
+                    onClick={() => {
+                      calendarOnlyDateRef.current?.showPicker?.();
+                      calendarOnlyDateRef.current?.focus();
+                    }}
+                    className="px-2.5 py-1 rounded-full border border-white/10 text-xs text-slate-300 hover:text-slate-100 font-mono"
                   >
-                    Life areas
+                    {formatDateLabel(calendarOnlyDate, 'Today')}
                   </button>
-                  {pathTasks.map((task, index) => (
-                    <button
-                      key={task.id}
-                      type="button"
-                      onClick={() => setSelectionPath(selectionPath.slice(0, index + 1))}
-                      className="px-2 py-1 rounded-md border border-transparent hover:border-slate-300 hover:bg-white/70 dark:hover:bg-slate-700/40"
-                    >
-                      {task.title}
-                    </button>
-                  ))}
+                  <input
+                    ref={calendarOnlyDateRef}
+                    type="date"
+                    value={calendarOnlyDate}
+                    onChange={(e) => setCalendarOnlyDate(e.target.value)}
+                    className="sr-only"
+                    aria-hidden="true"
+                  />
                 </div>
-                <div className="max-h-64 overflow-auto space-y-1">
+                <button
+                  type="submit"
+                  className="p-2 rounded-full border border-white/10 text-slate-300 hover:text-slate-100 hover:border-white/20"
+                  disabled={!calendarOnlyTitle.trim() || !calendarOnlyDate}
+                  aria-label="Add to calendar"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14m7-7H5" />
+                  </svg>
+                </button>
+              </form>
+            </div>
+
+            <div className="h-full rounded-xl border border-white/10 bg-slate-900 p-3 flex flex-col">
+              <form onSubmit={handleScheduleExisting} className="flex flex-col h-full">
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <div className="text-xs text-slate-400 flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setSelectionPath([])}
+                      className="hover:text-slate-200"
+                    >
+                      Life Areas
+                    </button>
+                    {pathTasks.map((task, index) => (
+                      <React.Fragment key={task.id}>
+                        <span className="text-slate-600">/</span>
+                        <button
+                          type="button"
+                          onClick={() => setSelectionPath(selectionPath.slice(0, index + 1))}
+                          className="hover:text-slate-200"
+                        >
+                          {task.title}
+                        </button>
+                      </React.Fragment>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          existingDateRef.current?.showPicker?.();
+                          existingDateRef.current?.focus();
+                        }}
+                        className="px-2.5 py-1 rounded-full border border-white/10 text-xs text-slate-300 hover:text-slate-100 font-mono"
+                      >
+                        {formatDateLabel(existingScheduledDate, 'Pick date')}
+                      </button>
+                      <input
+                        ref={existingDateRef}
+                        type="date"
+                        value={existingScheduledDate}
+                        onChange={(e) => setExistingScheduledDate(e.target.value)}
+                        className="sr-only"
+                        aria-hidden="true"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      className="p-2 rounded-full border border-white/10 text-slate-300 hover:text-slate-100 hover:border-white/20 disabled:opacity-40"
+                      disabled={!existingTaskId || !existingScheduledDate}
+                      aria-label="Schedule task"
+                    >
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M13 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex-1 overflow-auto space-y-1 pr-1">
                   {currentChildren.length === 0 ? (
-                    <p className="text-xs text-slate-500 dark:text-slate-400 px-2 py-3">No tasks here.</p>
+                    <p className="text-xs text-slate-500">No tasks here.</p>
                   ) : (
                     currentChildren.map(child => {
                       const hasChildren = tasks.some(t => t.parentId === child.id);
                       const isSelected = child.id === existingTaskId;
                       return (
-                        <div
+                        <button
                           key={child.id}
-                          className={`flex items-center justify-between gap-2 px-2 py-2 rounded-lg border transition-colors ${
+                          type="button"
+                          onClick={() => {
+                            if (hasChildren) {
+                              setSelectionPath([...selectionPath, child.id]);
+                            } else {
+                              setExistingTaskId(child.id);
+                            }
+                          }}
+                          className={`group w-full flex items-center justify-between rounded-lg px-2 py-2 text-left text-sm transition-colors ${
                             isSelected
-                              ? 'border-slate-400 bg-white dark:bg-slate-700/60'
-                              : 'border-transparent hover:border-slate-300 hover:bg-white/70 dark:hover:bg-slate-700/40'
+                              ? 'bg-white/10 text-slate-100'
+                              : 'text-slate-300 hover:bg-white/5'
                           }`}
                         >
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (hasChildren) {
-                                setSelectionPath([...selectionPath, child.id]);
-                              } else {
-                                setExistingTaskId(child.id);
-                              }
-                            }}
-                            className="text-left flex-1"
-                          >
-                            <div className="text-sm text-slate-900 dark:text-white">{child.title}</div>
-                            {hasChildren && (
-                              <div className="text-[11px] text-slate-500 dark:text-slate-400">Contains subtasks</div>
-                            )}
-                          </button>
-                          <div className="flex items-center gap-2">
-                            {hasChildren && (
-                              <button
-                                type="button"
-                                onClick={() => setSelectionPath([...selectionPath, child.id])}
-                                className="text-[11px] px-2 py-1 rounded-md border border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-300 dark:hover:text-white"
-                              >
-                                Open →
-                              </button>
-                            )}
-                          </div>
-                        </div>
+                          <span className="truncate">{child.title}</span>
+                          {!hasChildren && (
+                            <span className="opacity-0 group-hover:opacity-100 text-slate-500">
+                              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14m7-7H5" />
+                              </svg>
+                            </span>
+                          )}
+                        </button>
                       );
                     })
                   )}
                 </div>
-                {selectedTask && (
-                  <div className="text-xs text-slate-500 dark:text-slate-400">
-                    Selected: <span className="text-slate-700 dark:text-slate-200">{selectedTask.title}</span>
-                  </div>
-                )}
-              </div>
+              </form>
             </div>
-            <div className="space-y-2">
-              <label className="text-xs uppercase tracking-[0.12em] text-slate-500">Scheduled date</label>
-              <input
-                type="date"
-                value={existingScheduledDate}
-                onChange={(e) => setExistingScheduledDate(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-300 dark:focus:ring-slate-600"
-              />
-            </div>
-            <div className="md:col-span-3 flex justify-end">
-              <button
-                type="submit"
-                className="px-4 py-2 rounded-lg bg-slate-900 text-white dark:bg-white dark:text-slate-900 font-semibold hover:-translate-y-[1px] transition-transform disabled:opacity-50"
-                disabled={!existingTaskId || !existingScheduledDate}
-              >
-                Save to calendar
-              </button>
-            </div>
-          </form>
+          </div>
         </section>
       </main>
     </div>
