@@ -12,6 +12,7 @@ export function TaskPanel() {
   const [editTitle, setEditTitle] = useState('');
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [subtasksOpen, setSubtasksOpen] = useState(false);
+  const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
   const panelRef = useRef<HTMLDivElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
@@ -26,6 +27,7 @@ export function TaskPanel() {
       setEditTitle(task.title || '');
       setIsEditingTitle(false);
       setSubtasksOpen(false);
+      setNewSubtaskTitle('');
     }
   }, [task]);
 
@@ -107,12 +109,15 @@ export function TaskPanel() {
   };
 
   const handleAddSubtask = async () => {
+    const trimmed = newSubtaskTitle.trim();
+    if (!trimmed) return;
     await createTask({
       parentId: task.id,
-      title: 'New Subtask',
+      title: trimmed,
       status: 'NOT_STARTED',
       priority: 'MEDIUM',
     });
+    setNewSubtaskTitle('');
     setSubtasksOpen(true);
   };
 
@@ -130,6 +135,13 @@ export function TaskPanel() {
     if (confirm(message)) {
       await deleteTask(task.id);
     }
+  };
+
+  const handleSaveAll = async () => {
+    await handleTitleSave();
+    await handleDescriptionSave();
+    await handleScheduledDateSave();
+    await handleDueDateSave();
   };
 
   return (
@@ -196,7 +208,7 @@ export function TaskPanel() {
                 target.style.height = `${target.scrollHeight}px`;
               }}
               rows={3}
-              className="w-full bg-slate-800/50 text-slate-100 rounded-xl px-3 py-2 text-sm leading-relaxed placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-600"
+              className="w-full min-h-[120px] bg-slate-800/50 text-slate-100 rounded-xl px-3 py-2 text-sm leading-relaxed placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-600"
               placeholder="What's this task about?"
             />
           </div>
@@ -260,89 +272,133 @@ export function TaskPanel() {
           <div>
             <div className="text-[11px] uppercase tracking-[0.14em] text-slate-400 mb-2">Dates</div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">
-                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 3v3M16 3v3M4 11h16M5 20h14a1 1 0 001-1V7a1 1 0 00-1-1H5a1 1 0 00-1 1v12a1 1 0 001 1z" />
-                  </svg>
-                </span>
-                {!scheduledDate && (
-                  <span className="absolute left-9 top-1/2 -translate-y-1/2 text-xs text-slate-500 pointer-events-none">
-                    Start
+              <div className="flex flex-col gap-2">
+                <label className="text-[11px] uppercase tracking-[0.14em] text-slate-400" htmlFor="task-scheduled-date">
+                  Scheduled
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M8 3v3M16 3v3M4 11h16M5 20h14a1 1 0 001-1V7a1 1 0 00-1-1H5a1 1 0 00-1 1v12a1 1 0 001 1z" />
+                    </svg>
                   </span>
-                )}
-                <input
-                  type="date"
-                  value={scheduledDate}
-                  onChange={(e) => setScheduledDate(e.target.value)}
-                  onBlur={handleScheduledDateSave}
-                  className={`w-full rounded-xl bg-slate-800/50 px-9 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-slate-600 ${
-                    scheduledDate ? 'text-slate-100' : 'text-transparent'
-                  }`}
-                  aria-label="Scheduled date"
-                />
-                {scheduledDate && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setScheduledDate('');
-                      updateTask(task.id, { scheduledDate: undefined });
-                    }}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
-                    aria-label="Clear scheduled date"
-                  >
-                    ×
-                  </button>
-                )}
+                  {!scheduledDate && (
+                    <span className="absolute left-9 top-1/2 -translate-y-1/2 text-xs text-slate-500 pointer-events-none">
+                      Start
+                    </span>
+                  )}
+                  <input
+                    id="task-scheduled-date"
+                    type="date"
+                    value={scheduledDate}
+                    onChange={(e) => setScheduledDate(e.target.value)}
+                    onBlur={handleScheduledDateSave}
+                    className={`w-full rounded-xl bg-slate-800/50 px-9 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-slate-600 ${
+                      scheduledDate ? 'text-slate-100' : 'text-transparent'
+                    }`}
+                    aria-label="Scheduled date"
+                  />
+                  {scheduledDate && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setScheduledDate('');
+                        updateTask(task.id, { scheduledDate: undefined });
+                      }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+                      aria-label="Clear scheduled date"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
               </div>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">
-                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 3v3M16 3v3M4 11h16M5 20h14a1 1 0 001-1V7a1 1 0 00-1-1H5a1 1 0 00-1 1v12a1 1 0 001 1z" />
-                  </svg>
-                </span>
-                {!dueDate && (
-                  <span className="absolute left-9 top-1/2 -translate-y-1/2 text-xs text-slate-500 pointer-events-none">
-                    Due
+              <div className="flex flex-col gap-2">
+                <label className="text-[11px] uppercase tracking-[0.14em] text-slate-400" htmlFor="task-due-date">
+                  Due
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M8 3v3M16 3v3M4 11h16M5 20h14a1 1 0 001-1V7a1 1 0 00-1-1H5a1 1 0 00-1 1v12a1 1 0 001 1z" />
+                    </svg>
                   </span>
-                )}
-                <input
-                  type="date"
-                  value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)}
-                  onBlur={handleDueDateSave}
-                  className={`w-full rounded-xl bg-slate-800/50 px-9 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-slate-600 ${
-                    dueDate ? 'text-slate-100' : 'text-transparent'
-                  }`}
-                  aria-label="Due date"
-                />
-                {dueDate && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDueDate('');
-                      updateTask(task.id, { dueDate: undefined });
-                    }}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
-                    aria-label="Clear due date"
-                  >
-                    ×
-                  </button>
-                )}
+                  {!dueDate && (
+                    <span className="absolute left-9 top-1/2 -translate-y-1/2 text-xs text-slate-500 pointer-events-none">
+                      Due
+                    </span>
+                  )}
+                  <input
+                    id="task-due-date"
+                    type="date"
+                    value={dueDate}
+                    onChange={(e) => setDueDate(e.target.value)}
+                    onBlur={handleDueDateSave}
+                    className={`w-full rounded-xl bg-slate-800/50 px-9 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-slate-600 ${
+                      dueDate ? 'text-slate-100' : 'text-transparent'
+                    }`}
+                    aria-label="Due date"
+                  />
+                  {dueDate && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDueDate('');
+                        updateTask(task.id, { dueDate: undefined });
+                      }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+                      aria-label="Clear due date"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
 
           <div>
-            <button
-              type="button"
-              onClick={() => setSubtasksOpen(!subtasksOpen)}
-              className="w-full flex items-center justify-between text-xs uppercase tracking-[0.16em] text-slate-400 hover:text-slate-200"
-              aria-expanded={subtasksOpen}
-            >
-              <span>Subtasks</span>
-              <span className="text-[11px] normal-case tracking-normal text-slate-500">{subtasks.length}</span>
-            </button>
+            <div className="flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => setSubtasksOpen(!subtasksOpen)}
+                className="text-xs uppercase tracking-[0.16em] text-slate-400 hover:text-slate-200"
+                aria-expanded={subtasksOpen}
+              >
+                Subtasks
+              </button>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={newSubtaskTitle}
+                  onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddSubtask();
+                    }
+                  }}
+                  onFocus={() => setSubtasksOpen(true)}
+                  placeholder="Add subtask"
+                  className="w-40 rounded-lg bg-slate-800/60 px-2 py-1 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-600"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddSubtask}
+                  disabled={!newSubtaskTitle.trim()}
+                  className={`p-1.5 rounded-lg bg-slate-800/70 text-slate-300 ${
+                    newSubtaskTitle.trim()
+                      ? 'hover:text-white hover:bg-slate-700'
+                      : 'opacity-40 cursor-not-allowed'
+                  }`}
+                  aria-label="Add subtask"
+                >
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14m7-7H5" />
+                  </svg>
+                </button>
+              </div>
+            </div>
             {subtasksOpen && (
               <div className="mt-3 space-y-2">
                 {subtasks.length === 0 ? (
@@ -375,24 +431,23 @@ export function TaskPanel() {
                     ))}
                   </div>
                 )}
-                <button
-                  type="button"
-                  onClick={handleAddSubtask}
-                  className="text-xs text-slate-400 hover:text-slate-200"
-                >
-                  + Add subtask
-                </button>
               </div>
             )}
           </div>
         </div>
 
-        <div className="px-5 pb-4 pt-1 flex justify-end">
+        <div className="px-5 pb-4 pt-3 flex items-center justify-end gap-2 border-t border-slate-800/70">
           <button
             onClick={handleDelete}
-            className="text-xs font-semibold text-red-400 hover:text-red-300"
+            className="px-3 py-2 text-xs font-semibold text-rose-300 hover:text-rose-200"
           >
             Delete
+          </button>
+          <button
+            onClick={handleSaveAll}
+            className="px-4 py-2 text-xs font-semibold rounded-lg bg-slate-100 text-slate-900 hover:bg-white"
+          >
+            Save
           </button>
         </div>
       </div>

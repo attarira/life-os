@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   DndContext,
@@ -8,6 +8,8 @@ import {
   DragOverlay,
   DragStartEvent,
   PointerSensor,
+  useDraggable,
+  useDroppable,
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
@@ -99,6 +101,19 @@ const STATUS_RING = [
   { status: 'ON_HOLD' as TaskStatus, color: 'rgba(245,158,11,0.75)' },
   { status: 'COMPLETED' as TaskStatus, color: 'rgba(34,197,94,0.75)' },
 ];
+
+const DAY_AHEAD_START_HOUR = 7;
+const DAY_AHEAD_END_HOUR = 19;
+const DAY_AHEAD_SLOTS = Array.from(
+  { length: DAY_AHEAD_END_HOUR - DAY_AHEAD_START_HOUR + 1 },
+  (_, idx) => DAY_AHEAD_START_HOUR + idx
+);
+
+function formatHourLabel(hour: number) {
+  const suffix = hour >= 12 ? 'PM' : 'AM';
+  const display = hour % 12 || 12;
+  return `${display}:00 ${suffix}`;
+}
 
 function buildStatusRingSegments(
   statusCounts: Record<TaskStatus, number>,
@@ -344,6 +359,67 @@ function SortableLifeAreaCard({
   );
 }
 
+function DayAheadDraggableTask({
+  task,
+  subtle,
+}: {
+  task: Task;
+  subtle?: boolean;
+}) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: task.id,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      className={`rounded-lg border border-slate-800/80 bg-slate-900/60 px-3 py-2 text-xs text-slate-200 shadow-sm transition-all ${
+        subtle ? 'text-slate-400' : ''
+      } ${isDragging ? 'opacity-60 shadow-md' : 'hover:border-slate-700 hover:bg-slate-900/80'}`}
+    >
+      <div className="font-semibold text-slate-100">{task.title}</div>
+      <div className="mt-1 flex items-center gap-2 text-[10px] uppercase tracking-[0.08em] text-slate-400">
+        <span>{task.priority}</span>
+        {task.dueDate && (
+          <span>
+            Due {new Date(task.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function DayAheadSlot({
+  id,
+  label,
+  children,
+}: {
+  id: string;
+  label: string;
+  children?: React.ReactNode;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id });
+  return (
+    <div
+      ref={setNodeRef}
+      className={`flex gap-4 border-b border-slate-800/70 py-3 px-3 ${isOver ? 'bg-slate-900/80' : ''}`}
+    >
+      <div className="w-20 shrink-0 text-[11px] uppercase tracking-[0.18em] text-slate-500">{label}</div>
+      <div className="flex-1 min-h-[44px] space-y-2">
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export function HomeDashboard() {
   const { navigateTo, tasks, setSearchOpen, createTask, reorderTasks, updateTask, deleteTask } = useTaskContext();
   const { selectTask } = useTaskContext();
@@ -352,11 +428,22 @@ export function HomeDashboard() {
   const [editingArea, setEditingArea] = useState<Task | null>(null);
   const [editorTitle, setEditorTitle] = useState('');
   const [editorDescription, setEditorDescription] = useState('');
+  const [dayAheadOpen, setDayAheadOpen] = useState(false);
+  const [dayAheadDragId, setDayAheadDragId] = useState<string | null>(null);
+  const [carryoverDecisions, setCarryoverDecisions] = useState<Record<string, 'move' | 'deprioritize'>>({});
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
         distance: 8,
+      },
+    })
+  );
+
+  const dayAheadSensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 6,
       },
     })
   );
@@ -436,6 +523,69 @@ export function HomeDashboard() {
       todayCalendarItems: relevant.filter(t => t.calendarOnly),
     };
   }, [tasks]);
+
+  const { tomorrowStart, isTomorrow } = useMemo(() => {
+    const now = new Date();
+    const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    const nextDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 2);
+    const checkTomorrow = (d: Date) => d >= tomorrow && d < nextDay;
+    return { tomorrowStart: tomorrow, dayAfterStart: nextDay, isTomorrow: checkTomorrow };
+  }, []);
+
+  const carryoverCandidates = useMemo(
+    () => todayTasks.filter(t => !t.calendarOnly && t.status !== 'COMPLETED'),
+    [todayTasks]
+  );
+
+  useEffect(() => {
+    if (!dayAheadOpen) return;
+    setCarryoverDecisions(prev => {
+      const next = { ...prev };
+      carryoverCandidates.forEach(task => {
+        if (!next[task.id]) next[task.id] = 'move';
+      });
+      return next;
+    });
+  }, [dayAheadOpen, carryoverCandidates]);
+
+  const carryoverMove = useMemo(
+    () => carryoverCandidates.filter(task => (carryoverDecisions[task.id] ?? 'move') === 'move'),
+    [carryoverCandidates, carryoverDecisions]
+  );
+
+  const tomorrowScheduled = useMemo(
+    () =>
+      tasks.filter(t => {
+        if (t.status === 'COMPLETED' || t.calendarOnly || !t.scheduledDate) return false;
+        return isTomorrow(new Date(t.scheduledDate));
+      }),
+    [tasks, isTomorrow]
+  );
+
+  const pendingTomorrow = useMemo(() => {
+    const carryoverIds = new Set(carryoverCandidates.map(t => t.id));
+    return tasks
+      .filter(t => !t.calendarOnly && t.status !== 'COMPLETED')
+      .filter(t => !t.scheduledDate || !isTomorrow(new Date(t.scheduledDate)))
+      .filter(t => {
+        if (!carryoverIds.has(t.id)) return true;
+        return (carryoverDecisions[t.id] ?? 'move') === 'move';
+      })
+      .sort((a, b) => {
+        const priorityWeight = { HIGH: 3, MEDIUM: 2, LOW: 1 } as const;
+        return (priorityWeight[b.priority] - priorityWeight[a.priority]) || a.title.localeCompare(b.title);
+      });
+  }, [tasks, carryoverCandidates, carryoverDecisions, isTomorrow]);
+
+  const priorityThree = useMemo(() => {
+    const priorityWeight = { HIGH: 3, MEDIUM: 2, LOW: 1 } as const;
+    const candidates = [...tomorrowScheduled, ...carryoverMove]
+      .filter((task, index, arr) => arr.findIndex(t => t.id === task.id) === index)
+      .sort((a, b) => {
+        return (priorityWeight[b.priority] - priorityWeight[a.priority]) || a.title.localeCompare(b.title);
+      });
+    return candidates.slice(0, 3);
+  }, [tomorrowScheduled, carryoverMove]);
 
   const handleCompleteToday = async (task: Task) => {
     if (task.calendarOnly) {

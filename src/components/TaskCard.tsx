@@ -6,7 +6,6 @@ import { CSS } from '@dnd-kit/utilities';
 import { useTaskContext } from '@/lib/task-context';
 import { Task } from '@/lib/types';
 import { getTaskPath, formatBreadcrumb, getCompletedAgoText } from '@/lib/tasks';
-import { formatCompactDate, getDateStatusColor } from '@/lib/color-utils';
 
 interface TaskCardProps {
   task: Task;
@@ -47,13 +46,59 @@ export function TaskCard({ task, isDragging, accentColor }: TaskCardProps) {
   const completedAgo = task.status === 'COMPLETED' ? getCompletedAgoText(task) : '';
 
   // Date logic
-  const dateColorClass = task.dueDate ? getDateStatusColor(new Date(task.dueDate)) : '';
+  const referenceDate = new Date(2026, 1, 4);
   const dueDateObj = task.dueDate ? new Date(task.dueDate) : null;
-  const isOverdue = dueDateObj ? dueDateObj.getTime() < Date.now() && task.status !== 'COMPLETED' : false;
-  const dueLabel = dueDateObj
-    ? dueDateObj.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  const scheduledDateObj = task.scheduledDate ? new Date(task.scheduledDate) : null;
+  const scheduledLabel = scheduledDateObj
+    ? scheduledDateObj.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
     : '';
-  const isOngoing = !dueDateObj && task.status !== 'COMPLETED';
+  const msPerDay = 1000 * 60 * 60 * 24;
+  const daysUntilScheduled = scheduledDateObj
+    ? Math.ceil((scheduledDateObj.getTime() - referenceDate.getTime()) / msPerDay)
+    : null;
+  const isPending = task.status === 'NOT_STARTED' && daysUntilScheduled !== null && daysUntilScheduled > 7;
+
+  const timeRemainingTag = (() => {
+    if (task.status === 'COMPLETED' || !dueDateObj) return null;
+    const daysLeft = Math.ceil((dueDateObj.getTime() - referenceDate.getTime()) / msPerDay);
+    if (daysLeft < 0) {
+      const overdueDays = Math.abs(daysLeft);
+      return {
+        label: `${overdueDays} Day${overdueDays === 1 ? '' : 's'} Overdue`,
+        className: 'border-red-500/40 bg-red-500/10 text-red-300',
+      };
+    }
+    if (daysLeft < 32) {
+      return {
+        label: `${daysLeft} Day${daysLeft === 1 ? '' : 's'} Left`,
+        className: 'border-slate-600/50 bg-slate-800/60 text-slate-200',
+      };
+    }
+    const monthsLeft = Math.round(daysLeft / 30);
+    return {
+      label: `${monthsLeft} Month${monthsLeft === 1 ? '' : 's'} Left`,
+      className: 'border-slate-600/50 bg-slate-800/60 text-slate-200',
+    };
+  })();
+
+  const statusTags: { label: string; className: string }[] = [];
+
+  if (task.status === 'COMPLETED') {
+    statusTags.push({ label: 'Done', className: 'text-emerald-300 border-emerald-400/30 bg-emerald-400/10' });
+  } else {
+    if (task.status === 'IN_PROGRESS' && !dueDateObj) {
+      statusTags.push({ label: 'Ongoing', className: 'text-slate-200 border-slate-500/40 bg-slate-500/15 font-semibold' });
+    }
+    if (task.status === 'NOT_STARTED' && scheduledDateObj) {
+      statusTags.push({ label: `Scheduled ${scheduledLabel}`, className: 'text-slate-500 border-slate-500/30 bg-slate-500/10' });
+      if (isPending) {
+        statusTags.push({ label: 'Pending', className: 'text-slate-500 border-slate-500/30 bg-slate-500/10' });
+      }
+    }
+    if (task.status === 'ON_HOLD') {
+      statusTags.push({ label: 'On Hold', className: 'text-amber-300 border-amber-400/30 bg-amber-400/10' });
+    }
+  }
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -123,8 +168,8 @@ export function TaskCard({ task, isDragging, accentColor }: TaskCardProps) {
       {...listeners}
       className={`
         group relative bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 
-        p-2.5 shadow-sm hover:shadow-md transition-all cursor-pointer
-        ${isDragging ? 'opacity-50 shadow-lg' : ''}
+        p-2.5 shadow-sm transition-all cursor-grab active:cursor-grabbing hover:shadow-md hover:-translate-y-0.5 hover:border-slate-300 dark:hover:border-slate-700
+        ${isDragging ? 'opacity-50 shadow-lg cursor-grabbing' : ''}
       `}
       onClick={handleCardClick}
     >
@@ -174,7 +219,7 @@ export function TaskCard({ task, isDragging, accentColor }: TaskCardProps) {
         )}
       </div>
 
-      <div className="flex items-center gap-3 mt-2.5">
+      <div className="flex items-center gap-3 mt-2.5 flex-wrap">
         {task.status !== 'COMPLETED' && (
           <div className="flex gap-0.5">
             <div className={`w-1 h-3 rounded-full ${task.priority === 'HIGH' ? 'bg-red-400' : task.priority === 'MEDIUM' ? 'bg-amber-400' : 'bg-slate-300'}`} />
@@ -182,21 +227,15 @@ export function TaskCard({ task, isDragging, accentColor }: TaskCardProps) {
           </div>
         )}
 
-        {dueDateObj && task.status !== 'COMPLETED' && (
-          <span
-            className={`text-[11px] px-2 py-0.5 rounded-md border ${
-              isOverdue
-                ? 'text-red-400 border-red-400/40 bg-red-400/10'
-                : 'text-slate-400 border-slate-500/30 bg-slate-500/10'
-            }`}
-          >
-            Due {dueLabel}
+        {statusTags.map((tag) => (
+          <span key={tag.label} className={`text-[11px] px-2 py-0.5 rounded-md border ${tag.className}`}>
+            {tag.label}
           </span>
-        )}
+        ))}
 
-        {isOngoing && (
-          <span className="text-[11px] px-2 py-0.5 rounded-md border text-slate-400 border-slate-500/30 bg-slate-500/10">
-            Ongoing
+        {timeRemainingTag && (
+          <span className={`text-[10px] px-2 py-0.5 rounded-md border uppercase tracking-[0.08em] ${timeRemainingTag.className}`}>
+            {timeRemainingTag.label}
           </span>
         )}
 
