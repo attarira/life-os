@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   DndContext,
@@ -29,9 +29,59 @@ type AreaSnapshot = {
   area: Task;
   statusCounts: Record<TaskStatus, number>;
   total: number;
+  activeCount: number;
+  weekCount: number;
   dueSoon: boolean;
   highlights: string[];
 };
+
+type NotePage = {
+  id: string;
+  title: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+const DASHBOARD_PAGES_STORAGE_KEY = 'lifeos:dashboard-pages:v1';
+
+function buildPageId() {
+  return typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function createPage(title = 'Untitled', content = ''): NotePage {
+  const nowIso = new Date().toISOString();
+  return {
+    id: buildPageId(),
+    title,
+    content,
+    createdAt: nowIso,
+    updatedAt: nowIso,
+  };
+}
+
+function loadPagesState() {
+  if (typeof window === 'undefined') {
+    const starter = createPage();
+    return { pages: [starter], activePageId: starter.id };
+  }
+
+  try {
+    const raw = window.localStorage.getItem(DASHBOARD_PAGES_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      const hydrated = parsed.filter(Boolean) as NotePage[];
+      return { pages: hydrated, activePageId: hydrated[0].id };
+    }
+  } catch (error) {
+    console.warn('Failed to load pages:', error);
+  }
+
+  const starter = createPage();
+  return { pages: [starter], activePageId: starter.id };
+}
 
 const LIFE_AREA_ICONS: Record<string, React.JSX.Element> = {
   career: (
@@ -156,6 +206,8 @@ function LifeAreaCard({
   area,
   statusCounts,
   total,
+  activeCount,
+  weekCount,
   dueSoon,
   highlights = [],
   onOpen,
@@ -170,6 +222,8 @@ function LifeAreaCard({
   area: Task;
   statusCounts: Record<TaskStatus, number>;
   total: number;
+  activeCount: number;
+  weekCount: number;
   dueSoon: boolean;
   highlights?: string[];
   onOpen: () => void;
@@ -195,6 +249,25 @@ function LifeAreaCard({
   const ringRadius = (ringSize - ringTrackStroke) / 2;
   const ringCircumference = 2 * Math.PI * ringRadius;
   const ringSegments = buildStatusRingSegments(statusCounts, total, ringCircumference, ringSegmentGap);
+  const ringLabels = useMemo(
+    () => [
+      { value: total, label: 'tasks' },
+      { value: activeCount, label: 'active' },
+      { value: weekCount, label: 'this week' },
+    ],
+    [total, activeCount, weekCount]
+  );
+  const [ringLabelIndex, setRingLabelIndex] = useState(0);
+
+  useEffect(() => {
+    if (ringLabels.length <= 1) return;
+    const id = window.setInterval(() => {
+      setRingLabelIndex((prev) => (prev + 1) % ringLabels.length);
+    }, 5000);
+    return () => window.clearInterval(id);
+  }, [ringLabels.length]);
+
+  const currentRingLabel = ringLabels[ringLabelIndex] || ringLabels[0];
 
   return (
     <div
@@ -298,8 +371,14 @@ function LifeAreaCard({
                 });
               })()}
             </svg>
-            <div className="absolute inset-[12px] rounded-full bg-slate-900/90 dark:bg-slate-900 flex items-center justify-center text-[14px] font-semibold text-white">
-              {total}
+            <div className="absolute inset-[12px] rounded-full bg-slate-900/90 dark:bg-slate-900 flex flex-col items-center justify-center text-white text-center">
+              <div className="text-[15px] font-semibold">{currentRingLabel.value}</div>
+              <div
+                key={`${currentRingLabel.label}-${currentRingLabel.value}`}
+                className="text-[9px] uppercase tracking-[0.18em] text-slate-400 transition-opacity duration-300"
+              >
+                {currentRingLabel.label}
+              </div>
             </div>
           </div>
         </div>
@@ -342,10 +421,12 @@ function SortableLifeAreaCard({
   };
 
   return (
-    <LifeAreaCard
+      <LifeAreaCard
       area={snapshot.area}
       statusCounts={snapshot.statusCounts}
       total={snapshot.total}
+      activeCount={snapshot.activeCount}
+      weekCount={snapshot.weekCount}
       dueSoon={snapshot.dueSoon}
       highlights={snapshot.highlights}
       onOpen={onOpen}
@@ -397,6 +478,22 @@ function DayAheadDraggableTask({
   );
 }
 
+function DayAheadTaskPreview({ task }: { task: Task }) {
+  return (
+    <div className="rounded-lg border border-slate-800/80 bg-slate-900/80 px-3 py-2 text-xs text-slate-200 shadow-md">
+      <div className="font-semibold text-slate-100">{task.title}</div>
+      <div className="mt-1 flex items-center gap-2 text-[10px] uppercase tracking-[0.08em] text-slate-400">
+        <span>{task.priority}</span>
+        {task.dueDate && (
+          <span>
+            Due {new Date(task.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function DayAheadSlot({
   id,
   label,
@@ -431,6 +528,14 @@ export function HomeDashboard() {
   const [dayAheadOpen, setDayAheadOpen] = useState(false);
   const [dayAheadDragId, setDayAheadDragId] = useState<string | null>(null);
   const [carryoverDecisions, setCarryoverDecisions] = useState<Record<string, 'move' | 'deprioritize'>>({});
+  const [initialPagesState] = useState(() => loadPagesState());
+  const [pages, setPages] = useState<NotePage[]>(initialPagesState.pages);
+  const [activePageId, setActivePageId] = useState<string | null>(initialPagesState.activePageId);
+  const [isNotesDrawerOpen, setIsNotesDrawerOpen] = useState(false);
+  const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
+  const [noteDraftTitle, setNoteDraftTitle] = useState('');
+  const noteEditorRef = useRef<HTMLDivElement>(null);
+  const noteDraftContentRef = useRef('');
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -448,6 +553,142 @@ export function HomeDashboard() {
     })
   );
 
+  useEffect(() => {
+    if (pages.length === 0) return;
+    try {
+      localStorage.setItem(DASHBOARD_PAGES_STORAGE_KEY, JSON.stringify(pages));
+    } catch (error) {
+      console.warn('Failed to persist pages:', error);
+    }
+  }, [pages]);
+
+  const activePage = useMemo(
+    () => pages.find((page) => page.id === activePageId) || null,
+    [pages, activePageId]
+  );
+
+  useEffect(() => {
+    if (!isNoteModalOpen || !noteEditorRef.current) return;
+    noteEditorRef.current.innerHTML = noteDraftContentRef.current || '<p><br></p>';
+  }, [isNoteModalOpen, activePageId]);
+
+  const setDraftFromPage = (page: NotePage | null) => {
+    if (!page) return;
+    setNoteDraftTitle(page.title || 'Untitled');
+    noteDraftContentRef.current = page.content || '';
+  };
+
+  const commitNoteDraft = () => {
+    if (!activePage) return;
+    const nextTitle = noteDraftTitle.trim() || 'Untitled';
+    const nextContent = noteDraftContentRef.current;
+    const currentContent = activePage.content || '';
+    if (nextTitle === activePage.title && nextContent === currentContent) return;
+    const nowIso = new Date().toISOString();
+    setPages((prev) => prev.map((page) => (
+      page.id === activePage.id
+        ? { ...page, title: nextTitle, content: nextContent, updatedAt: nowIso }
+        : page
+    )));
+  };
+
+  const handleCreatePage = () => {
+    const next = createPage();
+    setPages((prev) => [next, ...prev]);
+    setActivePageId(next.id);
+    setDraftFromPage(next);
+    setIsNoteModalOpen(true);
+  };
+
+  const handleRenamePage = () => {
+    const nextTitle = prompt('Rename note', noteDraftTitle || activePage?.title || 'Untitled');
+    if (nextTitle === null) return;
+    const trimmed = nextTitle.trim();
+    if (!trimmed) return;
+    setNoteDraftTitle(trimmed);
+  };
+
+  const handleDeletePage = () => {
+    if (!activePage) return;
+    const confirmed = confirm(`Delete page "${activePage.title}"?`);
+    if (!confirmed) return;
+
+    setPages((prev) => {
+      const next = prev.filter((page) => page.id !== activePage.id);
+      if (next.length > 0) {
+        setActivePageId(next[0].id);
+        if (isNoteModalOpen) {
+          setDraftFromPage(next[0]);
+        }
+        return next;
+      }
+      const fallback = createPage();
+      setActivePageId(fallback.id);
+      if (isNoteModalOpen) {
+        setDraftFromPage(fallback);
+      }
+      return [fallback];
+    });
+  };
+
+  const handleDuplicatePage = () => {
+    if (!activePage) return;
+    const nowIso = new Date().toISOString();
+    const sourceTitle = noteDraftTitle.trim() || activePage.title || 'Untitled';
+    const sourceContent = noteDraftContentRef.current || activePage.content || '';
+    const copy: NotePage = {
+      ...activePage,
+      id: buildPageId(),
+      title: `${sourceTitle} Copy`,
+      content: sourceContent,
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    };
+    setPages((prev) => {
+      const next = prev.map((page) => (
+        page.id === activePage.id
+          ? { ...page, title: sourceTitle, content: sourceContent, updatedAt: nowIso }
+          : page
+      ));
+      return [copy, ...next];
+    });
+    setActivePageId(copy.id);
+    setDraftFromPage(copy);
+    setIsNoteModalOpen(true);
+  };
+
+  const handlePageTitleChange = (value: string) => {
+    setNoteDraftTitle(value);
+  };
+
+  const handlePageContentChange = (value: string) => {
+    noteDraftContentRef.current = value;
+  };
+
+  const sortedPages = useMemo(
+    () => pages.slice().sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
+    [pages]
+  );
+
+  const applyPageCommand = (command: 'bold' | 'italic' | 'insertUnorderedList') => {
+    document.execCommand(command);
+  };
+
+  const openNoteModal = (pageId: string) => {
+    if (isNoteModalOpen) {
+      commitNoteDraft();
+    }
+    const page = pages.find((candidate) => candidate.id === pageId) || null;
+    setDraftFromPage(page);
+    setActivePageId(pageId);
+    setIsNoteModalOpen(true);
+  };
+
+  const closeNoteModal = () => {
+    commitNoteDraft();
+    setIsNoteModalOpen(false);
+  };
+
   const lifeAreas = useMemo(
     () => tasks.filter(t => t.parentId === ROOT_TASK_ID && !t.calendarOnly).sort((a, b) => a.order - b.order),
     [tasks]
@@ -461,6 +702,17 @@ export function HomeDashboard() {
         acc[col.status] = immediateTasks.filter(t => t.status === col.status).length;
         return acc;
       }, {} as Record<TaskStatus, number>);
+
+      const activeCount = immediateTasks.filter(t => t.status !== 'COMPLETED').length;
+      const now = new Date();
+      const weekEnd = new Date(now);
+      weekEnd.setDate(now.getDate() + 7);
+      const weekCount = immediateTasks.filter(t => {
+        if (t.status === 'COMPLETED') return false;
+        const due = t.dueDate ? new Date(t.dueDate) : null;
+        const scheduled = t.scheduledDate ? new Date(t.scheduledDate) : null;
+        return Boolean((due && due <= weekEnd) || (scheduled && scheduled <= weekEnd));
+      }).length;
 
       const dueSoon = immediateTasks.some(isDueWithinThreeDays);
 
@@ -480,6 +732,8 @@ export function HomeDashboard() {
         area,
         statusCounts,
         total: immediateTasks.length,
+        activeCount,
+        weekCount,
         dueSoon,
         highlights: highlightCandidates.map(t => t.title),
       };
@@ -524,13 +778,10 @@ export function HomeDashboard() {
     };
   }, [tasks]);
 
-  const { tomorrowStart, isTomorrow } = useMemo(() => {
-    const now = new Date();
-    const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-    const nextDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 2);
-    const checkTomorrow = (d: Date) => d >= tomorrow && d < nextDay;
-    return { tomorrowStart: tomorrow, dayAfterStart: nextDay, isTomorrow: checkTomorrow };
-  }, []);
+  const now = new Date();
+  const tomorrowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  const dayAfterTomorrowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 2);
+  const isTomorrow = (d: Date) => d >= tomorrowStart && d < dayAfterTomorrowStart;
 
   const carryoverCandidates = useMemo(
     () => todayTasks.filter(t => !t.calendarOnly && t.status !== 'COMPLETED'),
@@ -577,16 +828,6 @@ export function HomeDashboard() {
       });
   }, [tasks, carryoverCandidates, carryoverDecisions, isTomorrow]);
 
-  const priorityThree = useMemo(() => {
-    const priorityWeight = { HIGH: 3, MEDIUM: 2, LOW: 1 } as const;
-    const candidates = [...tomorrowScheduled, ...carryoverMove]
-      .filter((task, index, arr) => arr.findIndex(t => t.id === task.id) === index)
-      .sort((a, b) => {
-        return (priorityWeight[b.priority] - priorityWeight[a.priority]) || a.title.localeCompare(b.title);
-      });
-    return candidates.slice(0, 3);
-  }, [tomorrowScheduled, carryoverMove]);
-
   const handleCompleteToday = async (task: Task) => {
     if (task.calendarOnly) {
       await deleteTask(task.id);
@@ -599,13 +840,13 @@ export function HomeDashboard() {
 
   const upcomingTasks = useMemo(() => {
     const now = new Date();
-    const tomorrowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
     const windowEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 8);
     return tasks
       .filter(t => t.dueDate && t.status !== 'COMPLETED' && !t.calendarOnly)
       .filter(t => {
-        const d = new Date(t.dueDate!);
-        return d >= tomorrowStart && d < windowEnd;
+        const due = new Date(t.dueDate!);
+        return due >= tomorrow && due < windowEnd;
       })
       .sort((a, b) => (a.dueDate?.getTime() || 0) - (b.dueDate?.getTime() || 0));
   }, [tasks]);
@@ -627,6 +868,46 @@ export function HomeDashboard() {
 
     const reordered = arrayMove(lifeAreas, oldIndex, newIndex).map(area => area.id);
     await reorderTasks(reordered, 'NOT_STARTED');
+  };
+
+  const handleDayAheadDragStart = (event: DragStartEvent) => {
+    setDayAheadDragId(event.active.id as string);
+  };
+
+  const handleDayAheadDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    setDayAheadDragId(null);
+
+    if (!over) return;
+    const overId = String(over.id);
+    if (!overId.startsWith('slot-')) return;
+
+    const hour = Number(overId.replace('slot-', ''));
+    if (Number.isNaN(hour)) return;
+
+    const task = tasks.find(t => t.id === active.id);
+    if (!task) return;
+
+    const scheduledDate = new Date(tomorrowStart);
+    scheduledDate.setHours(hour, 0, 0, 0);
+    await updateTask(task.id, { scheduledDate });
+  };
+
+  const handleDayAheadApply = async () => {
+    for (const task of carryoverCandidates) {
+      const decision = carryoverDecisions[task.id] ?? 'move';
+      if (decision === 'deprioritize') {
+        await updateTask(task.id, { priority: 'LOW' });
+        continue;
+      }
+      if (decision === 'move' && task.scheduledDate) {
+        const scheduled = new Date(task.scheduledDate);
+        const moved = new Date(tomorrowStart);
+        moved.setHours(scheduled.getHours(), scheduled.getMinutes(), 0, 0);
+        await updateTask(task.id, { scheduledDate: moved });
+      }
+    }
+    setDayAheadOpen(false);
   };
 
   const openEditor = (area?: Task) => {
@@ -669,6 +950,8 @@ export function HomeDashboard() {
     closeEditor();
   };
 
+  const activeDayAheadTask = dayAheadDragId ? tasks.find(t => t.id === dayAheadDragId) : null;
+
   const handleEditorDelete = async () => {
     if (!editingArea) {
       closeEditor();
@@ -708,7 +991,93 @@ export function HomeDashboard() {
       </header>
 
       <main className="flex-1 overflow-auto p-6">
-        <div className="max-w-7xl mx-auto space-y-6">
+        <aside
+          className={`hidden xl:block fixed right-0 top-[73px] bottom-0 z-30 transition-[width] duration-200 ${
+            isNotesDrawerOpen ? 'w-[330px]' : 'w-[56px]'
+          }`}
+        >
+          <div className="h-full w-full rounded-l-2xl border-l border-t border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-950/95 shadow-2xl backdrop-blur-sm">
+            {!isNotesDrawerOpen ? (
+              <button
+                type="button"
+                onClick={() => setIsNotesDrawerOpen(true)}
+                className="h-full w-full flex flex-col items-center justify-center gap-3 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100"
+                aria-label="Open notes drawer"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+                <span className="text-[10px] uppercase tracking-[0.22em] [writing-mode:vertical-rl] rotate-180">
+                  Notes
+                </span>
+              </button>
+            ) : (
+              <div className="h-full flex flex-col">
+                <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.16em] text-slate-400">NOTES</p>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">{sortedPages.length} total</p>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={handleCreatePage}
+                        className="inline-flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium bg-slate-900 text-white dark:bg-white dark:text-slate-900"
+                      >
+                        New
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsNotesDrawerOpen(false)}
+                        className="h-8 w-8 rounded-md border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                        aria-label="Collapse notes drawer"
+                      >
+                        <svg className="w-4 h-4 mx-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 5l-7 7 7 7" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                  {sortedPages.map((page) => {
+                    const preview = page.content.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+                    const isActive = page.id === activePageId;
+                    return (
+                      <button
+                        key={page.id}
+                        type="button"
+                        onClick={() => openNoteModal(page.id)}
+                        className={`w-full text-left rounded-lg px-2.5 py-2 transition-colors ${
+                          isActive
+                            ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-white'
+                            : 'hover:bg-slate-100/80 text-slate-700 dark:text-slate-300 dark:hover:bg-slate-800/70'
+                        }`}
+                      >
+                        <p className="text-sm font-medium truncate">{page.title || 'Untitled'}</p>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                          {preview || 'Empty page'}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        </aside>
+
+        <div className={`max-w-7xl mx-auto space-y-6 ${isNotesDrawerOpen ? 'xl:pr-[330px]' : 'xl:pr-[56px]'}`}>
+          <div className="flex items-center justify-end">
+            <button
+              onClick={() => setDayAheadOpen(true)}
+              className="px-3 py-2 text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-lg hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-slate-600 transition-colors"
+            >
+              Day Ahead
+            </button>
+          </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div className="group bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm relative overflow-hidden">
               <div className="flex items-center justify-between mb-4">
@@ -848,7 +1217,6 @@ export function HomeDashboard() {
               ) : (
                 <div className="divide-y divide-slate-200 dark:divide-slate-800">
                   {upcomingTasks.map(task => {
-                    const area = lifeAreas.find(a => a.id === task.parentId);
                     const dueLabel = task.dueDate
                       ? new Date(task.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
                       : '';
@@ -898,6 +1266,8 @@ export function HomeDashboard() {
                   area={activeArea.area}
                   statusCounts={activeArea.statusCounts}
                   total={activeArea.total}
+                  activeCount={activeArea.activeCount}
+                  weekCount={activeArea.weekCount}
                   dueSoon={activeArea.dueSoon}
                   onOpen={() => {}}
                   muted
@@ -968,6 +1338,269 @@ export function HomeDashboard() {
                       Save
                     </button>
                   </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {isNoteModalOpen && activePage && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-8">
+              <div
+                className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+                onClick={closeNoteModal}
+              />
+              <div className="relative w-full max-w-2xl rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-2xl p-5 space-y-4">
+                <div className="flex items-center justify-between gap-3">
+                  <input
+                    value={noteDraftTitle}
+                    onChange={(e) => handlePageTitleChange(e.target.value)}
+                    className="flex-1 bg-transparent text-lg font-semibold text-slate-900 dark:text-white focus:outline-none border-b border-slate-200 dark:border-slate-700 pb-1"
+                  />
+                  <button
+                    type="button"
+                    onClick={closeNoteModal}
+                    className="h-8 w-8 rounded-lg text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
+                    aria-label="Close note"
+                  >
+                    <svg className="w-4 h-4 mx-auto" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" fill="none">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M18 6 6 18M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => applyPageCommand('bold')}
+                      className="h-8 w-8 rounded-md border border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                      aria-label="Bold"
+                    >
+                      B
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => applyPageCommand('italic')}
+                      className="h-8 w-8 rounded-md border border-slate-200 dark:border-slate-700 text-sm italic font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                      aria-label="Italic"
+                    >
+                      I
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => applyPageCommand('insertUnorderedList')}
+                      className="h-8 w-8 rounded-md border border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                      aria-label="Bullet list"
+                    >
+                      •
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs">
+                    <button
+                      type="button"
+                      onClick={handleRenamePage}
+                      className="px-2 py-1 rounded-md text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                    >
+                      Rename
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDuplicatePage}
+                      className="px-2 py-1 rounded-md text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                    >
+                      Duplicate
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDeletePage}
+                      className="px-2 py-1 rounded-md text-red-600 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+
+                <div
+                  ref={noteEditorRef}
+                  contentEditable
+                  suppressContentEditableWarning
+                  onInput={(e) => handlePageContentChange((e.currentTarget as HTMLDivElement).innerHTML)}
+                  className="min-h-[300px] max-h-[60vh] overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/40 px-3 py-2 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-300 dark:focus:ring-slate-700"
+                />
+              </div>
+            </div>
+          )}
+
+          {dayAheadOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center px-6 py-10">
+              <div
+                className="absolute inset-0 bg-black/70"
+                onClick={() => setDayAheadOpen(false)}
+              />
+              <div className="relative w-full max-w-6xl bg-slate-950 text-slate-100 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800/80">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-[0.3em] text-slate-500">Day Ahead</p>
+                    <h2 className="text-lg font-semibold text-slate-100">
+                      {tomorrowStart.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}
+                    </h2>
+                  </div>
+                  <button
+                    onClick={() => setDayAheadOpen(false)}
+                    className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+                    aria-label="Close day ahead"
+                  >
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" fill="none">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M18 6 6 18M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-[minmax(260px,320px)_1fr] gap-4 p-6">
+                  <div className="rounded-xl border border-slate-800/80 bg-slate-900/40 p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Carryover</p>
+                        <p className="text-xs text-slate-400">Today not completed</p>
+                      </div>
+                      <span className="text-[11px] text-slate-500">{carryoverCandidates.length}</span>
+                    </div>
+                    <div className="space-y-3 max-h-[520px] overflow-y-auto pr-1">
+                      {carryoverCandidates.length === 0 && (
+                        <p className="text-xs text-slate-500">Nothing to carry forward.</p>
+                      )}
+                      {carryoverCandidates.map(task => {
+                        const decision = carryoverDecisions[task.id] ?? 'move';
+                        return (
+                          <div key={task.id} className="rounded-lg border border-slate-800/80 bg-slate-950/40 p-3 space-y-2">
+                            <div className="text-sm font-semibold text-slate-100">{task.title}</div>
+                            <div className="text-[11px] text-slate-500">
+                              {task.scheduledDate && (
+                                <span className="mr-2">
+                                  Scheduled {new Date(task.scheduledDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                </span>
+                              )}
+                              {task.dueDate && (
+                                <span>
+                                  Due {new Date(task.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.14em]">
+                              <button
+                                type="button"
+                                onClick={() => setCarryoverDecisions(prev => ({ ...prev, [task.id]: 'move' }))}
+                                className={`px-2 py-1 rounded-md border ${
+                                  decision === 'move'
+                                    ? 'border-slate-500 text-slate-100 bg-slate-800/70'
+                                    : 'border-slate-800 text-slate-500 hover:text-slate-300'
+                                }`}
+                              >
+                                Move
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setCarryoverDecisions(prev => ({ ...prev, [task.id]: 'deprioritize' }))}
+                                className={`px-2 py-1 rounded-md border ${
+                                  decision === 'deprioritize'
+                                    ? 'border-slate-500 text-slate-100 bg-slate-800/70'
+                                    : 'border-slate-800 text-slate-500 hover:text-slate-300'
+                                }`}
+                              >
+                                Deprioritize
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-slate-800/80 bg-slate-900/40 overflow-hidden">
+                    <DndContext
+                      sensors={dayAheadSensors}
+                      onDragStart={handleDayAheadDragStart}
+                      onDragEnd={handleDayAheadDragEnd}
+                    >
+                      <div className="grid grid-cols-[220px_1fr]">
+                        <div className="border-r border-slate-800/80 bg-slate-950/60">
+                          <div className="px-4 py-3 border-b border-slate-800/80">
+                            <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Pending</p>
+                            <p className="text-xs text-slate-500">Drag into timeline</p>
+                          </div>
+                          <div className="px-3 py-3 space-y-2 max-h-[520px] overflow-y-auto">
+                            {pendingTomorrow.length === 0 && (
+                              <p className="text-xs text-slate-500">No pending tasks.</p>
+                            )}
+                            {pendingTomorrow.map(task => (
+                              <DayAheadDraggableTask key={task.id} task={task} />
+                            ))}
+                          </div>
+                        </div>
+                        <div className="bg-slate-950/40">
+                          <div className="px-4 py-3 border-b border-slate-800/80">
+                            <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Schedule</p>
+                            <p className="text-xs text-slate-500">Tomorrow timeline</p>
+                          </div>
+                          <div className="max-h-[520px] overflow-y-auto">
+                            {DAY_AHEAD_SLOTS.map(hour => {
+                              const slotTasks = tomorrowScheduled.filter(task => {
+                                if (!task.scheduledDate) return false;
+                                return new Date(task.scheduledDate).getHours() === hour;
+                              });
+                              return (
+                                <DayAheadSlot key={hour} id={`slot-${hour}`} label={formatHourLabel(hour)}>
+                                  {slotTasks.length === 0 && (
+                                    <div className="text-[11px] text-slate-600">Drop task here</div>
+                                  )}
+                                  {slotTasks.map(task => (
+                                    <div key={task.id} className="flex items-center gap-2">
+                                      <div className="flex-1">
+                                        <DayAheadDraggableTask task={task} />
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => updateTask(task.id, { scheduledDate: undefined })}
+                                        className="h-8 w-8 rounded-lg border border-slate-800/80 text-slate-500 hover:text-slate-200 hover:border-slate-700"
+                                        aria-label="Remove from schedule"
+                                      >
+                                        <svg className="w-3.5 h-3.5 mx-auto" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" fill="none">
+                                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                      </button>
+                                    </div>
+                                  ))}
+                                </DayAheadSlot>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+
+                      <DragOverlay>
+                        {activeDayAheadTask ? (
+                          <div className="w-52">
+                            <DayAheadTaskPreview task={activeDayAheadTask} />
+                          </div>
+                        ) : null}
+                      </DragOverlay>
+                    </DndContext>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-slate-800/80 bg-slate-950/80">
+                  <button
+                    onClick={() => setDayAheadOpen(false)}
+                    className="px-3 py-2 text-xs uppercase tracking-[0.18em] text-slate-400 hover:text-slate-200"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleDayAheadApply}
+                    className="px-4 py-2 text-xs uppercase tracking-[0.18em] bg-slate-100 text-slate-900 rounded-lg hover:bg-white"
+                  >
+                    Apply Plan
+                  </button>
                 </div>
               </div>
             </div>

@@ -46,7 +46,9 @@ export function TaskCard({ task, isDragging, accentColor }: TaskCardProps) {
   const completedAgo = task.status === 'COMPLETED' ? getCompletedAgoText(task) : '';
 
   // Date logic
-  const referenceDate = new Date(2026, 1, 4);
+  const referenceDate = new Date();
+  // Use local noon to stay aligned with date-only task inputs saved at noon.
+  referenceDate.setHours(12, 0, 0, 0);
   const dueDateObj = task.dueDate ? new Date(task.dueDate) : null;
   const scheduledDateObj = task.scheduledDate ? new Date(task.scheduledDate) : null;
   const scheduledLabel = scheduledDateObj
@@ -87,7 +89,11 @@ export function TaskCard({ task, isDragging, accentColor }: TaskCardProps) {
     statusTags.push({ label: 'Done', className: 'text-emerald-300 border-emerald-400/30 bg-emerald-400/10' });
   } else {
     if (task.status === 'IN_PROGRESS' && !dueDateObj) {
-      statusTags.push({ label: 'Ongoing', className: 'text-slate-200 border-slate-500/40 bg-slate-500/15 font-semibold' });
+      const frequencyLabel = task.frequency?.trim();
+      statusTags.push({
+        label: frequencyLabel || 'Ongoing',
+        className: 'text-slate-200 border-slate-500/40 bg-slate-500/15 font-semibold',
+      });
     }
     if (task.status === 'NOT_STARTED' && scheduledDateObj) {
       statusTags.push({ label: `Scheduled ${scheduledLabel}`, className: 'text-slate-500 border-slate-500/30 bg-slate-500/10' });

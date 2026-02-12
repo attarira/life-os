@@ -13,6 +13,7 @@ export function TaskPanel() {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [subtasksOpen, setSubtasksOpen] = useState(false);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
+  const [frequency, setFrequency] = useState('');
   const panelRef = useRef<HTMLDivElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
@@ -28,6 +29,7 @@ export function TaskPanel() {
       setIsEditingTitle(false);
       setSubtasksOpen(false);
       setNewSubtaskTitle('');
+      setFrequency(task.frequency || '');
     }
   }, [task]);
 
@@ -108,6 +110,14 @@ export function TaskPanel() {
     }
   };
 
+  const handleFrequencySave = async () => {
+    const trimmed = frequency.trim();
+    const current = task.frequency || '';
+    if (trimmed !== current) {
+      await updateTask(task.id, { frequency: trimmed || undefined });
+    }
+  };
+
   const handleAddSubtask = async () => {
     const trimmed = newSubtaskTitle.trim();
     if (!trimmed) return;
@@ -142,6 +152,7 @@ export function TaskPanel() {
     await handleDescriptionSave();
     await handleScheduledDateSave();
     await handleDueDateSave();
+    await handleFrequencySave();
   };
 
   return (
@@ -356,6 +367,20 @@ export function TaskPanel() {
               </div>
             </div>
           </div>
+
+          {task.status === 'IN_PROGRESS' && !task.dueDate && (
+            <div>
+              <div className="text-[11px] uppercase tracking-[0.14em] text-slate-400 mb-2">Frequency</div>
+              <input
+                value={frequency}
+                onChange={(e) => setFrequency(e.target.value)}
+                onBlur={handleFrequencySave}
+                placeholder="Daily, 2x a week, every Friday..."
+                className="w-full rounded-xl bg-slate-800/50 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-600"
+              />
+              <p className="mt-1 text-xs text-slate-500">Shown instead of “Ongoing” for no-due tasks.</p>
+            </div>
+          )}
 
           <div>
             <div className="flex items-center justify-between gap-3">

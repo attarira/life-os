@@ -19,6 +19,7 @@ export interface Task {
   scheduledDate?: Date;
   calendarOnly?: boolean;
   tags?: string[];
+  frequency?: string;
 }
 
 // Task creation input (without auto-generated fields)
