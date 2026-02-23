@@ -122,8 +122,8 @@ function SortablePlannerRow({
       ref={setNodeRef}
       style={style}
       className={`group/row flex items-center gap-3 px-4 py-2.5 border-b border-slate-800/40 last:border-b-0 transition-all ${isDragging
-          ? 'opacity-50 bg-slate-800/40 z-10 shadow-lg rounded-lg'
-          : 'hover:bg-slate-800/30'
+        ? 'opacity-50 bg-slate-800/40 z-10 shadow-lg rounded-lg'
+        : 'hover:bg-slate-800/30'
         }`}
     >
       {/* Drag handle area — invisible, whole row drags on hover via the grip zone */}
@@ -151,8 +151,8 @@ function SortablePlannerRow({
           onToggle();
         }}
         className={`flex-shrink-0 w-4 h-4 rounded-[5px] border-[1.5px] transition-all flex items-center justify-center ${entry.completed
-            ? 'bg-emerald-500/80 border-emerald-500/80 text-white'
-            : 'border-slate-600 hover:border-slate-400'
+          ? 'bg-emerald-500/80 border-emerald-500/80 text-white'
+          : 'border-slate-600 hover:border-slate-400'
           }`}
       >
         {entry.completed && (
@@ -169,8 +169,8 @@ function SortablePlannerRow({
       >
         <span
           className={`text-[13px] leading-snug block truncate transition-all ${entry.completed
-              ? 'text-slate-500 line-through'
-              : 'text-slate-100'
+            ? 'text-slate-500 line-through'
+            : 'text-slate-100'
             }`}
         >
           {entry.label}
@@ -208,8 +208,8 @@ function PlannerRowPreview({ entry }: { entry: PlannerEntry }) {
   return (
     <div className="flex items-center gap-3 px-4 py-2.5 bg-slate-800/90 border border-slate-700 rounded-lg shadow-2xl backdrop-blur-sm">
       <div className={`w-4 h-4 rounded-[5px] border-[1.5px] ${entry.completed
-          ? 'bg-emerald-500/80 border-emerald-500/80'
-          : 'border-slate-500'
+        ? 'bg-emerald-500/80 border-emerald-500/80'
+        : 'border-slate-500'
         }`} />
       <span className="text-[13px] text-slate-200">{entry.label}</span>
     </div>
@@ -376,7 +376,7 @@ export function PlannerCard({ tasks, navigateTo, selectTask, createTask }: Plann
   // ─── Render ──────────────────────────────────────────────────────────────
 
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
+    <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
       {/* Header */}
       <div className="px-5 pt-5 pb-3">
         <div className="flex items-center justify-between mb-3">
@@ -399,7 +399,7 @@ export function PlannerCard({ tasks, navigateTo, selectTask, createTask }: Plann
 
         {/* Dual-Action Input */}
         <div className="relative">
-          <div className="flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700/60 bg-slate-50 dark:bg-slate-800/40 pl-3 pr-1.5 py-1.5 focus-within:border-blue-500/40 focus-within:ring-1 focus-within:ring-blue-500/20 transition-all">
+          <div className="flex items-center gap-2 rounded-lg border border-slate-700/60 bg-slate-800/40 pl-3 pr-1.5 py-1.5 focus-within:border-blue-500/40 focus-within:ring-1 focus-within:ring-blue-500/20 transition-all">
             <svg className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
             </svg>
@@ -415,7 +415,7 @@ export function PlannerCard({ tasks, navigateTo, selectTask, createTask }: Plann
               onFocus={() => draft.trim() && setShowDropdown(true)}
               onKeyDown={handleKeyDown}
               placeholder="Add task or search..."
-              className="flex-1 bg-transparent text-[13px] text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none"
+              className="flex-1 bg-transparent text-[13px] text-slate-100 placeholder:text-slate-600 focus:outline-none"
             />
           </div>
 
@@ -423,7 +423,7 @@ export function PlannerCard({ tasks, navigateTo, selectTask, createTask }: Plann
           {showDropdown && draft.trim() && (
             <div
               ref={dropdownRef}
-              className="absolute left-0 right-0 top-full mt-1 z-20 rounded-lg border border-slate-200 dark:border-slate-700/60 bg-white dark:bg-slate-900 shadow-xl overflow-hidden"
+              className="absolute left-0 right-0 top-full mt-1 z-20 rounded-lg border border-slate-700/60 bg-slate-900 shadow-xl overflow-hidden"
             >
               {searchResults.map((task, idx) => {
                 const path = getTaskPath(tasks, task.id);
@@ -438,8 +438,8 @@ export function PlannerCard({ tasks, navigateTo, selectTask, createTask }: Plann
                     onClick={() => attachTask(task)}
                     onMouseEnter={() => setHighlightIndex(idx)}
                     className={`w-full text-left px-3 py-2 flex items-center gap-2 text-[13px] transition-colors ${highlightIndex === idx
-                        ? 'bg-blue-500/10 text-blue-300'
-                        : 'text-slate-300 hover:bg-slate-800/50'
+                      ? 'bg-blue-500/10 text-blue-300'
+                      : 'text-slate-300 hover:bg-slate-800/50'
                       }`}
                   >
                     <svg className="w-3 h-3 text-slate-500 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -463,8 +463,8 @@ export function PlannerCard({ tasks, navigateTo, selectTask, createTask }: Plann
                   onClick={() => quickCreate(draft)}
                   onMouseEnter={() => setHighlightIndex(searchResults.length)}
                   className={`w-full text-left px-3 py-2 flex items-center gap-2 text-[13px] border-t border-slate-800/40 transition-colors ${highlightIndex === searchResults.length
-                      ? 'bg-emerald-500/10 text-emerald-300'
-                      : 'text-slate-400 hover:bg-slate-800/50'
+                    ? 'bg-emerald-500/10 text-emerald-300'
+                    : 'text-slate-400 hover:bg-slate-800/50'
                     }`}
                 >
                   <svg className="w-3 h-3 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -485,7 +485,7 @@ export function PlannerCard({ tasks, navigateTo, selectTask, createTask }: Plann
       {/* Task List */}
       {entries.length === 0 ? (
         <div className="px-5 pb-5 pt-1">
-          <p className="text-[13px] text-slate-500 dark:text-slate-600">
+          <p className="text-[13px] text-slate-600">
             Add tasks to start planning your day.
           </p>
         </div>
@@ -499,7 +499,7 @@ export function PlannerCard({ tasks, navigateTo, selectTask, createTask }: Plann
             items={entries.map(e => e.id)}
             strategy={verticalListSortingStrategy}
           >
-            <div className="border-t border-slate-200 dark:border-slate-800/60">
+            <div className="border-t border-slate-800/60">
               {entries.map(entry => {
                 const linkedTask = entry.taskId
                   ? tasks.find(t => t.id === entry.taskId) || null
@@ -540,7 +540,7 @@ export function PlannerCard({ tasks, navigateTo, selectTask, createTask }: Plann
       {/* Progress bar (only if entries exist) */}
       {totalCount > 0 && (
         <div className="px-5 pb-4 pt-2">
-          <div className="h-1 rounded-full bg-slate-200 dark:bg-slate-800/80 overflow-hidden">
+          <div className="h-1 rounded-full bg-slate-800/80 overflow-hidden">
             <div
               className="h-full rounded-full bg-gradient-to-r from-blue-500 to-emerald-500 transition-all duration-500 ease-out"
               style={{ width: `${totalCount > 0 ? (completedCount / totalCount) * 100 : 0}%` }}

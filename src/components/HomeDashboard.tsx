@@ -124,13 +124,14 @@ const LIFE_AREA_ICONS: Record<string, React.JSX.Element> = {
   ),
 };
 
-const AREA_TONES: Record<string, { bg: string; text: string; accent: string }> = {
-  career: { bg: 'bg-blue-900/40', text: 'text-blue-200', accent: 'bg-blue-500/85' },
-  health: { bg: 'bg-emerald-900/40', text: 'text-emerald-200', accent: 'bg-emerald-500/85' },
-  finances: { bg: 'bg-cyan-900/40', text: 'text-cyan-200', accent: 'bg-cyan-500/85' },
-  relationships: { bg: 'bg-rose-900/40', text: 'text-rose-200', accent: 'bg-purple-500/85' },
-  growth: { bg: 'bg-indigo-900/40', text: 'text-indigo-200', accent: 'bg-indigo-500/85' },
-  recreation: { bg: 'bg-amber-900/40', text: 'text-amber-200', accent: 'bg-amber-500/70' },
+const AREA_GRADIENTS: Record<string, { gradient: string; iconBg: string; ringTrack: string }> = {
+  career: { gradient: 'linear-gradient(135deg, #1a3a6b 0%, #0c1f3d 100%)', iconBg: 'bg-blue-500/25', ringTrack: 'rgba(59,130,246,0.25)' },
+  health: { gradient: 'linear-gradient(135deg, #0f5f5f 0%, #073535 100%)', iconBg: 'bg-emerald-500/25', ringTrack: 'rgba(16,185,129,0.25)' },
+  finances: { gradient: 'linear-gradient(135deg, #0e5565 0%, #062e38 100%)', iconBg: 'bg-cyan-500/25', ringTrack: 'rgba(6,182,212,0.25)' },
+  relationships: { gradient: 'linear-gradient(135deg, #5c1d50 0%, #33102c 100%)', iconBg: 'bg-purple-500/25', ringTrack: 'rgba(168,85,247,0.25)' },
+  growth: { gradient: 'linear-gradient(135deg, #252e62 0%, #131836 100%)', iconBg: 'bg-indigo-500/25', ringTrack: 'rgba(99,102,241,0.25)' },
+  recreation: { gradient: 'linear-gradient(135deg, #8a6012 0%, #4a3308 100%)', iconBg: 'bg-amber-500/25', ringTrack: 'rgba(245,158,11,0.25)' },
+  home: { gradient: 'linear-gradient(135deg, #2d4a3e 0%, #162620 100%)', iconBg: 'bg-teal-500/25', ringTrack: 'rgba(20,184,166,0.25)' },
 };
 
 const AREA_BADGES: Record<string, string> = {
@@ -172,6 +173,7 @@ function buildStatusRingSegments(
 
 function resolveAreaKey(id: string) {
   const key = id.toLowerCase();
+  if (key.includes('home')) return 'home';
   if (key.includes('health') || key.includes('well')) return 'health';
   if (key.includes('finance') || key.includes('budget')) return 'finances';
   if (key.includes('relation') || key.includes('family') || key.includes('social')) return 'relationships';
@@ -227,33 +229,16 @@ function LifeAreaCard({
       <path d="M4 9h6V4H4v5zM14 9h6V4h-6v5zM4 20h6v-5H4v5zM14 20h6v-5h-6v5z" />
     </svg>
   );
-  const tone = AREA_TONES[toneKey] || { bg: 'bg-slate-800/70', text: 'text-slate-200', accent: 'bg-slate-400' };
-  const ringSize = 84;
-  const ringTrackStroke = 10;
-  const ringSegmentStroke = 7;
+  const grad = AREA_GRADIENTS[toneKey] || { gradient: 'linear-gradient(135deg, #253040 0%, #141c28 100%)', iconBg: 'bg-slate-400/20', ringTrack: 'rgba(148,163,184,0.2)' };
+  const ringSize = 72;
+  const ringTrackStroke = 8;
+  const ringSegmentStroke = 6;
   const ringSegmentGap = 2.2;
   const ringRadius = (ringSize - ringTrackStroke) / 2;
   const ringCircumference = 2 * Math.PI * ringRadius;
   const ringSegments = buildStatusRingSegments(statusCounts, total, ringCircumference, ringSegmentGap);
-  const ringLabels = useMemo(
-    () => [
-      { value: total, label: 'tasks' },
-      { value: activeCount, label: 'active' },
-      { value: weekCount, label: 'this week' },
-    ],
-    [total, activeCount, weekCount]
-  );
-  const [ringLabelIndex, setRingLabelIndex] = useState(0);
 
-  useEffect(() => {
-    if (ringLabels.length <= 1) return;
-    const id = window.setInterval(() => {
-      setRingLabelIndex((prev) => (prev + 1) % ringLabels.length);
-    }, 5000);
-    return () => window.clearInterval(id);
-  }, [ringLabels.length]);
-
-  const currentRingLabel = ringLabels[ringLabelIndex] || ringLabels[0];
+  const firstHighlight = highlights[0];
 
   return (
     <div
@@ -261,126 +246,110 @@ function LifeAreaCard({
       onClick={onOpen}
       {...(dragHandleProps?.attributes || {})}
       {...(dragHandleProps?.listeners || {})}
-      className={`group relative overflow-hidden flex flex-col gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 pb-12 text-left shadow-sm transition-all ${isDragging ? 'ring-2 ring-slate-300 dark:ring-slate-700 shadow-lg' : 'hover:shadow-md hover:-translate-y-0.5'
-        } ${isActive ? 'border-slate-300 dark:border-slate-600 shadow-md' : ''} ${muted ? 'pointer-events-none' : 'cursor-pointer'}`}
-      style={{ ...(style || {}), ['--tile-pad' as string]: '12px' }}
+      className={`group relative overflow-hidden flex flex-col rounded-2xl text-left transition-all select-none ${isDragging ? 'ring-2 ring-white/20 shadow-2xl scale-[1.02]' : 'hover:shadow-xl hover:-translate-y-0.5'
+        } ${isActive ? 'ring-1 ring-white/10' : ''} ${muted ? 'pointer-events-none opacity-70' : 'cursor-pointer'}`}
+      style={{
+        ...(style || {}),
+        background: grad.gradient,
+        minHeight: '180px',
+      }}
     >
-      <div className={`absolute left-0 top-0 bottom-0 w-1 rounded-l-2xl ${tone.accent}`} aria-hidden="true" />
-      <div className="flex items-start gap-3 relative" style={{ paddingRight: 'calc(var(--tile-pad) + 32px + 12px)' }}>
-        <div className="flex items-start gap-3">
-          <div
-            className={`flex h-12 w-12 items-center justify-center rounded-xl ${tone.bg} ${tone.text}`}
-          >
-            <span className="flex items-center justify-center leading-none">{icon}</span>
+      {/* Top row: icon + title | edit button */}
+      <div className="flex items-start justify-between p-4 pb-0">
+        <div className="flex items-center gap-2.5">
+          <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${grad.iconBg} text-white/80`}>
+            {icon}
           </div>
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <h3 className="text-lg font-semibold text-slate-900 dark:text-white leading-tight">{area.title}</h3>
-              {dueSoon && (
-                <span
-                  className="inline-flex items-center justify-center rounded-full bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-300 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em]"
-                >
-                  <svg className="w-3 h-3 mr-1" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 2a1 1 0 01.894.553l9 18A1 1 0 0121 22H3a1 1 0 01-.894-1.447l9-18A1 1 0 0112 2zm0 6a1 1 0 00-1 1v4a1 1 0 001 1h.01a1 1 0 001-1V9a1 1 0 00-1.01-1zM12 17a1.25 1.25 0 100-2.5A1.25 1.25 0 0012 17z" />
-                  </svg>
-                  Due soon
-                </span>
-              )}
-            </div>
-          </div>
+          <h3 className="text-[15px] font-semibold text-white leading-tight">{area.title}</h3>
+          {dueSoon && (
+            <span className="inline-flex items-center rounded-full bg-red-500/20 text-red-300 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide">
+              <svg className="w-2.5 h-2.5 mr-0.5" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2a1 1 0 01.894.553l9 18A1 1 0 0121 22H3a1 1 0 01-.894-1.447l9-18A1 1 0 0112 2zm0 6a1 1 0 00-1 1v4a1 1 0 001 1h.01a1 1 0 001-1V9a1 1 0 00-1.01-1zM12 17a1.25 1.25 0 100-2.5A1.25 1.25 0 0012 17z" />
+              </svg>
+              Due soon
+            </span>
+          )}
         </div>
-      </div>
-
-      <div className="absolute flex items-center gap-3" style={{ top: 'var(--tile-pad)', right: 'var(--tile-pad)' }}>
         {onEdit && (
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onEdit();
-            }}
-            className="h-8 w-8 rounded-lg text-slate-500 hover:text-slate-100 dark:text-slate-400 dark:hover:text-white bg-transparent hover:bg-white/5 dark:hover:bg-white/10 grid place-items-center transition-colors duration-150"
+            onClick={(e) => { e.stopPropagation(); onEdit(); }}
+            className="h-7 w-7 rounded-lg text-white/30 hover:text-white/70 hover:bg-white/10 grid place-items-center transition-colors"
           >
-            <svg className="w-4 h-4" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" fill="none">
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" fill="none">
               <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
             </svg>
           </button>
         )}
       </div>
 
-      <div className="py-1 grid grid-cols-[minmax(0,1fr)_84px] items-center gap-3">
-        <div className="min-w-0">
-          {Array.isArray(highlights) && highlights.length > 0 ? (
-            <div className="flex flex-col gap-1.5 text-sm text-slate-200 dark:text-slate-100 font-medium">
-              {highlights.map((item, idx) => (
-                <div key={idx} className="leading-snug truncate">{item}</div>
-              ))}
+      {/* Middle: highlight tasks */}
+      <div className="flex-1 px-4 pt-3 pb-2 flex flex-col justify-center">
+        {highlights.length > 0 ? (
+          <div className="flex flex-col gap-1">
+            {highlights.slice(0, 3).map((item, idx) => (
+              <div key={idx} className="text-[13px] text-white/60 leading-snug truncate">{item}</div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-[13px] text-white/30">No active focus.</p>
+        )}
+      </div>
+
+      {/* Bottom row: action hint | donut ring */}
+      <div className="flex items-end justify-between p-4 pt-0">
+        {/* "Next:" callout */}
+        <div className="min-w-0 flex-1">
+          {firstHighlight && (
+            <div className="inline-flex items-center gap-1.5 rounded-lg bg-white/[0.07] backdrop-blur-sm px-2.5 py-1.5 text-[11px] text-white/50 max-w-full truncate">
+              <span className="text-white/70 font-medium shrink-0">Next:</span>
+              <span className="truncate">{firstHighlight}</span>
             </div>
-          ) : (
-            <p className="text-sm text-slate-500 dark:text-slate-400">No active focus.</p>
           )}
         </div>
-        <div className="justify-self-end">
-          <div className="relative" style={{ width: ringSize, height: ringSize }}>
-            <svg width={ringSize} height={ringSize} viewBox={`0 0 ${ringSize} ${ringSize}`} className="block">
-              <circle
-                cx={ringSize / 2}
-                cy={ringSize / 2}
-                r={ringRadius}
-                stroke="rgba(148,163,184,0.2)"
-                strokeWidth={ringTrackStroke}
-                fill="none"
-              />
-              {(() => {
-                let offset = 0;
-                const hasGaps = ringSegments.length > 1;
-                return ringSegments.map((segment, index) => {
-                  const visibleLength = hasGaps ? Math.max(segment.length - segment.gap, 0) : segment.length;
-                  const dashArray = `${visibleLength} ${ringCircumference - visibleLength}`;
-                  const dashOffset = ringCircumference - offset;
-                  offset += segment.length;
-                  return (
-                    <circle
-                      key={`${segment.color}-${index}`}
-                      cx={ringSize / 2}
-                      cy={ringSize / 2}
-                      r={ringRadius}
-                      stroke={segment.color}
-                      strokeWidth={ringSegmentStroke}
-                      strokeLinecap="round"
-                      strokeDasharray={dashArray}
-                      strokeDashoffset={dashOffset}
-                      fill="none"
-                      transform={`rotate(-90 ${ringSize / 2} ${ringSize / 2})`}
-                    />
-                  );
-                });
-              })()}
-            </svg>
-            <div className="absolute inset-[12px] rounded-full bg-slate-900/90 dark:bg-slate-900 flex flex-col items-center justify-center text-white text-center">
-              <div className="text-[15px] font-semibold">{currentRingLabel.value}</div>
-              <div
-                key={`${currentRingLabel.label}-${currentRingLabel.value}`}
-                className="text-[9px] uppercase tracking-[0.18em] text-slate-400 transition-opacity duration-300"
-              >
-                {currentRingLabel.label}
-              </div>
-            </div>
+
+        {/* Task count donut */}
+        <div className="relative flex-shrink-0 ml-3" style={{ width: ringSize, height: ringSize }}>
+          <svg width={ringSize} height={ringSize} viewBox={`0 0 ${ringSize} ${ringSize}`} className="block">
+            <circle
+              cx={ringSize / 2}
+              cy={ringSize / 2}
+              r={ringRadius}
+              stroke={grad.ringTrack}
+              strokeWidth={ringTrackStroke}
+              fill="none"
+            />
+            {(() => {
+              let offset = 0;
+              const hasGaps = ringSegments.length > 1;
+              return ringSegments.map((segment, index) => {
+                const visibleLength = hasGaps ? Math.max(segment.length - segment.gap, 0) : segment.length;
+                const dashArray = `${visibleLength} ${ringCircumference - visibleLength}`;
+                const dashOffset = ringCircumference - offset;
+                offset += segment.length;
+                return (
+                  <circle
+                    key={`${segment.color}-${index}`}
+                    cx={ringSize / 2}
+                    cy={ringSize / 2}
+                    r={ringRadius}
+                    stroke={segment.color}
+                    strokeWidth={ringSegmentStroke}
+                    strokeLinecap="round"
+                    strokeDasharray={dashArray}
+                    strokeDashoffset={dashOffset}
+                    fill="none"
+                    transform={`rotate(-90 ${ringSize / 2} ${ringSize / 2})`}
+                  />
+                );
+              });
+            })()}
+          </svg>
+          <div className="absolute inset-[8px] rounded-full bg-black/40 backdrop-blur-sm flex flex-col items-center justify-center text-center">
+            <div className="text-[14px] font-bold text-white">{total}</div>
+            <div className="text-[8px] uppercase tracking-[0.2em] text-white/40">Tasks</div>
           </div>
         </div>
       </div>
-
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onOpen();
-        }}
-        className="absolute bottom-[var(--tile-pad)] right-[var(--tile-pad)] inline-flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400 opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 transition-all"
-      >
-        <span>Open</span>
-        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-        </svg>
-      </button>
     </div>
   );
 }
@@ -778,37 +747,48 @@ export function HomeDashboard() {
   const rightPad = isNotesDrawerOpen ? 'xl:pr-[330px]' : 'xl:pr-[56px]';
 
   return (
-    <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-900">
-      <header className="flex-shrink-0 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-6 py-4">
-        <div className={`flex items-center justify-between max-w-7xl mx-auto ${leftPad} ${rightPad}`}>
-          <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-            <span className="font-semibold text-slate-900 dark:text-white">LifeOS</span>
-            <span className="text-slate-400 dark:text-slate-500">/</span>
-            <span className="text-slate-500 dark:text-slate-400">Dashboard</span>
+    <div className="flex flex-col h-full bg-slate-950">
+      <header className="flex-shrink-0 bg-slate-950 border-b border-slate-800 px-6 py-4">
+        <div className={`flex items-center justify-between max-w-[1600px] mx-auto ${leftPad} ${rightPad}`}>
+          <div className="flex items-center gap-2 text-sm text-slate-300">
+            <span className="font-semibold text-white">LifeOS</span>
+            <span className="text-slate-600">/</span>
+            <span className="text-slate-400">Home</span>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="hidden md:inline text-xs text-slate-400 dark:text-slate-500">
-              {new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
-            </span>
+          <div className="flex items-center gap-2">
             <button
               onClick={() => setSearchOpen(true)}
-              className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-200 transition-colors border border-transparent hover:border-slate-300 dark:hover:border-slate-500"
+              className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              aria-label="Search"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
             </button>
+            <button
+              className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              aria-label="Notifications"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+              </svg>
+            </button>
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white text-xs font-bold ml-1">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+            </div>
           </div>
         </div>
       </header>
 
-      <main className="flex-1 overflow-auto p-6">
+      <main className="flex-1 overflow-auto">
         {/* ─── Chat Drawer (LEFT) ─── */}
         <aside
           className={`hidden xl:block fixed left-0 top-[73px] bottom-0 z-30 transition-[width] duration-200 ${isChatDrawerOpen ? 'w-[330px]' : 'w-[56px]'
             }`}
         >
-          <div className="h-full w-full rounded-r-2xl border-r border-t border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-950/95 shadow-2xl backdrop-blur-sm">
+          <div className="h-full w-full rounded-r-2xl border-r border-t border-b border-slate-800 bg-slate-950/95 shadow-2xl backdrop-blur-sm">
             <ChatPanel
               appContext={chatContext}
               collapsed={!isChatDrawerOpen}
@@ -822,12 +802,12 @@ export function HomeDashboard() {
           className={`hidden xl:block fixed right-0 top-[73px] bottom-0 z-30 transition-[width] duration-200 ${isNotesDrawerOpen ? 'w-[330px]' : 'w-[56px]'
             }`}
         >
-          <div className="h-full w-full rounded-l-2xl border-l border-t border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-950/95 shadow-2xl backdrop-blur-sm">
+          <div className="h-full w-full rounded-l-2xl border-l border-t border-b border-slate-800 bg-slate-950/95 shadow-2xl backdrop-blur-sm">
             {!isNotesDrawerOpen ? (
               <button
                 type="button"
                 onClick={() => setIsNotesDrawerOpen(true)}
-                className="h-full w-full flex flex-col items-center justify-center gap-3 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100"
+                className="h-full w-full flex flex-col items-center justify-center gap-3 text-slate-400 hover:text-slate-100"
                 aria-label="Open notes drawer"
               >
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
@@ -839,24 +819,24 @@ export function HomeDashboard() {
               </button>
             ) : (
               <div className="h-full flex flex-col">
-                <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800">
+                <div className="px-4 py-3 border-b border-slate-800">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-xs uppercase tracking-[0.16em] text-slate-400">NOTES</p>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400">{sortedPages.length} total</p>
+                      <p className="text-[11px] text-slate-400">{sortedPages.length} total</p>
                     </div>
                     <div className="flex items-center gap-1">
                       <button
                         type="button"
                         onClick={handleCreatePage}
-                        className="inline-flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium bg-slate-900 text-white dark:bg-white dark:text-slate-900"
+                        className="inline-flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium bg-white text-slate-900"
                       >
                         New
                       </button>
                       <button
                         type="button"
                         onClick={() => setIsNotesDrawerOpen(false)}
-                        className="h-8 w-8 rounded-md border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                        className="h-8 w-8 rounded-md border border-slate-700 text-slate-300 hover:bg-slate-800"
                         aria-label="Collapse notes drawer"
                       >
                         <svg className="w-4 h-4 mx-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
@@ -876,8 +856,8 @@ export function HomeDashboard() {
                         type="button"
                         onClick={() => openNoteModal(page.id)}
                         className={`w-full text-left rounded-lg px-2.5 py-2 transition-colors ${isActive
-                          ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-white'
-                          : 'hover:bg-slate-100/80 text-slate-700 dark:text-slate-300 dark:hover:bg-slate-800/70'
+                          ? 'bg-slate-800 text-white'
+                          : 'hover:bg-slate-800/70 text-slate-300'
                           }`}
                       >
                         <p className="text-sm font-medium truncate">{page.title || 'Untitled'}</p>
@@ -890,91 +870,110 @@ export function HomeDashboard() {
           </div>
         </aside>
 
-        <div className={`max-w-7xl mx-auto space-y-6 ${leftPad} ${rightPad}`}>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <PlannerCard
-              tasks={tasks}
-              navigateTo={navigateTo}
-              selectTask={selectTask}
-              createTask={createTask}
-            />
+        <div className={`max-w-[1600px] mx-auto p-6 ${leftPad} ${rightPad}`}>
+          {/* ─── Two-Panel Layout ─── */}
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-8">
+            {/* ─── LEFT: Focus Areas ─── */}
+            <div className="space-y-5">
+              <h2 className="text-[15px] font-semibold text-white tracking-tight">Focus Areas</h2>
+              <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+                <SortableContext items={lifeAreas.map(area => area.id)} strategy={rectSortingStrategy}>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {areaSnapshots.map(snapshot => (
+                      <SortableLifeAreaCard
+                        key={snapshot.area.id}
+                        snapshot={snapshot}
+                        onOpen={() => navigateTo(snapshot.area.id)}
+                        onEdit={() => openEditor(snapshot.area)}
+                        isActive={primaryAreaId === snapshot.area.id}
+                      />
+                    ))}
+                    {lifeAreas.length === 0 && (
+                      <div className="col-span-full flex items-center justify-center rounded-2xl border border-dashed border-slate-700 bg-slate-900 py-12 text-slate-400" />
+                    )}
+                  </div>
+                </SortableContext>
 
-            <div className="group bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm relative overflow-hidden">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="h-9 w-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-300">
-                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                      <path d="M12 8v4l3 2M5 3v3M19 3v3M4 11h16M5 20h14a1 1 0 001-1V7a1 1 0 00-1-1H5a1 1 0 00-1 1v12a1 1 0 001 1z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Upcoming</p>
-                  </div>
-                </div>
-              </div>
-              {upcomingTasks.length === 0 ? (
-                <p className="text-sm text-slate-500 dark:text-slate-400">No upcoming tasks in the next week.</p>
-              ) : (
-                <div className="divide-y divide-slate-200 dark:divide-slate-800">
-                  {upcomingTasks.map(task => {
-                    const dueLabel = task.dueDate
-                      ? new Date(task.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-                      : '';
-                    return (
-                      <button
-                        key={task.id}
-                        onClick={() => {
-                          navigateTo(task.parentId);
-                          selectTask(task.id);
-                        }}
-                        className="w-full text-left py-3 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 px-2 rounded-lg transition-colors"
-                      >
-                        <div className="flex flex-col">
-                          <span className="text-sm font-medium text-slate-900 dark:text-white">{task.title}</span>
-                        </div>
-                        <span className="text-xs text-slate-500 dark:text-slate-400">
-                          {dueLabel ? `Due ${dueLabel}` : 'Upcoming'}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+                <DragOverlay>
+                  {activeArea ? (
+                    <LifeAreaCard
+                      area={activeArea.area}
+                      statusCounts={activeArea.statusCounts}
+                      total={activeArea.total}
+                      activeCount={activeArea.activeCount}
+                      weekCount={activeArea.weekCount}
+                      dueSoon={activeArea.dueSoon}
+                      onOpen={() => { }}
+                      muted
+                    />
+                  ) : null}
+                </DragOverlay>
+              </DndContext>
             </div>
-          </div>
-          <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-            <SortableContext items={lifeAreas.map(area => area.id)} strategy={rectSortingStrategy}>
-              <div className={`grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-6 ${isNotesDrawerOpen ? 'xl:grid-cols-2 2xl:grid-cols-3' : 'xl:grid-cols-3'}`}>
-                {areaSnapshots.map(snapshot => (
-                  <SortableLifeAreaCard
-                    key={snapshot.area.id}
-                    snapshot={snapshot}
-                    onOpen={() => navigateTo(snapshot.area.id)}
-                    onEdit={() => openEditor(snapshot.area)}
-                    isActive={primaryAreaId === snapshot.area.id}
-                  />
-                ))}
-                {lifeAreas.length === 0 && (
-                  <div className="col-span-full flex items-center justify-center rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 py-12 text-slate-500 dark:text-slate-400" />
+
+            {/* ─── RIGHT: Planner & Upcoming ─── */}
+            <div className="space-y-5 lg:sticky lg:top-0 lg:self-start">
+              <h2 className="text-[15px] font-semibold text-white tracking-tight">Planner &amp; Upcoming</h2>
+
+              {/* Planner */}
+              <PlannerCard
+                tasks={tasks}
+                navigateTo={navigateTo}
+                selectTask={selectTask}
+                createTask={createTask}
+              />
+
+              {/* Upcoming */}
+              <div className="rounded-2xl border border-slate-800 bg-slate-900 overflow-hidden">
+                <div className="px-4 py-3 border-b border-slate-800/60">
+                  <p className="text-xs uppercase tracking-[0.16em] text-slate-400 font-medium">Upcoming</p>
+                </div>
+                {upcomingTasks.length === 0 ? (
+                  <div className="px-4 py-5">
+                    <p className="text-[13px] text-slate-500">No upcoming tasks in the next week.</p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-slate-800/50">
+                    {upcomingTasks.map(task => {
+                      const dueDate = task.dueDate ? new Date(task.dueDate) : null;
+                      const now = new Date();
+                      const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 2);
+                      const isTomorrow = dueDate && dueDate < tomorrow && dueDate >= new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+                      const dueLabel = dueDate
+                        ? dueDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+                        : '';
+                      const diffMs = dueDate ? dueDate.getTime() - now.getTime() : 0;
+                      const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+                      const relativeLabel = diffDays <= 0 ? 'Today' : diffDays === 1 ? '1d' : `${diffDays}d`;
+
+                      return (
+                        <button
+                          key={task.id}
+                          onClick={() => {
+                            navigateTo(task.parentId);
+                            selectTask(task.id);
+                          }}
+                          className="w-full text-left px-4 py-3 flex items-start gap-3 hover:bg-slate-800/40 transition-colors group/up"
+                        >
+                          <div className="mt-0.5 flex-shrink-0 w-4 h-4 rounded-[4px] border-[1.5px] border-slate-600 group-hover/up:border-slate-400 transition-colors" />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[13px] text-slate-200 truncate">{task.title}</div>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-[11px] text-slate-500">Due {dueLabel}</span>
+                              {isTomorrow && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-medium">Tomorrow</span>
+                              )}
+                            </div>
+                          </div>
+                          <span className="text-[11px] text-slate-600 flex-shrink-0 mt-0.5">{relativeLabel}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 )}
               </div>
-            </SortableContext>
-
-            <DragOverlay>
-              {activeArea ? (
-                <LifeAreaCard
-                  area={activeArea.area}
-                  statusCounts={activeArea.statusCounts}
-                  total={activeArea.total}
-                  activeCount={activeArea.activeCount}
-                  weekCount={activeArea.weekCount}
-                  dueSoon={activeArea.dueSoon}
-                  onOpen={() => { }}
-                  muted
-                />
-              ) : null}
-            </DragOverlay>
-          </DndContext>
+            </div>
+          </div>
 
           {editorOpen && (
             <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center px-4 py-8 z-50">
