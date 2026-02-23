@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, Rea
 import { Task, TaskStatus, ROOT_TASK_ID, CreateTaskInput, UpdateTaskInput, COMPLETED_HIDE_DAYS } from './types';
 import { taskStore } from './store';
 import { createSeedTasks, getSubtreeIds, getNextOrder, isCompletedOlderThan } from './tasks';
+import { AUTO_BACKUP_KEY, DASHBOARD_PAGES_STORAGE_KEY, LAST_BACKUP_KEY } from './storage-keys';
 
 interface TaskContextValue {
   // State
@@ -64,8 +65,6 @@ export function TaskProvider({ children }: TaskProviderProps) {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
-  const BACKUP_KEY = 'lifeos:autoBackups';
-  const LAST_BACKUP_KEY = 'lifeos:lastBackupDate';
   const BACKUP_RETENTION_DAYS = 30;
 
   // Initialize on mount
@@ -95,19 +94,33 @@ export function TaskProvider({ children }: TaskProviderProps) {
     try {
       const todayKey = new Date().toISOString().split('T')[0];
       const lastBackup = localStorage.getItem(LAST_BACKUP_KEY);
-      if (lastBackup === todayKey) return;
+      const existingRaw = localStorage.getItem(AUTO_BACKUP_KEY);
+      const existing = existingRaw ? JSON.parse(existingRaw) : [];
+      const hasTodayBackupWithNotes = Array.isArray(existing) && existing.some((entry: { createdAt?: string; notesPages?: unknown }) => (
+        typeof entry?.createdAt === 'string' &&
+        entry.createdAt.split('T')[0] === todayKey &&
+        Array.isArray(entry.notesPages)
+      ));
+      if (lastBackup === todayKey && hasTodayBackupWithNotes) return;
 
       const now = new Date();
       const cutoff = new Date(now);
       cutoff.setDate(cutoff.getDate() - BACKUP_RETENTION_DAYS);
-      const existingRaw = localStorage.getItem(BACKUP_KEY);
-      const existing = existingRaw ? JSON.parse(existingRaw) : [];
       const retained = Array.isArray(existing)
         ? existing.filter((entry: { createdAt?: string }) => {
             if (!entry?.createdAt) return false;
-            return new Date(entry.createdAt) >= cutoff;
+            return new Date(entry.createdAt) >= cutoff && entry.createdAt.split('T')[0] !== todayKey;
           })
         : [];
+
+      let notesPages: unknown[] = [];
+      try {
+        const notesRaw = localStorage.getItem(DASHBOARD_PAGES_STORAGE_KEY);
+        const notesParsed = notesRaw ? JSON.parse(notesRaw) : [];
+        notesPages = Array.isArray(notesParsed) ? notesParsed : [];
+      } catch (error) {
+        console.warn('Failed to include notes in auto-backup:', error);
+      }
 
       const id = typeof crypto !== 'undefined' && 'randomUUID' in crypto
         ? crypto.randomUUID()
@@ -119,9 +132,10 @@ export function TaskProvider({ children }: TaskProviderProps) {
           id,
           createdAt: now.toISOString(),
           tasks,
+          notesPages,
         },
       ];
-      localStorage.setItem(BACKUP_KEY, JSON.stringify(next));
+      localStorage.setItem(AUTO_BACKUP_KEY, JSON.stringify(next));
       localStorage.setItem(LAST_BACKUP_KEY, todayKey);
     } catch (error) {
       console.warn('Auto-backup failed:', error);
@@ -145,10 +159,22 @@ export function TaskProvider({ children }: TaskProviderProps) {
   }, [tasks]);
 
   const updateTask = useCallback(async (id: string, updates: UpdateTaskInput): Promise<Task> => {
+    if (updates.status === 'COMPLETED') {
+      const subtreeIds = getSubtreeIds(tasks, id);
+      const descendants = subtreeIds.filter(taskId => taskId !== id);
+      const [updatedRoot, ...updatedDescendants] = await Promise.all([
+        taskStore.updateTask(id, updates),
+        ...descendants.map(taskId => taskStore.updateTask(taskId, { status: 'COMPLETED' })),
+      ]);
+      const updatedMap = new Map([updatedRoot, ...updatedDescendants].map(task => [task.id, task]));
+      setTasks(prev => prev.map(task => updatedMap.get(task.id) || task));
+      return updatedRoot;
+    }
+
     const updated = await taskStore.updateTask(id, updates);
-    setTasks(prev => prev.map(t => t.id === id ? updated : t));
+    setTasks(prev => prev.map(task => task.id === id ? updated : task));
     return updated;
-  }, []);
+  }, [tasks]);
 
   const deleteTask = useCallback(async (id: string): Promise<void> => {
     const idsToDelete = getSubtreeIds(tasks, id);
@@ -168,11 +194,25 @@ export function TaskProvider({ children }: TaskProviderProps) {
     if (newParentId) {
       updates.parentId = newParentId;
     }
-    const updated = await taskStore.updateTask(taskId, updates);
-    setTasks(prev => prev.map(t => t.id === taskId ? updated : t));
-  }, []);
 
-  const reorderTasks = useCallback(async (taskIds: string[], status: TaskStatus): Promise<void> => {
+    if (newStatus === 'COMPLETED') {
+      const subtreeIds = getSubtreeIds(tasks, taskId);
+      const descendants = subtreeIds.filter(id => id !== taskId);
+      const [updatedRoot, ...updatedDescendants] = await Promise.all([
+        taskStore.updateTask(taskId, updates),
+        ...descendants.map(id => taskStore.updateTask(id, { status: 'COMPLETED' })),
+      ]);
+      const updatedMap = new Map([updatedRoot, ...updatedDescendants].map(task => [task.id, task]));
+      setTasks(prev => prev.map(task => updatedMap.get(task.id) || task));
+      return;
+    }
+
+    const updated = await taskStore.updateTask(taskId, updates);
+    setTasks(prev => prev.map(task => task.id === taskId ? updated : task));
+  }, [tasks]);
+
+  const reorderTasks = useCallback(async (taskIds: string[], _status: TaskStatus): Promise<void> => {
+    void _status;
     const updates = taskIds.map((id, index) =>
       taskStore.updateTask(id, { order: index })
     );

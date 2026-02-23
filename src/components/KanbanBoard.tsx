@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   DndContext,
   DragEndEvent,
@@ -24,6 +24,93 @@ const CAREER_LINKS = {
   github: 'https://github.com/attarira',
   resume: 'https://docs.google.com/document/d/1gnqkl4Q5bSDd1YFLqFO8K6SPooKS-xUT/edit',
 };
+
+type NetWorthSnapshot = {
+  id: string;
+  date: string;
+  assets: number;
+  liabilities: number;
+};
+
+type SubscriptionCategory = 'entertainment' | 'utilities' | 'productivity' | 'health' | 'other';
+
+type SubscriptionItem = {
+  id: string;
+  name: string;
+  cost: number;
+  billing: 'monthly' | 'yearly';
+  active: boolean;
+  category: SubscriptionCategory;
+};
+
+const CATEGORY_COLORS: Record<SubscriptionCategory, string> = {
+  entertainment: 'bg-indigo-500',
+  utilities: 'bg-emerald-500',
+  productivity: 'bg-blue-500',
+  health: 'bg-rose-500',
+  other: 'bg-slate-500',
+};
+
+const CATEGORY_LABELS: Record<SubscriptionCategory, string> = {
+  entertainment: 'Entertainment',
+  utilities: 'Utilities',
+  productivity: 'Productivity',
+  health: 'Health',
+  other: 'Other',
+};
+
+const FINANCE_NET_WORTH_KEY = 'lifeos:finance:netWorth:v1';
+const FINANCE_SUBSCRIPTIONS_KEY = 'lifeos:finance:subscriptions:v1';
+
+function buildId() {
+  return typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function loadNetWorthSnapshots(): NetWorthSnapshot[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(FINANCE_NET_WORTH_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    if (Array.isArray(parsed)) {
+      return parsed
+        .filter(Boolean)
+        .map((item) => ({
+          id: String(item.id || buildId()),
+          date: String(item.date || new Date().toISOString().slice(0, 10)),
+          assets: Number(item.assets || 0),
+          liabilities: Number(item.liabilities || 0),
+        }));
+    }
+  } catch (error) {
+    console.warn('Failed to load net worth snapshots:', error);
+  }
+  return [];
+}
+
+function loadSubscriptions(): SubscriptionItem[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(FINANCE_SUBSCRIPTIONS_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    if (Array.isArray(parsed)) {
+      return parsed
+        .filter(Boolean)
+        .map((item) => ({
+          id: String(item.id || buildId()),
+          name: String(item.name || 'Subscription'),
+          cost: Number(item.cost || 0),
+          billing: item.billing === 'yearly' ? 'yearly' : 'monthly',
+          active: item.active !== false,
+          category: (item.category as SubscriptionCategory) || 'other',
+        }));
+    }
+  } catch (error) {
+    console.warn('Failed to load subscriptions:', error);
+  }
+  return [];
+}
 
 function resolveAreaKey(id: string) {
   const key = id.toLowerCase();
@@ -49,6 +136,19 @@ export function KanbanBoard() {
   } = useTaskContext();
 
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [netWorthSnapshots, setNetWorthSnapshots] = useState<NetWorthSnapshot[]>(() => loadNetWorthSnapshots());
+  const [subscriptions, setSubscriptions] = useState<SubscriptionItem[]>(() => loadSubscriptions());
+  const [snapshotDate, setSnapshotDate] = useState(new Date().toISOString().slice(0, 10));
+  const [snapshotAssets, setSnapshotAssets] = useState('');
+  const [snapshotLiabilities, setSnapshotLiabilities] = useState('');
+  const [showNetWorthHistory, setShowNetWorthHistory] = useState(false);
+  const [editingSnapshotId, setEditingSnapshotId] = useState<string | null>(null);
+  const [editingSnapshot, setEditingSnapshot] = useState<{ date: string; assets: string; liabilities: string }>({ date: '', assets: '', liabilities: '' });
+  const [subscriptionName, setSubscriptionName] = useState('');
+  const [subscriptionCost, setSubscriptionCost] = useState('');
+  const [subscriptionBilling, setSubscriptionBilling] = useState<'monthly' | 'yearly'>('monthly');
+  const [subscriptionCategory, setSubscriptionCategory] = useState<SubscriptionCategory>('other');
+  const [showAddSubscription, setShowAddSubscription] = useState(false);
 
   const visibleChildren = getVisibleChildren();
   const archivedCount = getArchivedTasks().length;
@@ -130,6 +230,121 @@ export function KanbanBoard() {
   const path = getTaskPath(tasks, currentParentId);
   const rootArea = path[0];
   const showCareerResources = rootArea ? resolveAreaKey(rootArea.title || rootArea.id) === 'career' : false;
+  const showFinanceSections = rootArea ? resolveAreaKey(rootArea.title || rootArea.id) === 'finances' : false;
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(FINANCE_NET_WORTH_KEY, JSON.stringify(netWorthSnapshots));
+  }, [netWorthSnapshots]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(FINANCE_SUBSCRIPTIONS_KEY, JSON.stringify(subscriptions));
+  }, [subscriptions]);
+
+  const sortedSnapshots = useMemo(() => {
+    return netWorthSnapshots.slice().sort((a, b) => b.date.localeCompare(a.date));
+  }, [netWorthSnapshots]);
+
+  const latestSnapshot = sortedSnapshots.length > 0 ? sortedSnapshots[0] : null;
+  const previousSnapshot = sortedSnapshots.length > 1 ? sortedSnapshots[1] : null;
+
+  const latestNetWorth = latestSnapshot
+    ? latestSnapshot.assets - latestSnapshot.liabilities
+    : 0;
+
+  const previousNetWorth = previousSnapshot
+    ? previousSnapshot.assets - previousSnapshot.liabilities
+    : null;
+
+  const trendPercent = previousNetWorth !== null && previousNetWorth !== 0
+    ? ((latestNetWorth - previousNetWorth) / Math.abs(previousNetWorth)) * 100
+    : null;
+
+  const activeSubscriptions = subscriptions.filter((s) => s.active);
+  const monthlySubscriptionTotal = activeSubscriptions.reduce((sum, item) => {
+    if (item.billing === 'monthly') return sum + item.cost;
+    return sum + (item.cost / 12);
+  }, 0);
+
+  const handleAddNetWorthSnapshot = () => {
+    const assets = Number(snapshotAssets);
+    const liabilities = Number(snapshotLiabilities);
+    if (!snapshotDate || Number.isNaN(assets) || Number.isNaN(liabilities)) return;
+
+    const next: NetWorthSnapshot = {
+      id: buildId(),
+      date: snapshotDate,
+      assets,
+      liabilities,
+    };
+    setNetWorthSnapshots((prev) => [next, ...prev]);
+    setSnapshotAssets('');
+    setSnapshotLiabilities('');
+  };
+
+  const handleAddSubscription = () => {
+    const cost = Number(subscriptionCost);
+    const trimmedName = subscriptionName.trim();
+    if (!trimmedName || Number.isNaN(cost)) return;
+    const next: SubscriptionItem = {
+      id: buildId(),
+      name: trimmedName,
+      cost,
+      billing: subscriptionBilling,
+      active: true,
+      category: subscriptionCategory,
+    };
+    setSubscriptions((prev) => [next, ...prev]);
+    setSubscriptionName('');
+    setSubscriptionCost('');
+    setSubscriptionBilling('monthly');
+    setSubscriptionCategory('other');
+    setShowAddSubscription(false);
+  };
+
+  const toggleSubscription = (id: string) => {
+    setSubscriptions((prev) => prev.map((item) => (
+      item.id === id ? { ...item, active: !item.active } : item
+    )));
+  };
+
+  const deleteSubscription = (id: string) => {
+    setSubscriptions((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const startEditingSnapshot = (snap: NetWorthSnapshot) => {
+    setEditingSnapshotId(snap.id);
+    setEditingSnapshot({
+      date: snap.date,
+      assets: String(snap.assets),
+      liabilities: String(snap.liabilities),
+    });
+  };
+
+  const saveEditingSnapshot = () => {
+    if (!editingSnapshotId) return;
+    const assets = Number(editingSnapshot.assets);
+    const liabilities = Number(editingSnapshot.liabilities);
+    if (Number.isNaN(assets) || Number.isNaN(liabilities) || !editingSnapshot.date) return;
+    setNetWorthSnapshots((prev) =>
+      prev.map((snap) =>
+        snap.id === editingSnapshotId
+          ? { ...snap, date: editingSnapshot.date, assets, liabilities }
+          : snap
+      )
+    );
+    setEditingSnapshotId(null);
+  };
+
+  const cancelEditingSnapshot = () => {
+    setEditingSnapshotId(null);
+  };
+
+  const deleteSnapshot = (id: string) => {
+    setNetWorthSnapshots((prev) => prev.filter((snap) => snap.id !== id));
+    if (editingSnapshotId === id) setEditingSnapshotId(null);
+  };
 
   return (
     <div className="flex flex-col h-full">
@@ -209,6 +424,372 @@ export function KanbanBoard() {
       {/* Board */}
       <div className="flex-1 overflow-hidden p-4">
         <div className="max-w-7xl mx-auto h-full flex flex-col gap-4">
+          {showFinanceSections && (
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-stretch">
+              {/* ─── Net Worth Card ─── */}
+              <section className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/70 flex flex-col">
+                <div className="p-4 pb-3 border-b border-slate-100 dark:border-slate-700/50">
+                  <div className="flex items-center justify-between mb-1">
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Net Worth</h3>
+                    <div className="flex items-center gap-2">
+                      {sortedSnapshots.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setShowNetWorthHistory(!showNetWorthHistory)}
+                          className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                          title={showNetWorthHistory ? 'Hide history' : 'Show history'}
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </button>
+                      )}
+                      <span className="text-[11px] text-slate-400 dark:text-slate-500">
+                        {latestSnapshot ? latestSnapshot.date : '—'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-baseline gap-2.5">
+                    <span className="text-2xl font-bold text-slate-900 dark:text-white tabular-nums">
+                      ${latestNetWorth.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                    </span>
+                    {trendPercent !== null && (
+                      <span className={`inline-flex items-center gap-0.5 text-xs font-semibold px-1.5 py-0.5 rounded-md ${trendPercent >= 0
+                        ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10'
+                        : 'text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10'
+                        }`}>
+                        <svg className={`w-3 h-3 ${trendPercent < 0 ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                        </svg>
+                        {Math.abs(trendPercent).toFixed(1)}%
+                      </span>
+                    )}
+                  </div>
+                  {/* Horizontal Quick Stats */}
+                  <div className="grid grid-cols-2 gap-4 mt-3">
+                    <div className="flex items-center justify-between rounded-lg bg-slate-50 dark:bg-slate-900/50 px-3 py-2">
+                      <span className="text-[11px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">Assets</span>
+                      <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                        ${(latestSnapshot?.assets ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between rounded-lg bg-slate-50 dark:bg-slate-900/50 px-3 py-2">
+                      <span className="text-[11px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">Liabilities</span>
+                      <span className="text-sm font-semibold text-rose-600 dark:text-rose-400 tabular-nums">
+                        ${(latestSnapshot?.liabilities ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Snapshot History */}
+                {showNetWorthHistory && sortedSnapshots.length > 0 && (
+                  <div className="border-t border-slate-100 dark:border-slate-700/50">
+                    <div className="px-4 pt-3 pb-1">
+                      <span className="text-[11px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">History</span>
+                    </div>
+                    <div className="max-h-40 overflow-y-auto">
+                      {/* Table Header */}
+                      <div className="grid grid-cols-[100px_1fr_1fr_1fr_36px] gap-2 items-center px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 sticky top-0 bg-white dark:bg-slate-800/70">
+                        <span>Date</span>
+                        <span className="text-right">Assets</span>
+                        <span className="text-right">Liabilities</span>
+                        <span className="text-right">Net</span>
+                        <span />
+                      </div>
+                      <div className="divide-y divide-slate-100 dark:divide-slate-700/50">
+                        {sortedSnapshots.map((snap) => {
+                          const isEditing = editingSnapshotId === snap.id;
+                          const net = snap.assets - snap.liabilities;
+                          return (
+                            <div
+                              key={snap.id}
+                              className="grid grid-cols-[100px_1fr_1fr_1fr_36px] gap-2 items-center px-4 py-1.5 group hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                            >
+                              {isEditing ? (
+                                <>
+                                  <input
+                                    type="date"
+                                    value={editingSnapshot.date}
+                                    onChange={(e) => setEditingSnapshot((prev) => ({ ...prev, date: e.target.value }))}
+                                    className="rounded border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 px-1.5 py-0.5 text-xs text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                  />
+                                  <input
+                                    type="number"
+                                    value={editingSnapshot.assets}
+                                    onChange={(e) => setEditingSnapshot((prev) => ({ ...prev, assets: e.target.value }))}
+                                    className="rounded border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 px-1.5 py-0.5 text-xs text-right text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                  />
+                                  <input
+                                    type="number"
+                                    value={editingSnapshot.liabilities}
+                                    onChange={(e) => setEditingSnapshot((prev) => ({ ...prev, liabilities: e.target.value }))}
+                                    className="rounded border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 px-1.5 py-0.5 text-xs text-right text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                  />
+                                  <span className="text-xs text-right font-medium tabular-nums text-slate-400">—</span>
+                                  <div className="flex items-center gap-0.5">
+                                    <button
+                                      type="button"
+                                      onClick={saveEditingSnapshot}
+                                      className="p-0.5 rounded hover:bg-emerald-100 dark:hover:bg-emerald-500/20 text-emerald-500 transition-colors"
+                                      title="Save"
+                                    >
+                                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                      </svg>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={cancelEditingSnapshot}
+                                      className="p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-400 transition-colors"
+                                      title="Cancel"
+                                    >
+                                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                      </svg>
+                                    </button>
+                                  </div>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="text-xs text-slate-600 dark:text-slate-300 tabular-nums">{snap.date}</span>
+                                  <span className="text-xs text-right font-medium tabular-nums text-emerald-600 dark:text-emerald-400">
+                                    ${snap.assets.toLocaleString()}
+                                  </span>
+                                  <span className="text-xs text-right font-medium tabular-nums text-rose-600 dark:text-rose-400">
+                                    ${snap.liabilities.toLocaleString()}
+                                  </span>
+                                  <span className={`text-xs text-right font-semibold tabular-nums ${net >= 0 ? 'text-slate-800 dark:text-slate-100' : 'text-rose-600 dark:text-rose-400'}`}>
+                                    ${net.toLocaleString()}
+                                  </span>
+                                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button
+                                      type="button"
+                                      onClick={() => startEditingSnapshot(snap)}
+                                      className="p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                                      title="Edit"
+                                    >
+                                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                      </svg>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => deleteSnapshot(snap.id)}
+                                      className="p-0.5 rounded hover:bg-rose-100 dark:hover:bg-rose-500/20 text-slate-400 hover:text-rose-500 transition-colors"
+                                      title="Delete"
+                                    >
+                                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                      </svg>
+                                    </button>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Add Snapshot Form */}
+                <div className="p-4 pt-3 flex-1 flex flex-col justify-end border-t border-slate-100 dark:border-slate-700/50">
+                  <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-2">Log Snapshot</div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="date"
+                      value={snapshotDate}
+                      onChange={(e) => setSnapshotDate(e.target.value)}
+                      className="flex-1 rounded-lg border border-transparent hover:border-slate-200 dark:hover:border-slate-600 focus:border-slate-300 dark:focus:border-slate-500 bg-slate-50 dark:bg-slate-900/50 px-2.5 py-1.5 text-sm text-slate-700 dark:text-slate-200 focus:outline-none transition-colors"
+                    />
+                    <input
+                      type="number"
+                      value={snapshotAssets}
+                      onChange={(e) => setSnapshotAssets(e.target.value)}
+                      placeholder="Assets"
+                      className="w-24 rounded-lg border border-transparent hover:border-slate-200 dark:hover:border-slate-600 focus:border-slate-300 dark:focus:border-slate-500 bg-slate-50 dark:bg-slate-900/50 px-2.5 py-1.5 text-sm text-slate-700 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none transition-colors"
+                    />
+                    <input
+                      type="number"
+                      value={snapshotLiabilities}
+                      onChange={(e) => setSnapshotLiabilities(e.target.value)}
+                      placeholder="Liabilities"
+                      className="w-24 rounded-lg border border-transparent hover:border-slate-200 dark:hover:border-slate-600 focus:border-slate-300 dark:focus:border-slate-500 bg-slate-50 dark:bg-slate-900/50 px-2.5 py-1.5 text-sm text-slate-700 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none transition-colors"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddNetWorthSnapshot}
+                      className="px-3 py-1.5 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-semibold hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors flex-shrink-0"
+                    >
+                      Save
+                    </button>
+                  </div>
+                </div>
+              </section>
+
+              {/* ─── Subscriptions Card ─── */}
+              <section className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/70 flex flex-col">
+                <div className="p-4 pb-3 border-b border-slate-100 dark:border-slate-700/50">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Subscriptions</h3>
+                    <button
+                      type="button"
+                      onClick={() => setShowAddSubscription(!showAddSubscription)}
+                      className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                      title="Add subscription"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  {/* Inline Add Form */}
+                  {showAddSubscription && (
+                    <div className="mt-3 p-3 rounded-lg bg-slate-50 dark:bg-slate-900/50 space-y-2">
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          value={subscriptionName}
+                          onChange={(e) => setSubscriptionName(e.target.value)}
+                          placeholder="Service name"
+                          className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-sm text-slate-700 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300 dark:focus:ring-slate-600"
+                          autoFocus
+                        />
+                        <input
+                          type="number"
+                          value={subscriptionCost}
+                          onChange={(e) => setSubscriptionCost(e.target.value)}
+                          placeholder="Cost"
+                          className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-sm text-slate-700 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300 dark:focus:ring-slate-600"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <select
+                          value={subscriptionBilling}
+                          onChange={(e) => setSubscriptionBilling(e.target.value as 'monthly' | 'yearly')}
+                          className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-slate-300 dark:focus:ring-slate-600"
+                        >
+                          <option value="monthly">Monthly</option>
+                          <option value="yearly">Yearly</option>
+                        </select>
+                        <select
+                          value={subscriptionCategory}
+                          onChange={(e) => setSubscriptionCategory(e.target.value as SubscriptionCategory)}
+                          className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-slate-300 dark:focus:ring-slate-600"
+                        >
+                          {Object.entries(CATEGORY_LABELS).map(([val, label]) => (
+                            <option key={val} value={val}>{label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="flex justify-end gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => setShowAddSubscription(false)}
+                          className="px-3 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleAddSubscription}
+                          disabled={!subscriptionName.trim() || !subscriptionCost}
+                          className="px-3 py-1.5 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-semibold hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          Add
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Service List Table */}
+                <div className="flex-1 overflow-y-auto">
+                  {subscriptions.length === 0 ? (
+                    <div className="p-4 text-center">
+                      <p className="text-xs text-slate-400 dark:text-slate-500">No subscriptions tracked yet.</p>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-slate-100 dark:divide-slate-700/50">
+                      {/* Table Header */}
+                      <div className="grid grid-cols-[auto_1fr_80px_60px_40px] gap-3 items-center px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                        <span className="w-1" />
+                        <span>Service</span>
+                        <span className="text-right">Cost</span>
+                        <span className="text-center">Cycle</span>
+                        <span />
+                      </div>
+                      {/* Table Rows */}
+                      {subscriptions.map((item) => (
+                        <div
+                          key={item.id}
+                          className={`grid grid-cols-[auto_1fr_80px_60px_40px] gap-3 items-center px-4 py-2 group hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors ${!item.active ? 'opacity-50' : ''
+                            }`}
+                        >
+                          {/* Category Color Strip */}
+                          <div className={`w-1 h-6 rounded-full ${CATEGORY_COLORS[item.category]}`} title={CATEGORY_LABELS[item.category]} />
+                          {/* Name */}
+                          <span className={`text-sm font-medium truncate ${item.active ? 'text-slate-800 dark:text-slate-100' : 'text-slate-400 line-through'}`}>
+                            {item.name}
+                          </span>
+                          {/* Cost */}
+                          <span className="text-sm text-right font-medium tabular-nums text-slate-700 dark:text-slate-200">
+                            ${item.cost.toFixed(2)}
+                          </span>
+                          {/* Billing */}
+                          <span className="text-[11px] text-center text-slate-400 dark:text-slate-500">
+                            {item.billing === 'monthly' ? '/mo' : '/yr'}
+                          </span>
+                          {/* Action Icons */}
+                          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              type="button"
+                              onClick={() => toggleSubscription(item.id)}
+                              className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                              title={item.active ? 'Pause' : 'Resume'}
+                            >
+                              {item.active ? (
+                                <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                                </svg>
+                              ) : (
+                                <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+                                </svg>
+                              )}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => deleteSubscription(item.id)}
+                              className="p-1 rounded-md hover:bg-rose-100 dark:hover:bg-rose-500/20 text-slate-400 hover:text-rose-500 transition-colors"
+                              title="Delete"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Total Monthly Burn Footer */}
+                <div className="px-4 py-3 border-t border-slate-100 dark:border-slate-700/50 bg-slate-50/50 dark:bg-slate-900/30 rounded-b-xl">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Total Monthly Burn</span>
+                    <span className="text-lg font-bold text-slate-900 dark:text-white tabular-nums">
+                      ${monthlySubscriptionTotal.toFixed(2)}<span className="text-xs font-normal text-slate-400 dark:text-slate-500">/mo</span>
+                    </span>
+                  </div>
+                </div>
+              </section>
+            </div>
+          )}
+
           <div className="flex-1 min-h-0">
             <DndContext
               sensors={sensors}

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useTaskContext } from '@/lib/task-context';
 import { ROOT_TASK_ID } from '@/lib/types';
 import { KanbanBoard } from './KanbanBoard';
@@ -8,17 +8,14 @@ import { HomeDashboard } from './HomeDashboard';
 import { TaskPanel } from './TaskPanel';
 import { SearchModal } from './SearchModal';
 import { CompletedArchive } from './CompletedArchive';
+import { BackupsPanel } from './BackupsPanel';
 
 export function Board() {
   const {
     currentParentId,
     isLoading,
-    createTask,
     setSearchOpen,
-    tasks, // Needed if we want validation or logic here
   } = useTaskContext();
-
-  const [quickAddValue, setQuickAddValue] = useState('');
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -50,33 +47,6 @@ export function Board() {
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [setSearchOpen]);
-
-
-  const handleQuickAdd = async (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      const trimmed = quickAddValue.trim();
-      if (trimmed) {
-        // If at root, we need to know which area to add to.
-        // For now, maybe disable quick add at root or force user to pick?
-        // Let's rely on the specific board's input if inside a board.
-        // But this handles the global state if we lift it up.
-        // Actually, Board.tsx contained the sticky Header/QuickAdd.
-        // Now KanbanBoard contains the Header.
-        // So this Board.tsx is mainly a Router.
-
-        if (currentParentId !== ROOT_TASK_ID) {
-          await createTask({
-            parentId: currentParentId,
-            title: trimmed,
-            status: 'NOT_STARTED',
-            priority: 'MEDIUM',
-          });
-          setQuickAddValue('');
-        }
-      }
-    }
-  };
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen bg-slate-50 dark:bg-slate-900">
@@ -103,6 +73,7 @@ export function Board() {
       <TaskPanel />
       <SearchModal />
       <CompletedArchive />
+      <BackupsPanel />
 
       {/* Quick Add overlay or global? 
           For now, KanbanBoard has its internal logic if we move it there.

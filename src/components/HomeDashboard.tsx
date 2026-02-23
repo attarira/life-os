@@ -1,15 +1,12 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import Link from 'next/link';
 import {
   DndContext,
   DragEndEvent,
   DragOverlay,
   DragStartEvent,
   PointerSensor,
-  useDraggable,
-  useDroppable,
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
@@ -18,6 +15,9 @@ import { CSS } from '@dnd-kit/utilities';
 import { useTaskContext } from '@/lib/task-context';
 import { COLUMNS, ROOT_TASK_ID, Task, TaskStatus } from '@/lib/types';
 import { getSubtreeIds, getTaskPath } from '@/lib/tasks';
+import { DASHBOARD_PAGES_STORAGE_KEY } from '@/lib/storage-keys';
+import { ChatPanel, AppContext } from './ChatPanel';
+import { PlannerCard } from './PlannerCard';
 
 type DragHandleProps = {
   ref: (el: HTMLElement | null) => void;
@@ -42,8 +42,6 @@ type NotePage = {
   createdAt: string;
   updatedAt: string;
 };
-
-const DASHBOARD_PAGES_STORAGE_KEY = 'lifeos:dashboard-pages:v1';
 
 function buildPageId() {
   return typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -152,18 +150,6 @@ const STATUS_RING = [
   { status: 'COMPLETED' as TaskStatus, color: 'rgba(34,197,94,0.75)' },
 ];
 
-const DAY_AHEAD_START_HOUR = 7;
-const DAY_AHEAD_END_HOUR = 19;
-const DAY_AHEAD_SLOTS = Array.from(
-  { length: DAY_AHEAD_END_HOUR - DAY_AHEAD_START_HOUR + 1 },
-  (_, idx) => DAY_AHEAD_START_HOUR + idx
-);
-
-function formatHourLabel(hour: number) {
-  const suffix = hour >= 12 ? 'PM' : 'AM';
-  const display = hour % 12 || 12;
-  return `${display}:00 ${suffix}`;
-}
 
 function buildStatusRingSegments(
   statusCounts: Record<TaskStatus, number>,
@@ -275,9 +261,8 @@ function LifeAreaCard({
       onClick={onOpen}
       {...(dragHandleProps?.attributes || {})}
       {...(dragHandleProps?.listeners || {})}
-      className={`group relative overflow-hidden flex flex-col gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 pb-12 text-left shadow-sm transition-all ${
-        isDragging ? 'ring-2 ring-slate-300 dark:ring-slate-700 shadow-lg' : 'hover:shadow-md hover:-translate-y-0.5'
-      } ${isActive ? 'border-slate-300 dark:border-slate-600 shadow-md' : ''} ${muted ? 'pointer-events-none' : 'cursor-pointer'}`}
+      className={`group relative overflow-hidden flex flex-col gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 pb-12 text-left shadow-sm transition-all ${isDragging ? 'ring-2 ring-slate-300 dark:ring-slate-700 shadow-lg' : 'hover:shadow-md hover:-translate-y-0.5'
+        } ${isActive ? 'border-slate-300 dark:border-slate-600 shadow-md' : ''} ${muted ? 'pointer-events-none' : 'cursor-pointer'}`}
       style={{ ...(style || {}), ['--tile-pad' as string]: '12px' }}
     >
       <div className={`absolute left-0 top-0 bottom-0 w-1 rounded-l-2xl ${tone.accent}`} aria-hidden="true" />
@@ -288,7 +273,7 @@ function LifeAreaCard({
           >
             <span className="flex items-center justify-center leading-none">{icon}</span>
           </div>
-        <div className="space-y-1">
+          <div className="space-y-1">
             <div className="flex items-center gap-2">
               <h3 className="text-lg font-semibold text-slate-900 dark:text-white leading-tight">{area.title}</h3>
               {dueSoon && (
@@ -310,9 +295,9 @@ function LifeAreaCard({
         {onEdit && (
           <button
             onClick={(e) => {
-                e.stopPropagation();
-                onEdit();
-              }}
+              e.stopPropagation();
+              onEdit();
+            }}
             className="h-8 w-8 rounded-lg text-slate-500 hover:text-slate-100 dark:text-slate-400 dark:hover:text-white bg-transparent hover:bg-white/5 dark:hover:bg-white/10 grid place-items-center transition-colors duration-150"
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" fill="none">
@@ -322,8 +307,8 @@ function LifeAreaCard({
         )}
       </div>
 
-      <div className="py-1 relative">
-        <div className="min-w-0 pr-24">
+      <div className="py-1 grid grid-cols-[minmax(0,1fr)_84px] items-center gap-3">
+        <div className="min-w-0">
           {Array.isArray(highlights) && highlights.length > 0 ? (
             <div className="flex flex-col gap-1.5 text-sm text-slate-200 dark:text-slate-100 font-medium">
               {highlights.map((item, idx) => (
@@ -334,7 +319,7 @@ function LifeAreaCard({
             <p className="text-sm text-slate-500 dark:text-slate-400">No active focus.</p>
           )}
         </div>
-        <div className="absolute right-8 top-1/2 -translate-y-1/2">
+        <div className="justify-self-end">
           <div className="relative" style={{ width: ringSize, height: ringSize }}>
             <svg width={ringSize} height={ringSize} viewBox={`0 0 ${ringSize} ${ringSize}`} className="block">
               <circle
@@ -421,7 +406,7 @@ function SortableLifeAreaCard({
   };
 
   return (
-      <LifeAreaCard
+    <LifeAreaCard
       area={snapshot.area}
       statusCounts={snapshot.statusCounts}
       total={snapshot.total}
@@ -440,82 +425,7 @@ function SortableLifeAreaCard({
   );
 }
 
-function DayAheadDraggableTask({
-  task,
-  subtle,
-}: {
-  task: Task;
-  subtle?: boolean;
-}) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: task.id,
-  });
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-  };
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      {...attributes}
-      {...listeners}
-      className={`rounded-lg border border-slate-800/80 bg-slate-900/60 px-3 py-2 text-xs text-slate-200 shadow-sm transition-all ${
-        subtle ? 'text-slate-400' : ''
-      } ${isDragging ? 'opacity-60 shadow-md' : 'hover:border-slate-700 hover:bg-slate-900/80'}`}
-    >
-      <div className="font-semibold text-slate-100">{task.title}</div>
-      <div className="mt-1 flex items-center gap-2 text-[10px] uppercase tracking-[0.08em] text-slate-400">
-        <span>{task.priority}</span>
-        {task.dueDate && (
-          <span>
-            Due {new Date(task.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-          </span>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function DayAheadTaskPreview({ task }: { task: Task }) {
-  return (
-    <div className="rounded-lg border border-slate-800/80 bg-slate-900/80 px-3 py-2 text-xs text-slate-200 shadow-md">
-      <div className="font-semibold text-slate-100">{task.title}</div>
-      <div className="mt-1 flex items-center gap-2 text-[10px] uppercase tracking-[0.08em] text-slate-400">
-        <span>{task.priority}</span>
-        {task.dueDate && (
-          <span>
-            Due {new Date(task.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-          </span>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function DayAheadSlot({
-  id,
-  label,
-  children,
-}: {
-  id: string;
-  label: string;
-  children?: React.ReactNode;
-}) {
-  const { setNodeRef, isOver } = useDroppable({ id });
-  return (
-    <div
-      ref={setNodeRef}
-      className={`flex gap-4 border-b border-slate-800/70 py-3 px-3 ${isOver ? 'bg-slate-900/80' : ''}`}
-    >
-      <div className="w-20 shrink-0 text-[11px] uppercase tracking-[0.18em] text-slate-500">{label}</div>
-      <div className="flex-1 min-h-[44px] space-y-2">
-        {children}
-      </div>
-    </div>
-  );
-}
 
 export function HomeDashboard() {
   const { navigateTo, tasks, setSearchOpen, createTask, reorderTasks, updateTask, deleteTask } = useTaskContext();
@@ -525,13 +435,12 @@ export function HomeDashboard() {
   const [editingArea, setEditingArea] = useState<Task | null>(null);
   const [editorTitle, setEditorTitle] = useState('');
   const [editorDescription, setEditorDescription] = useState('');
-  const [dayAheadOpen, setDayAheadOpen] = useState(false);
-  const [dayAheadDragId, setDayAheadDragId] = useState<string | null>(null);
-  const [carryoverDecisions, setCarryoverDecisions] = useState<Record<string, 'move' | 'deprioritize'>>({});
+
   const [initialPagesState] = useState(() => loadPagesState());
   const [pages, setPages] = useState<NotePage[]>(initialPagesState.pages);
   const [activePageId, setActivePageId] = useState<string | null>(initialPagesState.activePageId);
   const [isNotesDrawerOpen, setIsNotesDrawerOpen] = useState(false);
+  const [isChatDrawerOpen, setIsChatDrawerOpen] = useState(false);
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [noteDraftTitle, setNoteDraftTitle] = useState('');
   const noteEditorRef = useRef<HTMLDivElement>(null);
@@ -545,13 +454,7 @@ export function HomeDashboard() {
     })
   );
 
-  const dayAheadSensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 6,
-      },
-    })
-  );
+
 
   useEffect(() => {
     if (pages.length === 0) return;
@@ -561,6 +464,19 @@ export function HomeDashboard() {
       console.warn('Failed to persist pages:', error);
     }
   }, [pages]);
+
+  useEffect(() => {
+    const handleNotesStorageUpdated = () => {
+      const nextState = loadPagesState();
+      setPages(nextState.pages);
+      setActivePageId((prev) => (
+        nextState.pages.some((page) => page.id === prev) ? prev : nextState.activePageId
+      ));
+    };
+
+    window.addEventListener('lifeos:notes-storage-updated', handleNotesStorageUpdated);
+    return () => window.removeEventListener('lifeos:notes-storage-updated', handleNotesStorageUpdated);
+  }, []);
 
   const activePage = useMemo(
     () => pages.find((page) => page.id === activePageId) || null,
@@ -693,6 +609,13 @@ export function HomeDashboard() {
     () => tasks.filter(t => t.parentId === ROOT_TASK_ID && !t.calendarOnly).sort((a, b) => a.order - b.order),
     [tasks]
   );
+  const parentIdsWithChildren = useMemo(() => {
+    const parentIds = new Set<string>();
+    tasks.forEach(task => {
+      parentIds.add(task.parentId);
+    });
+    return parentIds;
+  }, [tasks]);
 
   const areaSnapshots: AreaSnapshot[] = useMemo(() => {
     return lifeAreas.map(area => {
@@ -751,105 +674,23 @@ export function HomeDashboard() {
     return scored[0]?.id || null;
   }, [areaSnapshots, lifeAreas]);
 
-  const { todayTasks, todayCalendarItems } = useMemo(() => {
-    const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const tomorrowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-    const isToday = (d: Date) => d >= todayStart && d < tomorrowStart;
-    const getSortTime = (task: Task) => {
-      const dueDate = task.dueDate ? new Date(task.dueDate) : null;
-      const scheduled = task.scheduledDate ? new Date(task.scheduledDate) : null;
-      const dueTime = dueDate && isToday(dueDate) ? dueDate.getTime() : Number.MAX_SAFE_INTEGER;
-      const scheduledTime = scheduled && isToday(scheduled) ? scheduled.getTime() : Number.MAX_SAFE_INTEGER;
-      return Math.min(dueTime, scheduledTime);
-    };
-    const relevant = tasks
-      .filter(t => t.status !== 'COMPLETED')
-      .filter(t => {
-        const dueDate = t.dueDate ? new Date(t.dueDate) : null;
-        const scheduled = t.scheduledDate ? new Date(t.scheduledDate) : null;
-        return (dueDate && isToday(dueDate)) || (scheduled && isToday(scheduled));
-      })
-      .sort((a, b) => getSortTime(a) - getSortTime(b));
 
-    return {
-      todayTasks: relevant.filter(t => !t.calendarOnly),
-      todayCalendarItems: relevant.filter(t => t.calendarOnly),
-    };
-  }, [tasks]);
 
-  const now = new Date();
-  const tomorrowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-  const dayAfterTomorrowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 2);
-  const isTomorrow = (d: Date) => d >= tomorrowStart && d < dayAfterTomorrowStart;
 
-  const carryoverCandidates = useMemo(
-    () => todayTasks.filter(t => !t.calendarOnly && t.status !== 'COMPLETED'),
-    [todayTasks]
-  );
-
-  useEffect(() => {
-    if (!dayAheadOpen) return;
-    setCarryoverDecisions(prev => {
-      const next = { ...prev };
-      carryoverCandidates.forEach(task => {
-        if (!next[task.id]) next[task.id] = 'move';
-      });
-      return next;
-    });
-  }, [dayAheadOpen, carryoverCandidates]);
-
-  const carryoverMove = useMemo(
-    () => carryoverCandidates.filter(task => (carryoverDecisions[task.id] ?? 'move') === 'move'),
-    [carryoverCandidates, carryoverDecisions]
-  );
-
-  const tomorrowScheduled = useMemo(
-    () =>
-      tasks.filter(t => {
-        if (t.status === 'COMPLETED' || t.calendarOnly || !t.scheduledDate) return false;
-        return isTomorrow(new Date(t.scheduledDate));
-      }),
-    [tasks, isTomorrow]
-  );
-
-  const pendingTomorrow = useMemo(() => {
-    const carryoverIds = new Set(carryoverCandidates.map(t => t.id));
-    return tasks
-      .filter(t => !t.calendarOnly && t.status !== 'COMPLETED')
-      .filter(t => !t.scheduledDate || !isTomorrow(new Date(t.scheduledDate)))
-      .filter(t => {
-        if (!carryoverIds.has(t.id)) return true;
-        return (carryoverDecisions[t.id] ?? 'move') === 'move';
-      })
-      .sort((a, b) => {
-        const priorityWeight = { HIGH: 3, MEDIUM: 2, LOW: 1 } as const;
-        return (priorityWeight[b.priority] - priorityWeight[a.priority]) || a.title.localeCompare(b.title);
-      });
-  }, [tasks, carryoverCandidates, carryoverDecisions, isTomorrow]);
-
-  const handleCompleteToday = async (task: Task) => {
-    if (task.calendarOnly) {
-      await deleteTask(task.id);
-      return;
-    }
-    if (task.scheduledDate) {
-      await updateTask(task.id, { scheduledDate: undefined });
-    }
-  };
 
   const upcomingTasks = useMemo(() => {
     const now = new Date();
     const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
     const windowEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 8);
     return tasks
+      .filter(t => !parentIdsWithChildren.has(t.id))
       .filter(t => t.dueDate && t.status !== 'COMPLETED' && !t.calendarOnly)
       .filter(t => {
         const due = new Date(t.dueDate!);
         return due >= tomorrow && due < windowEnd;
       })
       .sort((a, b) => (a.dueDate?.getTime() || 0) - (b.dueDate?.getTime() || 0));
-  }, [tasks]);
+  }, [tasks, parentIdsWithChildren]);
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id as string);
@@ -870,45 +711,7 @@ export function HomeDashboard() {
     await reorderTasks(reordered, 'NOT_STARTED');
   };
 
-  const handleDayAheadDragStart = (event: DragStartEvent) => {
-    setDayAheadDragId(event.active.id as string);
-  };
 
-  const handleDayAheadDragEnd = async (event: DragEndEvent) => {
-    const { active, over } = event;
-    setDayAheadDragId(null);
-
-    if (!over) return;
-    const overId = String(over.id);
-    if (!overId.startsWith('slot-')) return;
-
-    const hour = Number(overId.replace('slot-', ''));
-    if (Number.isNaN(hour)) return;
-
-    const task = tasks.find(t => t.id === active.id);
-    if (!task) return;
-
-    const scheduledDate = new Date(tomorrowStart);
-    scheduledDate.setHours(hour, 0, 0, 0);
-    await updateTask(task.id, { scheduledDate });
-  };
-
-  const handleDayAheadApply = async () => {
-    for (const task of carryoverCandidates) {
-      const decision = carryoverDecisions[task.id] ?? 'move';
-      if (decision === 'deprioritize') {
-        await updateTask(task.id, { priority: 'LOW' });
-        continue;
-      }
-      if (decision === 'move' && task.scheduledDate) {
-        const scheduled = new Date(task.scheduledDate);
-        const moved = new Date(tomorrowStart);
-        moved.setHours(scheduled.getHours(), scheduled.getMinutes(), 0, 0);
-        await updateTask(task.id, { scheduledDate: moved });
-      }
-    }
-    setDayAheadOpen(false);
-  };
 
   const openEditor = (area?: Task) => {
     if (area) {
@@ -950,7 +753,7 @@ export function HomeDashboard() {
     closeEditor();
   };
 
-  const activeDayAheadTask = dayAheadDragId ? tasks.find(t => t.id === dayAheadDragId) : null;
+
 
   const handleEditorDelete = async () => {
     if (!editingArea) {
@@ -965,10 +768,19 @@ export function HomeDashboard() {
 
   const activeArea = activeId ? areaSnapshots.find(a => a.area.id === activeId) : null;
 
+  const chatContext: AppContext = useMemo(
+    () => ({ tasks, navigateTo, selectTask }),
+    [tasks, navigateTo, selectTask]
+  );
+
+  // Dynamic padding for left (chat) + right (notes) drawers
+  const leftPad = isChatDrawerOpen ? 'xl:pl-[330px]' : 'xl:pl-[56px]';
+  const rightPad = isNotesDrawerOpen ? 'xl:pr-[330px]' : 'xl:pr-[56px]';
+
   return (
     <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-900">
       <header className="flex-shrink-0 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-6 py-4">
-        <div className="flex items-center justify-between max-w-7xl mx-auto">
+        <div className={`flex items-center justify-between max-w-7xl mx-auto ${leftPad} ${rightPad}`}>
           <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
             <span className="font-semibold text-slate-900 dark:text-white">LifeOS</span>
             <span className="text-slate-400 dark:text-slate-500">/</span>
@@ -991,10 +803,24 @@ export function HomeDashboard() {
       </header>
 
       <main className="flex-1 overflow-auto p-6">
+        {/* ─── Chat Drawer (LEFT) ─── */}
         <aside
-          className={`hidden xl:block fixed right-0 top-[73px] bottom-0 z-30 transition-[width] duration-200 ${
-            isNotesDrawerOpen ? 'w-[330px]' : 'w-[56px]'
-          }`}
+          className={`hidden xl:block fixed left-0 top-[73px] bottom-0 z-30 transition-[width] duration-200 ${isChatDrawerOpen ? 'w-[330px]' : 'w-[56px]'
+            }`}
+        >
+          <div className="h-full w-full rounded-r-2xl border-r border-t border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-950/95 shadow-2xl backdrop-blur-sm">
+            <ChatPanel
+              appContext={chatContext}
+              collapsed={!isChatDrawerOpen}
+              onToggle={() => setIsChatDrawerOpen((v) => !v)}
+            />
+          </div>
+        </aside>
+
+        {/* ─── Notes Drawer (RIGHT) ─── */}
+        <aside
+          className={`hidden xl:block fixed right-0 top-[73px] bottom-0 z-30 transition-[width] duration-200 ${isNotesDrawerOpen ? 'w-[330px]' : 'w-[56px]'
+            }`}
         >
           <div className="h-full w-full rounded-l-2xl border-l border-t border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-950/95 shadow-2xl backdrop-blur-sm">
             {!isNotesDrawerOpen ? (
@@ -1043,23 +869,18 @@ export function HomeDashboard() {
 
                 <div className="flex-1 overflow-y-auto p-2 space-y-1">
                   {sortedPages.map((page) => {
-                    const preview = page.content.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
                     const isActive = page.id === activePageId;
                     return (
                       <button
                         key={page.id}
                         type="button"
                         onClick={() => openNoteModal(page.id)}
-                        className={`w-full text-left rounded-lg px-2.5 py-2 transition-colors ${
-                          isActive
-                            ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-white'
-                            : 'hover:bg-slate-100/80 text-slate-700 dark:text-slate-300 dark:hover:bg-slate-800/70'
-                        }`}
+                        className={`w-full text-left rounded-lg px-2.5 py-2 transition-colors ${isActive
+                          ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-white'
+                          : 'hover:bg-slate-100/80 text-slate-700 dark:text-slate-300 dark:hover:bg-slate-800/70'
+                          }`}
                       >
                         <p className="text-sm font-medium truncate">{page.title || 'Untitled'}</p>
-                        <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
-                          {preview || 'Empty page'}
-                        </p>
                       </button>
                     );
                   })}
@@ -1069,126 +890,14 @@ export function HomeDashboard() {
           </div>
         </aside>
 
-        <div className={`max-w-7xl mx-auto space-y-6 ${isNotesDrawerOpen ? 'xl:pr-[330px]' : 'xl:pr-[56px]'}`}>
-          <div className="flex items-center justify-end">
-            <button
-              onClick={() => setDayAheadOpen(true)}
-              className="px-3 py-2 text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-lg hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-slate-600 transition-colors"
-            >
-              Day Ahead
-            </button>
-          </div>
+        <div className={`max-w-7xl mx-auto space-y-6 ${leftPad} ${rightPad}`}>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div className="group bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm relative overflow-hidden">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="h-9 w-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-300">
-                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                      <path d="M8 3v3M16 3v3M4 11h16M5 20h14a1 1 0 001-1V7a1 1 0 00-1-1H5a1 1 0 00-1 1v12a1 1 0 001 1z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Today</p>
-                  </div>
-                </div>
-                <Link
-                  href="/calendar"
-                  className="opacity-0 group-hover:opacity-100 transition-opacity text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1"
-                >
-                  <span>Open</span>
-                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                  </svg>
-                </Link>
-              </div>
-              {todayTasks.length === 0 && todayCalendarItems.length === 0 ? (
-                <p className="text-sm text-slate-500 dark:text-slate-400">Nothing scheduled or due today.</p>
-              ) : (
-                <div className="space-y-3">
-                  {todayTasks.length > 0 && (
-                    <div className="divide-y divide-slate-200 dark:divide-slate-800">
-                      {todayTasks.map(task => {
-                        const now = new Date();
-                        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-                        const tomorrowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-                        const isToday = (d: Date) => d >= todayStart && d < tomorrowStart;
-                        const dueToday = task.dueDate ? isToday(new Date(task.dueDate)) : false;
-                        const areaPath = getTaskPath(tasks, task.id);
-                        const areaTask = areaPath[0];
-                        const areaKey = resolveAreaKey(areaTask?.title || areaTask?.id || '');
-                        const areaLabel = areaTask?.title || 'Task';
-                        const areaBadge = AREA_BADGES[areaKey] || AREA_BADGES.default;
-                        return (
-                          <div
-                            key={task.id}
-                            role="button"
-                            tabIndex={0}
-                            onClick={() => {
-                              navigateTo(task.parentId);
-                              selectTask(task.id);
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' || e.key === ' ') {
-                                e.preventDefault();
-                                navigateTo(task.parentId);
-                                selectTask(task.id);
-                              }
-                            }}
-                            className="group/row w-full text-left py-3 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 px-2 rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/50"
-                          >
-                            <div className="flex flex-col">
-                              <span className="text-sm font-medium text-slate-900 dark:text-white">{task.title}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className={`text-[11px] px-2 py-0.5 rounded-md ${areaBadge}`}>
-                                {areaLabel}
-                              </span>
-                              {dueToday && (
-                                <span className="text-[11px] px-2 py-0.5 rounded-md border text-red-600 border-red-500/30 bg-red-500/10">
-                                  Due
-                                </span>
-                              )}
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleCompleteToday(task);
-                                }}
-                                className="opacity-0 group-hover/row:opacity-100 transition-opacity text-slate-400 hover:text-emerald-500"
-                                aria-label="Complete for today"
-                              >
-                                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                </svg>
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {todayCalendarItems.length > 0 && (
-                    <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/60 px-3 py-2">
-                      <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 mb-2">Calendar-only</p>
-                      <div className="flex flex-wrap gap-2">
-                        {todayCalendarItems.map(item => (
-                          <button
-                            key={item.id}
-                            type="button"
-                            onClick={() => handleCompleteToday(item)}
-                            className="inline-flex items-center rounded-md border border-slate-300/60 text-slate-600 dark:text-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-800/60 px-2 py-1 text-[11px] hover:border-slate-400/70"
-                            aria-label={`Complete ${item.title} for today`}
-                          >
-                            {item.title}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+            <PlannerCard
+              tasks={tasks}
+              navigateTo={navigateTo}
+              selectTask={selectTask}
+              createTask={createTask}
+            />
 
             <div className="group bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm relative overflow-hidden">
               <div className="flex items-center justify-between mb-4">
@@ -1202,15 +911,6 @@ export function HomeDashboard() {
                     <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Upcoming</p>
                   </div>
                 </div>
-                <Link
-                  href="/calendar"
-                  className="opacity-0 group-hover:opacity-100 transition-opacity text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1"
-                >
-                  <span>Open</span>
-                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                  </svg>
-                </Link>
               </div>
               {upcomingTasks.length === 0 ? (
                 <p className="text-sm text-slate-500 dark:text-slate-400">No upcoming tasks in the next week.</p>
@@ -1244,7 +944,7 @@ export function HomeDashboard() {
           </div>
           <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
             <SortableContext items={lifeAreas.map(area => area.id)} strategy={rectSortingStrategy}>
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-x-4 gap-y-6">
+              <div className={`grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-6 ${isNotesDrawerOpen ? 'xl:grid-cols-2 2xl:grid-cols-3' : 'xl:grid-cols-3'}`}>
                 {areaSnapshots.map(snapshot => (
                   <SortableLifeAreaCard
                     key={snapshot.area.id}
@@ -1269,7 +969,7 @@ export function HomeDashboard() {
                   activeCount={activeArea.activeCount}
                   weekCount={activeArea.weekCount}
                   dueSoon={activeArea.dueSoon}
-                  onOpen={() => {}}
+                  onOpen={() => { }}
                   muted
                 />
               ) : null}
@@ -1431,180 +1131,6 @@ export function HomeDashboard() {
             </div>
           )}
 
-          {dayAheadOpen && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center px-6 py-10">
-              <div
-                className="absolute inset-0 bg-black/70"
-                onClick={() => setDayAheadOpen(false)}
-              />
-              <div className="relative w-full max-w-6xl bg-slate-950 text-slate-100 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
-                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800/80">
-                  <div>
-                    <p className="text-[11px] uppercase tracking-[0.3em] text-slate-500">Day Ahead</p>
-                    <h2 className="text-lg font-semibold text-slate-100">
-                      {tomorrowStart.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}
-                    </h2>
-                  </div>
-                  <button
-                    onClick={() => setDayAheadOpen(false)}
-                    className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
-                    aria-label="Close day ahead"
-                  >
-                    <svg className="w-4 h-4" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" fill="none">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M18 6 6 18M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-[minmax(260px,320px)_1fr] gap-4 p-6">
-                  <div className="rounded-xl border border-slate-800/80 bg-slate-900/40 p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <div>
-                        <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Carryover</p>
-                        <p className="text-xs text-slate-400">Today not completed</p>
-                      </div>
-                      <span className="text-[11px] text-slate-500">{carryoverCandidates.length}</span>
-                    </div>
-                    <div className="space-y-3 max-h-[520px] overflow-y-auto pr-1">
-                      {carryoverCandidates.length === 0 && (
-                        <p className="text-xs text-slate-500">Nothing to carry forward.</p>
-                      )}
-                      {carryoverCandidates.map(task => {
-                        const decision = carryoverDecisions[task.id] ?? 'move';
-                        return (
-                          <div key={task.id} className="rounded-lg border border-slate-800/80 bg-slate-950/40 p-3 space-y-2">
-                            <div className="text-sm font-semibold text-slate-100">{task.title}</div>
-                            <div className="text-[11px] text-slate-500">
-                              {task.scheduledDate && (
-                                <span className="mr-2">
-                                  Scheduled {new Date(task.scheduledDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                                </span>
-                              )}
-                              {task.dueDate && (
-                                <span>
-                                  Due {new Date(task.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.14em]">
-                              <button
-                                type="button"
-                                onClick={() => setCarryoverDecisions(prev => ({ ...prev, [task.id]: 'move' }))}
-                                className={`px-2 py-1 rounded-md border ${
-                                  decision === 'move'
-                                    ? 'border-slate-500 text-slate-100 bg-slate-800/70'
-                                    : 'border-slate-800 text-slate-500 hover:text-slate-300'
-                                }`}
-                              >
-                                Move
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setCarryoverDecisions(prev => ({ ...prev, [task.id]: 'deprioritize' }))}
-                                className={`px-2 py-1 rounded-md border ${
-                                  decision === 'deprioritize'
-                                    ? 'border-slate-500 text-slate-100 bg-slate-800/70'
-                                    : 'border-slate-800 text-slate-500 hover:text-slate-300'
-                                }`}
-                              >
-                                Deprioritize
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl border border-slate-800/80 bg-slate-900/40 overflow-hidden">
-                    <DndContext
-                      sensors={dayAheadSensors}
-                      onDragStart={handleDayAheadDragStart}
-                      onDragEnd={handleDayAheadDragEnd}
-                    >
-                      <div className="grid grid-cols-[220px_1fr]">
-                        <div className="border-r border-slate-800/80 bg-slate-950/60">
-                          <div className="px-4 py-3 border-b border-slate-800/80">
-                            <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Pending</p>
-                            <p className="text-xs text-slate-500">Drag into timeline</p>
-                          </div>
-                          <div className="px-3 py-3 space-y-2 max-h-[520px] overflow-y-auto">
-                            {pendingTomorrow.length === 0 && (
-                              <p className="text-xs text-slate-500">No pending tasks.</p>
-                            )}
-                            {pendingTomorrow.map(task => (
-                              <DayAheadDraggableTask key={task.id} task={task} />
-                            ))}
-                          </div>
-                        </div>
-                        <div className="bg-slate-950/40">
-                          <div className="px-4 py-3 border-b border-slate-800/80">
-                            <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Schedule</p>
-                            <p className="text-xs text-slate-500">Tomorrow timeline</p>
-                          </div>
-                          <div className="max-h-[520px] overflow-y-auto">
-                            {DAY_AHEAD_SLOTS.map(hour => {
-                              const slotTasks = tomorrowScheduled.filter(task => {
-                                if (!task.scheduledDate) return false;
-                                return new Date(task.scheduledDate).getHours() === hour;
-                              });
-                              return (
-                                <DayAheadSlot key={hour} id={`slot-${hour}`} label={formatHourLabel(hour)}>
-                                  {slotTasks.length === 0 && (
-                                    <div className="text-[11px] text-slate-600">Drop task here</div>
-                                  )}
-                                  {slotTasks.map(task => (
-                                    <div key={task.id} className="flex items-center gap-2">
-                                      <div className="flex-1">
-                                        <DayAheadDraggableTask task={task} />
-                                      </div>
-                                      <button
-                                        type="button"
-                                        onClick={() => updateTask(task.id, { scheduledDate: undefined })}
-                                        className="h-8 w-8 rounded-lg border border-slate-800/80 text-slate-500 hover:text-slate-200 hover:border-slate-700"
-                                        aria-label="Remove from schedule"
-                                      >
-                                        <svg className="w-3.5 h-3.5 mx-auto" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" fill="none">
-                                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                        </svg>
-                                      </button>
-                                    </div>
-                                  ))}
-                                </DayAheadSlot>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      </div>
-
-                      <DragOverlay>
-                        {activeDayAheadTask ? (
-                          <div className="w-52">
-                            <DayAheadTaskPreview task={activeDayAheadTask} />
-                          </div>
-                        ) : null}
-                      </DragOverlay>
-                    </DndContext>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-slate-800/80 bg-slate-950/80">
-                  <button
-                    onClick={() => setDayAheadOpen(false)}
-                    className="px-3 py-2 text-xs uppercase tracking-[0.18em] text-slate-400 hover:text-slate-200"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleDayAheadApply}
-                    className="px-4 py-2 text-xs uppercase tracking-[0.18em] bg-slate-100 text-slate-900 rounded-lg hover:bg-white"
-                  >
-                    Apply Plan
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       </main>
     </div>
