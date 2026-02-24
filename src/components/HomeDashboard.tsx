@@ -127,9 +127,9 @@ const LIFE_AREA_ICONS: Record<string, React.JSX.Element> = {
 const AREA_GRADIENTS: Record<string, { gradient: string; iconBg: string; ringTrack: string }> = {
   career: { gradient: 'linear-gradient(135deg, #1a3a6b 0%, #0c1f3d 100%)', iconBg: 'bg-blue-500/25', ringTrack: 'rgba(59,130,246,0.25)' },
   health: { gradient: 'linear-gradient(135deg, #0f5f5f 0%, #073535 100%)', iconBg: 'bg-emerald-500/25', ringTrack: 'rgba(16,185,129,0.25)' },
-  finances: { gradient: 'linear-gradient(135deg, #0e5565 0%, #062e38 100%)', iconBg: 'bg-cyan-500/25', ringTrack: 'rgba(6,182,212,0.25)' },
+  finances: { gradient: 'linear-gradient(135deg, #14532d 0%, #052e16 100%)', iconBg: 'bg-green-500/25', ringTrack: 'rgba(34,197,94,0.25)' },
   relationships: { gradient: 'linear-gradient(135deg, #5c1d50 0%, #33102c 100%)', iconBg: 'bg-purple-500/25', ringTrack: 'rgba(168,85,247,0.25)' },
-  growth: { gradient: 'linear-gradient(135deg, #252e62 0%, #131836 100%)', iconBg: 'bg-indigo-500/25', ringTrack: 'rgba(99,102,241,0.25)' },
+  growth: { gradient: 'linear-gradient(135deg, #701a75 0%, #4a044e 100%)', iconBg: 'bg-fuchsia-500/25', ringTrack: 'rgba(217,70,239,0.25)' },
   recreation: { gradient: 'linear-gradient(135deg, #8a6012 0%, #4a3308 100%)', iconBg: 'bg-amber-500/25', ringTrack: 'rgba(245,158,11,0.25)' },
   home: { gradient: 'linear-gradient(135deg, #2d4a3e 0%, #162620 100%)', iconBg: 'bg-teal-500/25', ringTrack: 'rgba(20,184,166,0.25)' },
 };
@@ -137,9 +137,9 @@ const AREA_GRADIENTS: Record<string, { gradient: string; iconBg: string; ringTra
 const AREA_BADGES: Record<string, string> = {
   career: 'bg-blue-100/70 text-blue-700 dark:bg-blue-500/20 dark:text-blue-200',
   health: 'bg-emerald-100/70 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200',
-  finances: 'bg-cyan-100/70 text-cyan-700 dark:bg-cyan-500/20 dark:text-cyan-200',
+  finances: 'bg-green-100/70 text-green-700 dark:bg-green-500/20 dark:text-green-200',
   relationships: 'bg-rose-100/70 text-rose-700 dark:bg-rose-500/20 dark:text-rose-200',
-  growth: 'bg-indigo-100/70 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-200',
+  growth: 'bg-fuchsia-100/70 text-fuchsia-700 dark:bg-fuchsia-500/20 dark:text-fuchsia-200',
   recreation: 'bg-amber-100/70 text-amber-700 dark:bg-amber-500/20 dark:text-amber-200',
   default: 'bg-slate-100/70 text-slate-600 dark:bg-slate-800/60 dark:text-slate-300',
 };
@@ -322,7 +322,7 @@ function LifeAreaCard({
               let offset = 0;
               const hasGaps = ringSegments.length > 1;
               return ringSegments.map((segment, index) => {
-                const visibleLength = hasGaps ? Math.max(segment.length - segment.gap, 0) : segment.length;
+                const visibleLength = hasGaps ? Math.max(segment.length - ringSegmentGap, 0) : segment.length;
                 const dashArray = `${visibleLength} ${ringCircumference - visibleLength}`;
                 const dashOffset = ringCircumference - offset;
                 offset += segment.length;
@@ -365,7 +365,15 @@ function SortableLifeAreaCard({
   onEdit: () => void;
   isActive: boolean;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({
     id: snapshot.area.id,
   });
 
@@ -387,7 +395,7 @@ function SortableLifeAreaCard({
       onEdit={onEdit}
       isActive={isActive}
       cardRef={setNodeRef}
-      dragHandleProps={{ listeners, attributes }}
+      dragHandleProps={{ listeners, attributes, ref: setActivatorNodeRef }}
       style={style}
       isDragging={isDragging}
     />
@@ -396,7 +404,7 @@ function SortableLifeAreaCard({
 
 
 
-export function HomeDashboard() {
+export function HomeDashboard({ isChatDrawerOpen }: { isChatDrawerOpen: boolean }) {
   const { navigateTo, tasks, setSearchOpen, createTask, reorderTasks, updateTask, deleteTask } = useTaskContext();
   const { selectTask } = useTaskContext();
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -409,7 +417,6 @@ export function HomeDashboard() {
   const [pages, setPages] = useState<NotePage[]>(initialPagesState.pages);
   const [activePageId, setActivePageId] = useState<string | null>(initialPagesState.activePageId);
   const [isNotesDrawerOpen, setIsNotesDrawerOpen] = useState(false);
-  const [isChatDrawerOpen, setIsChatDrawerOpen] = useState(false);
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [noteDraftTitle, setNoteDraftTitle] = useState('');
   const noteEditorRef = useRef<HTMLDivElement>(null);
@@ -773,30 +780,11 @@ export function HomeDashboard() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
               </svg>
             </button>
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white text-xs font-bold ml-1">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-            </div>
           </div>
         </div>
       </header>
 
       <main className="flex-1 overflow-auto">
-        {/* ─── Chat Drawer (LEFT) ─── */}
-        <aside
-          className={`hidden xl:block fixed left-0 top-[73px] bottom-0 z-30 transition-[width] duration-200 ${isChatDrawerOpen ? 'w-[330px]' : 'w-[56px]'
-            }`}
-        >
-          <div className="h-full w-full rounded-r-2xl border-r border-t border-b border-slate-800 bg-slate-950/95 shadow-2xl backdrop-blur-sm">
-            <ChatPanel
-              appContext={chatContext}
-              collapsed={!isChatDrawerOpen}
-              onToggle={() => setIsChatDrawerOpen((v) => !v)}
-            />
-          </div>
-        </aside>
-
         {/* ─── Notes Drawer (RIGHT) ─── */}
         <aside
           className={`hidden xl:block fixed right-0 top-[73px] bottom-0 z-30 transition-[width] duration-200 ${isNotesDrawerOpen ? 'w-[330px]' : 'w-[56px]'

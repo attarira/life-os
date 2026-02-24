@@ -9,6 +9,7 @@ import { TaskPanel } from './TaskPanel';
 import { SearchModal } from './SearchModal';
 import { CompletedArchive } from './CompletedArchive';
 import { BackupsPanel } from './BackupsPanel';
+import { ChatPanel } from './ChatPanel';
 
 export function Board() {
   const {
@@ -47,6 +48,14 @@ export function Board() {
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [setSearchOpen]);
+  // Global Chat State
+  const [isChatDrawerOpen, setIsChatDrawerOpen] = React.useState(false);
+  const { tasks, navigateTo, selectTask } = useTaskContext();
+  const chatContext = React.useMemo(
+    () => ({ tasks, navigateTo, selectTask }),
+    [tasks, navigateTo, selectTask]
+  );
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen bg-slate-50 dark:bg-slate-900">
@@ -60,12 +69,26 @@ export function Board() {
 
   return (
     <div className="flex flex-col h-screen bg-slate-100 dark:bg-slate-900">
+      {/* ─── Global Chat Drawer (LEFT) ─── */}
+      <aside
+        className={`hidden xl:block fixed left-0 top-[73px] bottom-0 z-40 transition-[width] duration-200 ${isChatDrawerOpen ? 'w-[330px]' : 'w-[56px]'
+          }`}
+      >
+        <div className="h-full w-full rounded-r-2xl border-r border-t border-b border-slate-800 bg-slate-950/95 shadow-2xl backdrop-blur-sm">
+          <ChatPanel
+            appContext={chatContext}
+            collapsed={!isChatDrawerOpen}
+            onToggle={() => setIsChatDrawerOpen((v) => !v)}
+          />
+        </div>
+      </aside>
+
       {/* Main Content */}
       <main className="flex-1 overflow-hidden relative">
         {isAtRoot ? (
-          <HomeDashboard />
+          <HomeDashboard isChatDrawerOpen={isChatDrawerOpen} />
         ) : (
-          <KanbanBoard />
+          <KanbanBoard isChatDrawerOpen={isChatDrawerOpen} />
         )}
       </main>
 
@@ -74,13 +97,6 @@ export function Board() {
       <SearchModal />
       <CompletedArchive />
       <BackupsPanel />
-
-      {/* Quick Add overlay or global? 
-          For now, KanbanBoard has its internal logic if we move it there.
-          The previous implementation had Quick Add permanently fixed below Header.
-          KanbanBoard needs to implement its own Quick Add if we want it there.
-          I'll add Quick Add to KanbanBoard structure to keep it contextual.
-      */}
     </div>
   );
 }

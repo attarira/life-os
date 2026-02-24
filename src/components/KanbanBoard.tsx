@@ -123,7 +123,7 @@ function resolveAreaKey(id: string) {
   return id;
 }
 
-export function KanbanBoard() {
+export function KanbanBoard({ isChatDrawerOpen }: { isChatDrawerOpen?: boolean }) {
   const {
     tasks,
     getVisibleChildren,

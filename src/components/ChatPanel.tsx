@@ -80,6 +80,8 @@ function formatTime(date: Date) {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
+import { ollamaCommandAdapter } from '@/lib/ollamaAdapter';
+
 type ChatPanelProps = {
   adapter?: ChatAdapter;
   appContext: AppContext;
@@ -88,23 +90,45 @@ type ChatPanelProps = {
 };
 
 export function ChatPanel({
-  adapter = localChatAdapter,
+  adapter = ollamaCommandAdapter,
   appContext,
   collapsed = false,
   onToggle,
 }: ChatPanelProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('lifeos-chat-history');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          // Revive dates
+          return parsed.map((m: any) => ({ ...m, timestamp: new Date(m.timestamp) }));
+        }
+      } catch (err) {
+        console.warn('Failed to load chat history', err);
+      }
+    }
+    return [{
       id: 'welcome',
       role: 'system',
-      content: 'Welcome to LifeOS. Type **help** to see what I can do.',
+      content: 'Welcome to LifeOS. Ask me anything about your tasks.',
       timestamp: new Date(),
-    },
-  ]);
+    }];
+  });
+
   const [draft, setDraft] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Save to localStorage when messages change
+  useEffect(() => {
+    try {
+      localStorage.setItem('lifeos-chat-history', JSON.stringify(messages));
+    } catch (err) {
+      console.warn('Failed to save chat history', err);
+    }
+  }, [messages]);
 
   // Auto-scroll on new messages
   useEffect(() => {
@@ -227,10 +251,10 @@ export function ChatPanel({
           <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div
               className={`max-w-[85%] rounded-xl px-3 py-2 text-[13px] leading-relaxed ${msg.role === 'user'
-                  ? 'bg-blue-500 text-white rounded-br-sm'
-                  : msg.role === 'system'
-                    ? 'bg-slate-100 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700/50 rounded-bl-sm'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-bl-sm'
+                ? 'bg-blue-500 text-white rounded-br-sm'
+                : msg.role === 'system'
+                  ? 'bg-slate-100 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700/50 rounded-bl-sm'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-bl-sm'
                 }`}
             >
               {/* Simple markdown rendering for bold and italic */}
@@ -296,7 +320,7 @@ export function ChatPanel({
           </button>
         </div>
         <p className="text-[10px] text-slate-400 dark:text-slate-600 mt-1.5 text-center">
-          Local mode · <span className="text-slate-500 dark:text-slate-500">Swap adapter for agent API</span>
+          Powered by <span className="text-slate-500 dark:text-slate-500">Ollama (gemma3:1b-it-qat)</span>
         </p>
       </div>
     </div>
