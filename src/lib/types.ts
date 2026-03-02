@@ -79,3 +79,20 @@ export const COLUMNS: { status: TaskStatus; label: string; color: string }[] = [
 
 // Days after which completed tasks are hidden
 export const COMPLETED_HIDE_DAYS = 7;
+
+// --- Memory Infrastructure Types ---
+
+export type MemoryType = 'preference' | 'task_history' | 'relationship' | 'fact' | 'system';
+
+export interface MemoryNode {
+  id: string;              // UUID v4
+  timestamp: string;       // ISO 8601 creation date
+  lastAccessedAt: string;  // ISO 8601 date, updated on retrieval
+  content: string;         // The raw text chunk
+  embedding: number[];     // Float32Array representation (e.g., 384 dims)
+  type: MemoryType;        // Categorization for hard filtering
+  importance: number;      // Fixed float [0.0, 1.0] assigned at creation
+  accessCount: number;     // Integer tracking how often this node is retrieved
+  sourceId?: string;       // Optional reference to a Task ID or chat thread ID
+}
+
