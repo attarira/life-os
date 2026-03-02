@@ -43,6 +43,8 @@ type SubscriptionItem = {
   billing: 'monthly' | 'yearly';
   active: boolean;
   category: SubscriptionCategory;
+  paymentMethod?: string;
+  dueDate?: string;
 };
 
 const CATEGORY_COLORS: Record<SubscriptionCategory, string> = {
@@ -93,6 +95,8 @@ function loadSubscriptions(): SubscriptionItem[] {
         billing: item.billing === 'yearly' ? 'yearly' : 'monthly',
         active: item.active !== false,
         category: (item.category as SubscriptionCategory) || 'other',
+        paymentMethod: item.paymentMethod ? String(item.paymentMethod) : undefined,
+        dueDate: item.dueDate ? String(item.dueDate) : undefined,
       }));
   }
   return [];
@@ -125,6 +129,8 @@ export function KanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawer
   const [subscriptionCost, setSubscriptionCost] = useState('');
   const [subscriptionBilling, setSubscriptionBilling] = useState<'monthly' | 'yearly'>('monthly');
   const [subscriptionCategory, setSubscriptionCategory] = useState<SubscriptionCategory>('other');
+  const [subscriptionPaymentMethod, setSubscriptionPaymentMethod] = useState('');
+  const [subscriptionDueDate, setSubscriptionDueDate] = useState('');
   const [showAddSubscription, setShowAddSubscription] = useState(false);
 
   const visibleChildren = getVisibleChildren();
@@ -269,12 +275,16 @@ export function KanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawer
       billing: subscriptionBilling,
       active: true,
       category: subscriptionCategory,
+      paymentMethod: subscriptionPaymentMethod.trim() || undefined,
+      dueDate: subscriptionDueDate.trim() || undefined,
     };
     setSubscriptions((prev) => [next, ...prev]);
     setSubscriptionName('');
     setSubscriptionCost('');
     setSubscriptionBilling('monthly');
     setSubscriptionCategory('other');
+    setSubscriptionPaymentMethod('');
+    setSubscriptionDueDate('');
     setShowAddSubscription(false);
   };
 
@@ -644,6 +654,20 @@ export function KanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawer
                         />
                       </div>
                       <div className="grid grid-cols-2 gap-2">
+                        <input
+                          value={subscriptionPaymentMethod}
+                          onChange={(e) => setSubscriptionPaymentMethod(e.target.value)}
+                          placeholder="Payment (e.g. WF Card)"
+                          className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-sm text-slate-700 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300 dark:focus:ring-slate-600"
+                        />
+                        <input
+                          value={subscriptionDueDate}
+                          onChange={(e) => setSubscriptionDueDate(e.target.value)}
+                          placeholder="Due Date (e.g. 5th)"
+                          className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-sm text-slate-700 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300 dark:focus:ring-slate-600"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
                         <select
                           value={subscriptionBilling}
                           onChange={(e) => setSubscriptionBilling(e.target.value as 'monthly' | 'yearly')}
@@ -692,65 +716,97 @@ export function KanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawer
                   ) : (
                     <div className="divide-y divide-slate-100 dark:divide-slate-700/50">
                       {/* Table Header */}
-                      <div className="grid grid-cols-[auto_1fr_80px_60px_40px] gap-3 items-center px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                      <div className="grid grid-cols-[auto_1fr_60px_80px_60px_40px] gap-3 items-center px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 sticky top-0 bg-white dark:bg-slate-800/70 z-10">
                         <span className="w-1" />
                         <span>Service</span>
+                        <span className="text-center">Due</span>
                         <span className="text-right">Cost</span>
                         <span className="text-center">Cycle</span>
                         <span />
                       </div>
                       {/* Table Rows */}
-                      {subscriptions.map((item) => (
-                        <div
-                          key={item.id}
-                          className={`grid grid-cols-[auto_1fr_80px_60px_40px] gap-3 items-center px-4 py-2 group hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors ${!item.active ? 'opacity-50' : ''
-                            }`}
-                        >
-                          {/* Category Color Strip */}
-                          <div className={`w-1 h-6 rounded-full ${CATEGORY_COLORS[item.category]}`} title={CATEGORY_LABELS[item.category]} />
-                          {/* Name */}
-                          <span className={`text-sm font-medium truncate ${item.active ? 'text-slate-800 dark:text-slate-100' : 'text-slate-400 line-through'}`}>
-                            {item.name}
-                          </span>
-                          {/* Cost */}
-                          <span className="text-sm text-right font-medium tabular-nums text-slate-700 dark:text-slate-200">
-                            ${item.cost.toFixed(2)}
-                          </span>
-                          {/* Billing */}
-                          <span className="text-[11px] text-center text-slate-400 dark:text-slate-500">
-                            {item.billing === 'monthly' ? '/mo' : '/yr'}
-                          </span>
-                          {/* Action Icons */}
-                          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button
-                              type="button"
-                              onClick={() => toggleSubscription(item.id)}
-                              className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
-                              title={item.active ? 'Pause' : 'Resume'}
-                            >
-                              {item.active ? (
-                                <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-                                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                                </svg>
-                              ) : (
-                                <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-                                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
-                                </svg>
+                      {[...subscriptions]
+                        .sort((a, b) => {
+                          const getNum = (str?: string) => {
+                            if (!str) return 999;
+                            const match = str.match(/\d+/);
+                            return match ? parseInt(match[0], 10) : 999;
+                          };
+                          const numA = getNum(a.dueDate);
+                          const numB = getNum(b.dueDate);
+                          if (numA === numB) {
+                            return a.name.localeCompare(b.name);
+                          }
+                          return numA - numB;
+                        })
+                        .map((item) => (
+                          <div
+                            key={item.id}
+                            className={`grid grid-cols-[auto_1fr_60px_80px_60px_40px] gap-3 items-center px-4 py-2 group hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors ${!item.active ? 'opacity-50' : ''
+                              }`}
+                          >
+                            {/* Category Color Strip */}
+                            <div className={`w-1 h-6 rounded-full ${CATEGORY_COLORS[item.category]}`} title={CATEGORY_LABELS[item.category]} />
+                            {/* Name and Payment Method */}
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className={`text-sm font-medium truncate ${item.active ? 'text-slate-800 dark:text-slate-100' : 'text-slate-400 line-through'}`}>
+                                {item.name}
+                              </span>
+                              {item.paymentMethod && (
+                                <div className="relative group/info flex-shrink-0">
+                                  <svg className="w-3.5 h-3.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-help transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  </svg>
+                                  <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover/info:block w-max max-w-[150px] p-2 bg-slate-800 dark:bg-slate-700 text-white text-xs rounded shadow-lg z-20 whitespace-normal text-center">
+                                    {item.paymentMethod}
+                                    <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-slate-800 dark:border-t-slate-700"></div>
+                                  </div>
+                                </div>
                               )}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => deleteSubscription(item.id)}
-                              className="p-1 rounded-md hover:bg-rose-100 dark:hover:bg-rose-500/20 text-slate-400 hover:text-rose-500 transition-colors"
-                              title="Delete"
-                            >
-                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                              </svg>
-                            </button>
+                            </div>
+                            {/* Due Date */}
+                            <span className="text-[11px] text-center text-slate-500 dark:text-slate-400">
+                              {item.dueDate || '-'}
+                            </span>
+                            {/* Cost */}
+                            <span className="text-sm text-right font-medium tabular-nums text-slate-700 dark:text-slate-200">
+                              ${item.cost.toFixed(2)}
+                            </span>
+                            {/* Billing */}
+                            <span className="text-[11px] text-center text-slate-400 dark:text-slate-500">
+                              {item.billing === 'monthly' ? '/mo' : '/yr'}
+                            </span>
+                            {/* Action Icons */}
+                            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button
+                                type="button"
+                                onClick={() => toggleSubscription(item.id)}
+                                className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                                title={item.active ? 'Pause' : 'Resume'}
+                              >
+                                {item.active ? (
+                                  <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                                  </svg>
+                                ) : (
+                                  <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+                                  </svg>
+                                )}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => deleteSubscription(item.id)}
+                                className="p-1 rounded-md hover:bg-rose-100 dark:hover:bg-rose-500/20 text-slate-400 hover:text-rose-500 transition-colors"
+                                title="Delete"
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
                     </div>
                   )}
                 </div>
