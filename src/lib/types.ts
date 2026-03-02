@@ -3,6 +3,19 @@ export type TaskStatus = "NOT_STARTED" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED"
 
 export type TaskPriority = "LOW" | "MEDIUM" | "HIGH";
 
+// Notification Types
+export type NotificationType = 'DUE_TASK' | 'DAILY_SUMMARY' | 'WEEKLY_SUMMARY' | 'SYSTEM';
+
+export interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  type: NotificationType;
+  read: boolean;
+  createdAt: Date;
+  relatedTaskId?: string;
+}
+
 // Core Task interface
 export interface Task {
   id: string;

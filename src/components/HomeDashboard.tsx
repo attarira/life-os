@@ -16,8 +16,10 @@ import { useTaskContext } from '@/lib/task-context';
 import { COLUMNS, ROOT_TASK_ID, Task, TaskStatus } from '@/lib/types';
 import { getSubtreeIds, getTaskPath } from '@/lib/tasks';
 import { DASHBOARD_PAGES_STORAGE_KEY } from '@/lib/storage-keys';
+import { generateId, resolveAreaKey, storage } from '@/lib/utils';
 import { ChatPanel, AppContext } from './ChatPanel';
 import { PlannerCard } from './PlannerCard';
+import { NotificationsTray } from './NotificationsTray';
 
 type DragHandleProps = {
   ref: (el: HTMLElement | null) => void;
@@ -43,16 +45,10 @@ type NotePage = {
   updatedAt: string;
 };
 
-function buildPageId() {
-  return typeof crypto !== 'undefined' && 'randomUUID' in crypto
-    ? crypto.randomUUID()
-    : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
 function createPage(title = 'Untitled', content = ''): NotePage {
   const nowIso = new Date().toISOString();
   return {
-    id: buildPageId(),
+    id: generateId(),
     title,
     content,
     createdAt: nowIso,
@@ -61,24 +57,18 @@ function createPage(title = 'Untitled', content = ''): NotePage {
 }
 
 function loadPagesState() {
-  if (typeof window === 'undefined') {
+  const defaultState = () => {
     const starter = createPage();
     return { pages: [starter], activePageId: starter.id };
+  };
+
+  const parsed = storage.get<any[]>(DASHBOARD_PAGES_STORAGE_KEY, []);
+  if (Array.isArray(parsed) && parsed.length > 0) {
+    const hydrated = parsed.filter(Boolean) as NotePage[];
+    return { pages: hydrated, activePageId: hydrated[0].id };
   }
 
-  try {
-    const raw = window.localStorage.getItem(DASHBOARD_PAGES_STORAGE_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    if (Array.isArray(parsed) && parsed.length > 0) {
-      const hydrated = parsed.filter(Boolean) as NotePage[];
-      return { pages: hydrated, activePageId: hydrated[0].id };
-    }
-  } catch (error) {
-    console.warn('Failed to load pages:', error);
-  }
-
-  const starter = createPage();
-  return { pages: [starter], activePageId: starter.id };
+  return defaultState();
 }
 
 const LIFE_AREA_ICONS: Record<string, React.JSX.Element> = {
@@ -171,17 +161,7 @@ function buildStatusRingSegments(
   return segments;
 }
 
-function resolveAreaKey(id: string) {
-  const key = id.toLowerCase();
-  if (key.includes('home')) return 'home';
-  if (key.includes('health') || key.includes('well')) return 'health';
-  if (key.includes('finance') || key.includes('budget')) return 'finances';
-  if (key.includes('relation') || key.includes('family') || key.includes('social')) return 'relationships';
-  if (key.includes('career') || key.includes('work') || key.includes('job')) return 'career';
-  if (key.includes('grow') || key.includes('learn') || key.includes('personal')) return 'growth';
-  if (key.includes('recre') || key.includes('play') || key.includes('fun')) return 'recreation';
-  return id;
-}
+
 
 function isDueWithinThreeDays(task: Task): boolean {
   if (!task.dueDate || task.status === 'COMPLETED') return false;
@@ -404,7 +384,7 @@ function SortableLifeAreaCard({
 
 
 
-export function HomeDashboard({ isChatDrawerOpen }: { isChatDrawerOpen: boolean }) {
+export function HomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawerOpen: boolean, isChatExpanded?: boolean }) {
   const { navigateTo, tasks, setSearchOpen, createTask, reorderTasks, updateTask, deleteTask } = useTaskContext();
   const { selectTask } = useTaskContext();
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -434,11 +414,7 @@ export function HomeDashboard({ isChatDrawerOpen }: { isChatDrawerOpen: boolean 
 
   useEffect(() => {
     if (pages.length === 0) return;
-    try {
-      localStorage.setItem(DASHBOARD_PAGES_STORAGE_KEY, JSON.stringify(pages));
-    } catch (error) {
-      console.warn('Failed to persist pages:', error);
-    }
+    storage.set(DASHBOARD_PAGES_STORAGE_KEY, pages);
   }, [pages]);
 
   useEffect(() => {
@@ -530,7 +506,7 @@ export function HomeDashboard({ isChatDrawerOpen }: { isChatDrawerOpen: boolean 
     const sourceContent = noteDraftContentRef.current || activePage.content || '';
     const copy: NotePage = {
       ...activePage,
-      id: buildPageId(),
+      id: generateId(),
       title: `${sourceTitle} Copy`,
       content: sourceContent,
       createdAt: nowIso,
@@ -593,9 +569,19 @@ export function HomeDashboard({ isChatDrawerOpen }: { isChatDrawerOpen: boolean 
     return parentIds;
   }, [tasks]);
 
+  const tasksByParentId = useMemo(() => {
+    const map = new Map<string, Task[]>();
+    tasks.forEach(t => {
+      const list = map.get(t.parentId) || [];
+      list.push(t);
+      map.set(t.parentId, list);
+    });
+    return map;
+  }, [tasks]);
+
   const areaSnapshots: AreaSnapshot[] = useMemo(() => {
     return lifeAreas.map(area => {
-      const immediateTasks = tasks.filter(t => t.parentId === area.id);
+      const immediateTasks = tasksByParentId.get(area.id) || [];
 
       const statusCounts = COLUMNS.reduce((acc, col) => {
         acc[col.status] = immediateTasks.filter(t => t.status === col.status).length;
@@ -750,7 +736,7 @@ export function HomeDashboard({ isChatDrawerOpen }: { isChatDrawerOpen: boolean 
   );
 
   // Dynamic padding for left (chat) + right (notes) drawers
-  const leftPad = isChatDrawerOpen ? 'xl:pl-[330px]' : 'xl:pl-[56px]';
+  const leftPad = isChatDrawerOpen ? (isChatExpanded ? 'xl:pl-[600px]' : 'xl:pl-[330px]') : 'xl:pl-[56px]';
   const rightPad = isNotesDrawerOpen ? 'xl:pr-[330px]' : 'xl:pr-[56px]';
 
   return (
@@ -772,14 +758,7 @@ export function HomeDashboard({ isChatDrawerOpen }: { isChatDrawerOpen: boolean 
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
             </button>
-            <button
-              className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-              aria-label="Notifications"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-              </svg>
-            </button>
+            <NotificationsTray />
           </div>
         </div>
       </header>
@@ -1112,7 +1091,33 @@ export function HomeDashboard({ isChatDrawerOpen }: { isChatDrawerOpen: boolean 
                   contentEditable
                   suppressContentEditableWarning
                   onInput={(e) => handlePageContentChange((e.currentTarget as HTMLDivElement).innerHTML)}
-                  className="min-h-[300px] max-h-[60vh] overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/40 px-3 py-2 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-300 dark:focus:ring-slate-700"
+                  onPaste={(e) => {
+                    e.preventDefault();
+                    const html = e.clipboardData.getData('text/html');
+                    if (html) {
+                      const parser = new DOMParser();
+                      const doc = parser.parseFromString(html, 'text/html');
+                      const walk = (node: Node) => {
+                        if (node.nodeType === Node.ELEMENT_NODE) {
+                          const el = node as HTMLElement;
+                          el.removeAttribute('style');
+                          el.removeAttribute('class');
+                          el.removeAttribute('font');
+                          el.removeAttribute('color');
+                          el.removeAttribute('size');
+                          el.removeAttribute('face');
+                          el.removeAttribute('bgcolor');
+                        }
+                        node.childNodes.forEach(walk);
+                      };
+                      walk(doc.body);
+                      document.execCommand('insertHTML', false, doc.body.innerHTML);
+                    } else {
+                      const text = e.clipboardData.getData('text/plain');
+                      document.execCommand('insertText', false, text);
+                    }
+                  }}
+                  className="note-editor-content min-h-[300px] max-h-[60vh] overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/40 px-3 py-2 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-300 dark:focus:ring-slate-700"
                 />
               </div>
             </div>

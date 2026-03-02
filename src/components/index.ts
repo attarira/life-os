@@ -6,3 +6,4 @@ export { TaskPanel } from './TaskPanel';
 export { SearchModal } from './SearchModal';
 export { CompletedArchive } from './CompletedArchive';
 export { ImportExport } from './ImportExport';
+export { NotificationsTray } from './NotificationsTray';

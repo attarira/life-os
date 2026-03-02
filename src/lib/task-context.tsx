@@ -5,6 +5,7 @@ import { Task, TaskStatus, ROOT_TASK_ID, CreateTaskInput, UpdateTaskInput, COMPL
 import { taskStore } from './store';
 import { createSeedTasks, getSubtreeIds, getNextOrder, isCompletedOlderThan } from './tasks';
 import { AUTO_BACKUP_KEY, DASHBOARD_PAGES_STORAGE_KEY, LAST_BACKUP_KEY } from './storage-keys';
+import { storage, generateId } from '@/lib/utils';
 
 interface TaskContextValue {
   // State
@@ -93,9 +94,8 @@ export function TaskProvider({ children }: TaskProviderProps) {
     if (isLoading) return;
     try {
       const todayKey = new Date().toISOString().split('T')[0];
-      const lastBackup = localStorage.getItem(LAST_BACKUP_KEY);
-      const existingRaw = localStorage.getItem(AUTO_BACKUP_KEY);
-      const existing = existingRaw ? JSON.parse(existingRaw) : [];
+      const lastBackup = storage.get(LAST_BACKUP_KEY, '');
+      const existing = storage.get<any[]>(AUTO_BACKUP_KEY, []);
       const hasTodayBackupWithNotes = Array.isArray(existing) && existing.some((entry: { createdAt?: string; notesPages?: unknown }) => (
         typeof entry?.createdAt === 'string' &&
         entry.createdAt.split('T')[0] === todayKey &&
@@ -108,23 +108,15 @@ export function TaskProvider({ children }: TaskProviderProps) {
       cutoff.setDate(cutoff.getDate() - BACKUP_RETENTION_DAYS);
       const retained = Array.isArray(existing)
         ? existing.filter((entry: { createdAt?: string }) => {
-            if (!entry?.createdAt) return false;
-            return new Date(entry.createdAt) >= cutoff && entry.createdAt.split('T')[0] !== todayKey;
-          })
+          if (!entry?.createdAt) return false;
+          return new Date(entry.createdAt) >= cutoff && entry.createdAt.split('T')[0] !== todayKey;
+        })
         : [];
 
-      let notesPages: unknown[] = [];
-      try {
-        const notesRaw = localStorage.getItem(DASHBOARD_PAGES_STORAGE_KEY);
-        const notesParsed = notesRaw ? JSON.parse(notesRaw) : [];
-        notesPages = Array.isArray(notesParsed) ? notesParsed : [];
-      } catch (error) {
-        console.warn('Failed to include notes in auto-backup:', error);
-      }
+      const notesParsed = storage.get<any[]>(DASHBOARD_PAGES_STORAGE_KEY, []);
+      const notesPages = Array.isArray(notesParsed) ? notesParsed : [];
 
-      const id = typeof crypto !== 'undefined' && 'randomUUID' in crypto
-        ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      const id = generateId();
 
       const next = [
         ...retained,
@@ -135,8 +127,8 @@ export function TaskProvider({ children }: TaskProviderProps) {
           notesPages,
         },
       ];
-      localStorage.setItem(AUTO_BACKUP_KEY, JSON.stringify(next));
-      localStorage.setItem(LAST_BACKUP_KEY, todayKey);
+      storage.set(AUTO_BACKUP_KEY, next);
+      storage.set(LAST_BACKUP_KEY, todayKey);
     } catch (error) {
       console.warn('Auto-backup failed:', error);
     }

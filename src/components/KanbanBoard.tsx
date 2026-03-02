@@ -15,9 +15,11 @@ import { arrayMove } from '@dnd-kit/sortable';
 import { useTaskContext } from '@/lib/task-context';
 import { COLUMNS, TaskStatus } from '@/lib/types';
 import { getTaskPath } from '@/lib/tasks';
+import { generateId, resolveAreaKey, storage } from '@/lib/utils';
 import { Breadcrumb } from './Breadcrumb';
 import { Column } from './Column';
 import { TaskCard } from './TaskCard';
+import { NotificationsTray } from './NotificationsTray';
 
 const CAREER_LINKS = {
   linkedin: 'https://www.linkedin.com/in/attarira',
@@ -62,68 +64,43 @@ const CATEGORY_LABELS: Record<SubscriptionCategory, string> = {
 const FINANCE_NET_WORTH_KEY = 'lifeos:finance:netWorth:v1';
 const FINANCE_SUBSCRIPTIONS_KEY = 'lifeos:finance:subscriptions:v1';
 
-function buildId() {
-  return typeof crypto !== 'undefined' && 'randomUUID' in crypto
-    ? crypto.randomUUID()
-    : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
+
 
 function loadNetWorthSnapshots(): NetWorthSnapshot[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = window.localStorage.getItem(FINANCE_NET_WORTH_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    if (Array.isArray(parsed)) {
-      return parsed
-        .filter(Boolean)
-        .map((item) => ({
-          id: String(item.id || buildId()),
-          date: String(item.date || new Date().toISOString().slice(0, 10)),
-          assets: Number(item.assets || 0),
-          liabilities: Number(item.liabilities || 0),
-        }));
-    }
-  } catch (error) {
-    console.warn('Failed to load net worth snapshots:', error);
+  const parsed = storage.get<any[]>(FINANCE_NET_WORTH_KEY, []);
+  if (Array.isArray(parsed)) {
+    return parsed
+      .filter(Boolean)
+      .map((item) => ({
+        id: String(item.id || generateId()),
+        date: String(item.date || new Date().toISOString().slice(0, 10)),
+        assets: Number(item.assets || 0),
+        liabilities: Number(item.liabilities || 0),
+      }));
   }
   return [];
 }
 
 function loadSubscriptions(): SubscriptionItem[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = window.localStorage.getItem(FINANCE_SUBSCRIPTIONS_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    if (Array.isArray(parsed)) {
-      return parsed
-        .filter(Boolean)
-        .map((item) => ({
-          id: String(item.id || buildId()),
-          name: String(item.name || 'Subscription'),
-          cost: Number(item.cost || 0),
-          billing: item.billing === 'yearly' ? 'yearly' : 'monthly',
-          active: item.active !== false,
-          category: (item.category as SubscriptionCategory) || 'other',
-        }));
-    }
-  } catch (error) {
-    console.warn('Failed to load subscriptions:', error);
+  const parsed = storage.get<any[]>(FINANCE_SUBSCRIPTIONS_KEY, []);
+  if (Array.isArray(parsed)) {
+    return parsed
+      .filter(Boolean)
+      .map((item) => ({
+        id: String(item.id || generateId()),
+        name: String(item.name || 'Subscription'),
+        cost: Number(item.cost || 0),
+        billing: item.billing === 'yearly' ? 'yearly' : 'monthly',
+        active: item.active !== false,
+        category: (item.category as SubscriptionCategory) || 'other',
+      }));
   }
   return [];
 }
 
-function resolveAreaKey(id: string) {
-  const key = id.toLowerCase();
-  if (key.includes('health') || key.includes('well')) return 'health';
-  if (key.includes('finance') || key.includes('budget')) return 'finances';
-  if (key.includes('relation') || key.includes('family') || key.includes('social')) return 'relationships';
-  if (key.includes('career') || key.includes('work') || key.includes('job')) return 'career';
-  if (key.includes('grow') || key.includes('learn') || key.includes('personal')) return 'growth';
-  if (key.includes('recre') || key.includes('play') || key.includes('fun')) return 'recreation';
-  return id;
-}
 
-export function KanbanBoard({ isChatDrawerOpen }: { isChatDrawerOpen?: boolean }) {
+
+export function KanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawerOpen?: boolean, isChatExpanded?: boolean }) {
   const {
     tasks,
     getVisibleChildren,
@@ -233,13 +210,11 @@ export function KanbanBoard({ isChatDrawerOpen }: { isChatDrawerOpen?: boolean }
   const showFinanceSections = rootArea ? resolveAreaKey(rootArea.title || rootArea.id) === 'finances' : false;
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    window.localStorage.setItem(FINANCE_NET_WORTH_KEY, JSON.stringify(netWorthSnapshots));
+    storage.set(FINANCE_NET_WORTH_KEY, netWorthSnapshots);
   }, [netWorthSnapshots]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    window.localStorage.setItem(FINANCE_SUBSCRIPTIONS_KEY, JSON.stringify(subscriptions));
+    storage.set(FINANCE_SUBSCRIPTIONS_KEY, subscriptions);
   }, [subscriptions]);
 
   const sortedSnapshots = useMemo(() => {
@@ -273,7 +248,7 @@ export function KanbanBoard({ isChatDrawerOpen }: { isChatDrawerOpen?: boolean }
     if (!snapshotDate || Number.isNaN(assets) || Number.isNaN(liabilities)) return;
 
     const next: NetWorthSnapshot = {
-      id: buildId(),
+      id: generateId(),
       date: snapshotDate,
       assets,
       liabilities,
@@ -288,7 +263,7 @@ export function KanbanBoard({ isChatDrawerOpen }: { isChatDrawerOpen?: boolean }
     const trimmedName = subscriptionName.trim();
     if (!trimmedName || Number.isNaN(cost)) return;
     const next: SubscriptionItem = {
-      id: buildId(),
+      id: generateId(),
       name: trimmedName,
       cost,
       billing: subscriptionBilling,
@@ -346,8 +321,10 @@ export function KanbanBoard({ isChatDrawerOpen }: { isChatDrawerOpen?: boolean }
     if (editingSnapshotId === id) setEditingSnapshotId(null);
   };
 
+  const leftPad = isChatDrawerOpen ? (isChatExpanded ? 'xl:pl-[600px]' : 'xl:pl-[330px]') : 'xl:pl-[56px]';
+
   return (
-    <div className="flex flex-col h-full">
+    <div className={`flex flex-col h-full transition-[padding] duration-200 ${leftPad}`}>
       {/* Header with Breadcrumb and Actions */}
       <header className="flex-shrink-0 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 py-3">
         <div className="flex items-center justify-between gap-4 max-w-7xl mx-auto">
@@ -404,6 +381,7 @@ export function KanbanBoard({ isChatDrawerOpen }: { isChatDrawerOpen?: boolean }
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
             </button>
+            <NotificationsTray />
 
             {archivedCount > 0 && (
               <button

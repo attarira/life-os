@@ -81,12 +81,15 @@ function formatTime(date: Date) {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 import { ollamaCommandAdapter } from '@/lib/ollamaAdapter';
+import { MarkdownMessage } from './MarkdownMessage';
 
 type ChatPanelProps = {
   adapter?: ChatAdapter;
   appContext: AppContext;
   collapsed?: boolean;
   onToggle?: () => void;
+  isExpanded?: boolean;
+  onToggleExpand?: () => void;
 };
 
 export function ChatPanel({
@@ -94,6 +97,8 @@ export function ChatPanel({
   appContext,
   collapsed = false,
   onToggle,
+  isExpanded = false,
+  onToggleExpand,
 }: ChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     if (typeof window !== 'undefined') {
@@ -229,6 +234,25 @@ export function ChatPanel({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
               </svg>
             </button>
+            {onToggleExpand && (
+              <button
+                type="button"
+                onClick={onToggleExpand}
+                className="p-1.5 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                aria-label={isExpanded ? "Collapse chat" : "Expand chat"}
+                title={isExpanded ? "Collapse" : "Expand"}
+              >
+                {isExpanded ? (
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5l5.25 5.25" />
+                  </svg>
+                ) : (
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
+                  </svg>
+                )}
+              </button>
+            )}
             {onToggle && (
               <button
                 type="button"
@@ -257,16 +281,11 @@ export function ChatPanel({
                   : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-bl-sm'
                 }`}
             >
-              {/* Simple markdown rendering for bold and italic */}
-              <p
-                className="whitespace-pre-wrap"
-                dangerouslySetInnerHTML={{
-                  __html: msg.content
-                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                    .replace(/_(.*?)_/g, '<em>$1</em>')
-                    .replace(/\n/g, '<br/>'),
-                }}
-              />
+              {msg.role === 'user' ? (
+                <div className="whitespace-pre-wrap">{msg.content}</div>
+              ) : (
+                <MarkdownMessage content={msg.content} />
+              )}
               <p className={`text-[10px] mt-1 ${msg.role === 'user' ? 'text-blue-200' : 'text-slate-400 dark:text-slate-500'
                 }`}>
                 {formatTime(msg.timestamp)}
