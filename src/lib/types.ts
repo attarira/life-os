@@ -16,6 +16,11 @@ export interface Notification {
   relatedTaskId?: string;
 }
 
+export interface TaskRecurrence {
+  rule: 'daily' | 'weekdays' | 'weekends' | 'mwf' | 'tth' | 'custom';
+  daysOfWeek?: number[]; // 0=Sun, 1=Mon, ..., 6=Sat
+}
+
 // Core Task interface
 export interface Task {
   id: string;
@@ -33,6 +38,7 @@ export interface Task {
   calendarOnly?: boolean;
   tags?: string[];
   frequency?: string;
+  recurrence?: TaskRecurrence;
 }
 
 // Task creation input (without auto-generated fields)

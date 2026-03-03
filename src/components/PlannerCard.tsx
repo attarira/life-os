@@ -17,8 +17,8 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Task, ROOT_TASK_ID } from '@/lib/types';
-import { PLANNER_ITEMS_STORAGE_KEY } from '@/lib/storage-keys';
+import { Task, ROOT_TASK_ID, TaskRecurrence } from '@/lib/types';
+import { PLANNER_ITEMS_STORAGE_KEY, PLANNER_DATE_STORAGE_KEY } from '@/lib/storage-keys';
 import { getTaskPath } from '@/lib/tasks';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -59,6 +59,19 @@ function savePlannerEntries(entries: PlannerEntry[]) {
   try {
     localStorage.setItem(PLANNER_ITEMS_STORAGE_KEY, JSON.stringify(entries));
   } catch { }
+}
+
+function matchesToday(recurrence: TaskRecurrence): boolean {
+  const day = new Date().getDay();
+  switch (recurrence.rule) {
+    case 'daily': return true;
+    case 'weekdays': return day >= 1 && day <= 5;
+    case 'weekends': return day === 0 || day === 6;
+    case 'mwf': return day === 1 || day === 3 || day === 5;
+    case 'tth': return day === 2 || day === 4;
+    case 'custom': return recurrence.daysOfWeek?.includes(day) ?? false;
+  }
+  return false;
 }
 
 // ─── Area Badge Styling ──────────────────────────────────────────────────────
@@ -230,6 +243,34 @@ export function PlannerCard({ tasks, navigateTo, selectTask, createTask }: Plann
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
   );
+
+  // Auto-populate recurring tasks & handle daily rollover
+  useEffect(() => {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const storedDate = typeof window !== 'undefined' ? localStorage.getItem(PLANNER_DATE_STORAGE_KEY) : todayStr;
+
+    setEntries(prev => {
+      let next = [...prev];
+      let changed = false;
+
+      // Handle daily rollover
+      if (storedDate !== todayStr && typeof window !== 'undefined') {
+        next = next.filter(e => !e.completed);
+        localStorage.setItem(PLANNER_DATE_STORAGE_KEY, todayStr);
+        changed = true;
+      }
+
+      const autoTasks = tasks.filter(t => t.recurrence && matchesToday(t.recurrence));
+      autoTasks.forEach(rt => {
+        if (!next.some(e => e.taskId === rt.id)) {
+          next.push({ id: buildId(), taskId: rt.id, label: rt.title, completed: false });
+          changed = true;
+        }
+      });
+
+      return changed ? next : prev;
+    });
+  }, [tasks]);
 
   // Persist entries
   useEffect(() => {

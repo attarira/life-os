@@ -114,13 +114,13 @@ const LIFE_AREA_ICONS: Record<string, React.JSX.Element> = {
   ),
 };
 
-const AREA_GRADIENTS: Record<string, { gradient: string; iconBg: string; ringTrack: string }> = {
+const AREA_GRADIENTS: Record<string, { gradient: string; iconBg: string; ringTrack: string; titleColor?: string; subtitleColor?: string; ringEmptyColor?: string; ringTextColor?: string }> = {
   career: { gradient: 'linear-gradient(135deg, #1a3a6b 0%, #0c1f3d 100%)', iconBg: 'bg-blue-500/25', ringTrack: 'rgba(59,130,246,0.25)' },
-  health: { gradient: 'linear-gradient(135deg, #0f5f5f 0%, #073535 100%)', iconBg: 'bg-emerald-500/25', ringTrack: 'rgba(16,185,129,0.25)' },
+  health: { gradient: 'linear-gradient(135deg, #0e7490 0%, #164e63 100%)', iconBg: 'bg-cyan-400/25', ringTrack: 'rgba(6,182,212,0.25)' },
   finances: { gradient: 'linear-gradient(135deg, #14532d 0%, #052e16 100%)', iconBg: 'bg-green-500/25', ringTrack: 'rgba(34,197,94,0.25)' },
-  relationships: { gradient: 'linear-gradient(135deg, #5c1d50 0%, #33102c 100%)', iconBg: 'bg-purple-500/25', ringTrack: 'rgba(168,85,247,0.25)' },
+  relationships: { gradient: 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)', iconBg: 'bg-red-400/25', ringTrack: 'rgba(248,113,113,0.35)' },
   growth: { gradient: 'linear-gradient(135deg, #701a75 0%, #4a044e 100%)', iconBg: 'bg-fuchsia-500/25', ringTrack: 'rgba(217,70,239,0.25)' },
-  recreation: { gradient: 'linear-gradient(135deg, #8a6012 0%, #4a3308 100%)', iconBg: 'bg-amber-500/25', ringTrack: 'rgba(245,158,11,0.25)' },
+  recreation: { gradient: 'linear-gradient(135deg, #c2410c 0%, #7c2d12 100%)', iconBg: 'bg-orange-500/25', ringTrack: 'rgba(249,115,22,0.25)' },
   home: { gradient: 'linear-gradient(135deg, #2d4a3e 0%, #162620 100%)', iconBg: 'bg-teal-500/25', ringTrack: 'rgba(20,184,166,0.25)' },
 };
 
@@ -237,12 +237,12 @@ function LifeAreaCard({
       {/* Top row: icon + title | edit button */}
       <div className="flex items-start justify-between p-4 pb-0">
         <div className="flex items-center gap-2.5">
-          <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${grad.iconBg} text-white/80`}>
+          <div className={`flex h-10 w-10 items-center justify-center rounded-xl flex-shrink-0 ${grad.iconBg} ${!grad.iconBg.includes('text-') ? 'text-white/80' : ''}`}>
             {icon}
           </div>
-          <h3 className="text-[15px] font-semibold text-white leading-tight">{area.title}</h3>
+          <h3 className={`text-[15px] font-semibold leading-tight ${grad.titleColor || 'text-white'}`}>{area.title}</h3>
           {dueSoon && (
-            <span className="inline-flex items-center rounded-full bg-red-500/20 text-red-300 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide">
+            <span className="inline-flex items-center rounded-full bg-red-500/20 text-red-500 dark:text-red-300 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide">
               <svg className="w-2.5 h-2.5 mr-0.5" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M12 2a1 1 0 01.894.553l9 18A1 1 0 0121 22H3a1 1 0 01-.894-1.447l9-18A1 1 0 0112 2zm0 6a1 1 0 00-1 1v4a1 1 0 001 1h.01a1 1 0 001-1V9a1 1 0 00-1.01-1zM12 17a1.25 1.25 0 100-2.5A1.25 1.25 0 0012 17z" />
               </svg>
@@ -253,7 +253,7 @@ function LifeAreaCard({
         {onEdit && (
           <button
             onClick={(e) => { e.stopPropagation(); onEdit(); }}
-            className="h-7 w-7 rounded-lg text-white/30 hover:text-white/70 hover:bg-white/10 grid place-items-center transition-colors"
+            className={`flex-shrink-0 h-7 w-7 rounded-lg grid place-items-center transition-colors ${grad.titleColor ? 'text-slate-400 hover:text-slate-600 hover:bg-slate-200/50' : 'text-white/30 hover:text-white/70 hover:bg-white/10'}`}
           >
             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" fill="none">
               <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
@@ -267,11 +267,11 @@ function LifeAreaCard({
         {highlights.length > 0 ? (
           <div className="flex flex-col gap-1">
             {highlights.slice(0, 3).map((item, idx) => (
-              <div key={idx} className="text-[13px] text-white/60 leading-snug truncate">{item}</div>
+              <div key={idx} className={`text-[13px] leading-snug truncate ${grad.subtitleColor || 'text-white/60'}`}>{item}</div>
             ))}
           </div>
         ) : (
-          <p className="text-[13px] text-white/30">No active focus.</p>
+          <p className={`text-[13px] ${grad.ringEmptyColor || 'text-white/30'}`}>No active focus.</p>
         )}
       </div>
 
@@ -280,8 +280,8 @@ function LifeAreaCard({
         {/* "Next:" callout */}
         <div className="min-w-0 flex-1">
           {firstHighlight && (
-            <div className="inline-flex items-center gap-1.5 rounded-lg bg-white/[0.07] backdrop-blur-sm px-2.5 py-1.5 text-[11px] text-white/50 max-w-full truncate">
-              <span className="text-white/70 font-medium shrink-0">Next:</span>
+            <div className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] max-w-full truncate ${grad.titleColor ? 'bg-slate-100/50 text-slate-500' : 'bg-white/[0.07] backdrop-blur-sm text-white/50'}`}>
+              <span className={`font-medium shrink-0 ${grad.titleColor ? 'text-slate-600' : 'text-white/70'}`}>Next:</span>
               <span className="truncate">{firstHighlight}</span>
             </div>
           )}
@@ -325,8 +325,8 @@ function LifeAreaCard({
             })()}
           </svg>
           <div className="absolute inset-[8px] rounded-full bg-black/40 backdrop-blur-sm flex flex-col items-center justify-center text-center">
-            <div className="text-[14px] font-bold text-white">{total}</div>
-            <div className="text-[8px] uppercase tracking-[0.2em] text-white/40">Tasks</div>
+            <div className={`text-[14px] font-bold ${grad.ringTextColor || 'text-white'}`}>{total}</div>
+            <div className={`text-[8px] uppercase tracking-[0.2em] ${grad.ringEmptyColor || 'text-white/40'}`}>Tasks</div>
           </div>
         </div>
       </div>
@@ -743,10 +743,19 @@ export function HomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDraw
     <div className="flex flex-col h-full bg-slate-950">
       <header className="flex-shrink-0 bg-slate-950 border-b border-slate-800 px-6 py-4">
         <div className={`flex items-center justify-between max-w-[1600px] mx-auto ${leftPad} ${rightPad}`}>
-          <div className="flex items-center gap-2 text-sm text-slate-300">
-            <span className="font-semibold text-white">LifeOS</span>
-            <span className="text-slate-600">/</span>
-            <span className="text-slate-400">Home</span>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 text-sm text-slate-300">
+              <span className="font-semibold text-white">LifeOS</span>
+              <span className="text-slate-600">/</span>
+              <span className="text-slate-400">Home</span>
+            </div>
+            <div className="h-4 w-px bg-slate-800 hidden sm:block"></div>
+            <div className="text-sm font-medium text-slate-400 hidden sm:flex items-center gap-1.5 bg-slate-900/50 px-3 py-1 rounded-full border border-slate-800/60">
+              <svg className="w-3.5 h-3.5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <button

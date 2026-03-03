@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTaskContext } from '@/lib/task-context';
-import { Task } from '@/lib/types';
+import { Task, TaskRecurrence } from '@/lib/types';
 
 export function TaskPanel() {
   const { tasks, selectedTaskId, selectTask, updateTask, deleteTask, createTask } = useTaskContext();
@@ -14,6 +14,7 @@ export function TaskPanel() {
   const [subtasksOpen, setSubtasksOpen] = useState(false);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
   const [frequency, setFrequency] = useState('');
+  const [recurrence, setRecurrence] = useState<TaskRecurrence | undefined>();
   const panelRef = useRef<HTMLDivElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
@@ -30,6 +31,7 @@ export function TaskPanel() {
       setSubtasksOpen(false);
       setNewSubtaskTitle('');
       setFrequency(task.frequency || '');
+      setRecurrence(task.recurrence);
     }
   }, [task]);
 
@@ -116,6 +118,11 @@ export function TaskPanel() {
     if (trimmed !== current) {
       await updateTask(task.id, { frequency: trimmed || undefined });
     }
+  };
+
+  const setRecurrenceAndUpdate = async (newRec?: TaskRecurrence) => {
+    setRecurrence(newRec);
+    await updateTask(task.id, { recurrence: newRec });
   };
 
   const handleAddSubtask = async () => {
@@ -324,10 +331,17 @@ export function TaskPanel() {
                   <input
                     id="task-scheduled-date"
                     type="date"
+                    onClick={(e) => {
+                      try {
+                        e.currentTarget.showPicker();
+                      } catch (err) {
+                        // ignore
+                      }
+                    }}
                     value={scheduledDate}
                     onChange={(e) => setScheduledDate(e.target.value)}
                     onBlur={handleScheduledDateSave}
-                    className={`w-full rounded-xl bg-slate-800/40 border border-slate-700/50 px-9 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500/40 transition-all ${scheduledDate ? 'text-slate-100' : 'text-transparent'
+                    className={`w-full rounded-xl bg-slate-800/40 border border-slate-700/50 px-9 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500/40 transition-all cursor-pointer [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-datetime-edit]:py-0 ${scheduledDate ? 'text-slate-100' : 'text-transparent'
                       }`}
                     aria-label="Scheduled date"
                   />
@@ -338,7 +352,7 @@ export function TaskPanel() {
                         setScheduledDate('');
                         updateTask(task.id, { scheduledDate: undefined });
                       }}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded text-slate-500 hover:text-slate-200 transition-colors"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded text-slate-500 hover:text-slate-200 transition-colors z-10"
                       aria-label="Clear scheduled date"
                     >
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -362,10 +376,17 @@ export function TaskPanel() {
                   <input
                     id="task-due-date"
                     type="date"
+                    onClick={(e) => {
+                      try {
+                        e.currentTarget.showPicker();
+                      } catch (err) {
+                        // ignore
+                      }
+                    }}
                     value={dueDate}
                     onChange={(e) => setDueDate(e.target.value)}
                     onBlur={handleDueDateSave}
-                    className={`w-full rounded-xl bg-slate-800/40 border border-slate-700/50 px-9 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500/40 transition-all ${dueDate ? 'text-slate-100' : 'text-transparent'
+                    className={`w-full rounded-xl bg-slate-800/40 border border-slate-700/50 px-9 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500/40 transition-all cursor-pointer [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-datetime-edit]:py-0 ${dueDate ? 'text-slate-100' : 'text-transparent'
                       }`}
                     aria-label="Due date"
                   />
@@ -376,7 +397,7 @@ export function TaskPanel() {
                         setDueDate('');
                         updateTask(task.id, { dueDate: undefined });
                       }}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded text-slate-500 hover:text-slate-200 transition-colors"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded text-slate-500 hover:text-slate-200 transition-colors z-10"
                       aria-label="Clear due date"
                     >
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -388,20 +409,74 @@ export function TaskPanel() {
               </div>
             </div>
 
-            {/* ── Frequency (conditional) ── */}
+            {/* ── Frequency & Recurrence ── */}
             {task.status === 'IN_PROGRESS' && !task.dueDate && (
-              <div>
-                <label className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400 mb-2.5">
-                  Frequency
-                </label>
-                <input
-                  value={frequency}
-                  onChange={(e) => setFrequency(e.target.value)}
-                  onBlur={handleFrequencySave}
-                  placeholder="Daily, 2x a week, every Friday..."
-                  className="w-full rounded-xl bg-slate-800/40 border border-slate-700/50 px-4 py-2.5 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500/40 transition-all"
-                />
-                <p className="mt-1.5 text-[11px] text-slate-600">Shown on the card instead of &ldquo;Ongoing&rdquo;.</p>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400 mb-2.5">
+                    Frequency (Label)
+                  </label>
+                  <input
+                    value={frequency}
+                    onChange={(e) => setFrequency(e.target.value)}
+                    onBlur={handleFrequencySave}
+                    placeholder="Daily, 2x a week, every Friday..."
+                    className="w-full rounded-xl bg-slate-800/40 border border-slate-700/50 px-4 py-2.5 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500/40 transition-all"
+                  />
+                  <p className="mt-1.5 text-[11px] text-slate-600">Shown on the card instead of &ldquo;Ongoing&rdquo;.</p>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400 mb-2.5">
+                    Planner Recurrence
+                  </label>
+                  <select
+                    value={recurrence?.rule || 'none'}
+                    onChange={async (e) => {
+                      const rule = e.target.value;
+                      if (rule === 'none') {
+                        await setRecurrenceAndUpdate(undefined);
+                      } else {
+                        await setRecurrenceAndUpdate({ rule: rule as TaskRecurrence['rule'], daysOfWeek: recurrence?.daysOfWeek || [] });
+                      }
+                    }}
+                    className="w-full rounded-xl bg-slate-800/40 border border-slate-700/50 px-4 py-2 text-[13px] text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition-all cursor-pointer"
+                  >
+                    <option value="none">Does not repeat</option>
+                    <option value="daily">Daily</option>
+                    <option value="weekdays">Weekdays</option>
+                    <option value="weekends">Weekends</option>
+                    <option value="mwf">Mon, Wed, Fri</option>
+                    <option value="tth">Tue, Thu</option>
+                    <option value="custom">Custom Days</option>
+                  </select>
+
+                  {recurrence?.rule === 'custom' && (
+                    <div className="flex gap-1.5 flex-wrap mt-2.5">
+                      {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, idx) => {
+                        const isSelected = recurrence.daysOfWeek?.includes(idx);
+                        return (
+                          <button
+                            key={day}
+                            type="button"
+                            onClick={async () => {
+                              const currentDays = recurrence.daysOfWeek || [];
+                              const nextDays = isSelected
+                                ? currentDays.filter(d => d !== idx)
+                                : [...currentDays, idx].sort((a, b) => a - b);
+                              await setRecurrenceAndUpdate({ ...recurrence, daysOfWeek: nextDays });
+                            }}
+                            className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${isSelected ? 'bg-blue-500 text-white shadow-sm shadow-blue-500/20' : 'bg-slate-800 border border-slate-700/50 text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                              }`}
+                          >
+                            {day}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <p className="mt-2 text-[11px] text-slate-500">Scheduled task will automatically appear on the daily planner.</p>
+                </div>
               </div>
             )}
 

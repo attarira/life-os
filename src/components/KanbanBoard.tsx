@@ -498,6 +498,11 @@ export function KanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawer
                                 <>
                                   <input
                                     type="date"
+                                    onClick={(e) => {
+                                      try {
+                                        e.currentTarget.showPicker();
+                                      } catch (err) { }
+                                    }}
                                     value={editingSnapshot.date}
                                     onChange={(e) => setEditingSnapshot((prev) => ({ ...prev, date: e.target.value }))}
                                     className="rounded border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 px-1.5 py-0.5 text-xs text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-400"
@@ -588,6 +593,11 @@ export function KanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawer
                   <div className="flex items-center gap-2">
                     <input
                       type="date"
+                      onClick={(e) => {
+                        try {
+                          e.currentTarget.showPicker();
+                        } catch (err) { }
+                      }}
                       value={snapshotDate}
                       onChange={(e) => setSnapshotDate(e.target.value)}
                       className="flex-1 rounded-lg border border-transparent hover:border-slate-200 dark:hover:border-slate-600 focus:border-slate-300 dark:focus:border-slate-500 bg-slate-50 dark:bg-slate-900/50 px-2.5 py-1.5 text-sm text-slate-700 dark:text-slate-200 focus:outline-none transition-colors"
