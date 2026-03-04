@@ -96,6 +96,22 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
     return () => clearInterval(interval);
   }, [isInitialized, tasksLoading, tasks]);
 
+  // Auto clean-up old notifications over 7 days old
+  useEffect(() => {
+    if (!isInitialized || notifications.length === 0) return;
+
+    const now = new Date();
+    const cutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+    setNotifications(prev => {
+      const filtered = prev.filter(n => n.createdAt > cutoff);
+      if (filtered.length !== prev.length) {
+        return filtered;
+      }
+      return prev;
+    });
+  }, [notifications.length, isInitialized]);
+
   const markAsRead = useCallback((id: string) => {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
   }, []);

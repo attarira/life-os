@@ -20,6 +20,8 @@ import { generateId, resolveAreaKey, storage } from '@/lib/utils';
 import { ChatPanel, AppContext } from './ChatPanel';
 import { PlannerCard } from './PlannerCard';
 import { NotificationsTray } from './NotificationsTray';
+import { CurrencyToggle } from './CurrencyToggle';
+import { BackupsPanel } from './BackupsPanel';
 
 type DragHandleProps = {
   ref: (el: HTMLElement | null) => void;
@@ -581,34 +583,68 @@ export function HomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDraw
 
   const areaSnapshots: AreaSnapshot[] = useMemo(() => {
     return lifeAreas.map(area => {
-      const immediateTasks = tasksByParentId.get(area.id) || [];
+      const allAreaTasks: Task[] = [];
+      const stack = [...(tasksByParentId.get(area.id) || [])];
+      while (stack.length > 0) {
+        const current = stack.pop()!;
+        allAreaTasks.push(current);
+        stack.push(...(tasksByParentId.get(current.id) || []));
+      }
 
       const statusCounts = COLUMNS.reduce((acc, col) => {
-        acc[col.status] = immediateTasks.filter(t => t.status === col.status).length;
+        acc[col.status] = allAreaTasks.filter(t => t.status === col.status).length;
         return acc;
       }, {} as Record<TaskStatus, number>);
 
-      const activeCount = immediateTasks.filter(t => t.status !== 'COMPLETED').length;
+      const activeCount = allAreaTasks.filter(t => t.status !== 'COMPLETED').length;
       const now = new Date();
       const weekEnd = new Date(now);
       weekEnd.setDate(now.getDate() + 7);
-      const weekCount = immediateTasks.filter(t => {
+      const weekCount = allAreaTasks.filter(t => {
         if (t.status === 'COMPLETED') return false;
         const due = t.dueDate ? new Date(t.dueDate) : null;
         const scheduled = t.scheduledDate ? new Date(t.scheduledDate) : null;
         return Boolean((due && due <= weekEnd) || (scheduled && scheduled <= weekEnd));
       }).length;
 
-      const dueSoon = immediateTasks.some(isDueWithinThreeDays);
+      const dueSoon = allAreaTasks.some(isDueWithinThreeDays);
 
-      const highlightCandidates = immediateTasks
+      const getPriorityValue = (p: string | undefined) => {
+        if (p === 'HIGH') return 1;
+        if (p === 'MEDIUM') return 2;
+        if (p === 'LOW') return 3;
+        return 4;
+      };
+
+      const highlightCandidates = allAreaTasks
         .filter(t => t.status === 'IN_PROGRESS' || isDueWithinThreeDays(t))
+        .filter((t, _, arr) => {
+          // If this task has a child that is ALSO in our highlight candidates pool,
+          // prefer the child instead since it's the actionable next step.
+          const hasChildInPool = arr.some(possibleChild => possibleChild.parentId === t.id);
+          return !hasChildInPool;
+        })
         .sort((a, b) => {
-          // In-progress first, then by due date
+          // In-progress first
           if (a.status === 'IN_PROGRESS' && b.status !== 'IN_PROGRESS') return -1;
           if (b.status === 'IN_PROGRESS' && a.status !== 'IN_PROGRESS') return 1;
+
+          // Then by priority
+          const aPri = getPriorityValue(a.priority);
+          const bPri = getPriorityValue(b.priority);
+          if (aPri !== bPri) return aPri - bPri;
+
+          // Then by due date
           const ad = a.dueDate ? a.dueDate.getTime() : Number.MAX_SAFE_INTEGER;
           const bd = b.dueDate ? b.dueDate.getTime() : Number.MAX_SAFE_INTEGER;
+
+          if (ad === bd) {
+            const hour = new Date().getHours();
+            const scoreA = (a.id.charCodeAt(0) + hour) % 3;
+            const scoreB = (b.id.charCodeAt(0) + hour) % 3;
+            return scoreA - scoreB;
+          }
+
           return ad - bd;
         })
         .slice(0, 2);
@@ -616,7 +652,7 @@ export function HomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDraw
       return {
         area,
         statusCounts,
-        total: immediateTasks.length,
+        total: allAreaTasks.length,
         activeCount,
         weekCount,
         dueSoon,
@@ -757,17 +793,19 @@ export function HomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDraw
               {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 bg-slate-900/40 border border-slate-700/50 rounded-xl p-1 shadow-sm">
             <button
               onClick={() => setSearchOpen(true)}
-              className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-              aria-label="Search"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              title="Search Tasks"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
             </button>
+            <CurrencyToggle />
             <NotificationsTray />
+            <BackupsPanel />
           </div>
         </div>
       </header>

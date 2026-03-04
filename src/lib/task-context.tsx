@@ -116,6 +116,20 @@ export function TaskProvider({ children }: TaskProviderProps) {
       const notesParsed = storage.get<any[]>(DASHBOARD_PAGES_STORAGE_KEY, []);
       const notesPages = Array.isArray(notesParsed) ? notesParsed : [];
 
+      const plannerItemsParsed = storage.get<any[]>('lifeos:planner-items:v1', []);
+      const plannerItems = Array.isArray(plannerItemsParsed) ? plannerItemsParsed : [];
+
+      const netWorthParsed = storage.get<any[]>('lifeos:finance:netWorth:v1', []);
+      const netWorthSnapshots = Array.isArray(netWorthParsed) ? netWorthParsed : [];
+
+      const subsParsed = storage.get<any[]>('lifeos:finance:subscriptions:v1', []);
+      const subscriptions = Array.isArray(subsParsed) ? subsParsed : [];
+
+      const notificationsParsed = storage.get<any[]>('lifeos:notifications:v1', []);
+      const notifications = Array.isArray(notificationsParsed) ? notificationsParsed : [];
+
+      const currency = storage.get<string>('lifeos:currency', 'USD');
+
       const id = generateId();
 
       const next = [
@@ -125,6 +139,10 @@ export function TaskProvider({ children }: TaskProviderProps) {
           createdAt: now.toISOString(),
           tasks,
           notesPages,
+          plannerItems,
+          netWorthSnapshots,
+          notifications,
+          currency,
         },
       ];
       storage.set(AUTO_BACKUP_KEY, next);

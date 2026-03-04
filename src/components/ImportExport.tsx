@@ -10,7 +10,26 @@ export function ImportExport() {
   const handleExport = async () => {
     try {
       const tasks = await exportTasks();
-      const json = JSON.stringify(tasks, null, 2);
+      const notesPages = JSON.parse(localStorage.getItem('lifeos:dashboard-pages:v1') || '[]');
+      const plannerItems = JSON.parse(localStorage.getItem('lifeos:planner-items:v1') || '[]');
+      const netWorthSnapshots = JSON.parse(localStorage.getItem('lifeos:finance:netWorth:v1') || '[]');
+      const subscriptions = JSON.parse(localStorage.getItem('lifeos:finance:subscriptions:v1') || '[]');
+      const notifications = JSON.parse(localStorage.getItem('lifeos:notifications:v1') || '[]');
+      const currency = localStorage.getItem('lifeos:currency') || 'USD';
+
+      const payload = {
+        id: 'export-' + Date.now(),
+        createdAt: new Date().toISOString(),
+        tasks,
+        notesPages,
+        plannerItems,
+        netWorthSnapshots,
+        subscriptions,
+        notifications,
+        currency
+      };
+
+      const json = JSON.stringify(payload, null, 2);
       const blob = new Blob([json], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
 
@@ -33,16 +52,30 @@ export function ImportExport() {
 
     try {
       const text = await file.text();
-      const tasks = JSON.parse(text);
+      const data = JSON.parse(text);
 
-      // Basic validation
-      if (!Array.isArray(tasks)) {
-        throw new Error('Invalid format: expected an array of tasks');
-      }
+      if (Array.isArray(data)) {
+        if (confirm(`Import ${data.length} tasks? This will replace all existing data.`)) {
+          await importTasks(data);
+          alert('Import successful!');
+        }
+      } else if (data && typeof data === 'object' && Array.isArray(data.tasks)) {
+        if (confirm(`Import full backup? This will replace all existing tasks, configurations, and data.`)) {
+          await importTasks(data.tasks);
 
-      if (confirm(`Import ${tasks.length} tasks? This will replace all existing data.`)) {
-        await importTasks(tasks);
-        alert('Import successful!');
+          if (data.notesPages) localStorage.setItem('lifeos:dashboard-pages:v1', JSON.stringify(data.notesPages));
+          if (data.plannerItems) localStorage.setItem('lifeos:planner-items:v1', JSON.stringify(data.plannerItems));
+          if (data.netWorthSnapshots) localStorage.setItem('lifeos:finance:netWorth:v1', JSON.stringify(data.netWorthSnapshots));
+          if (data.subscriptions) localStorage.setItem('lifeos:finance:subscriptions:v1', JSON.stringify(data.subscriptions));
+          if (data.notifications) localStorage.setItem('lifeos:notifications:v1', JSON.stringify(data.notifications));
+          if (data.currency) localStorage.setItem('lifeos:currency', data.currency);
+
+          window.dispatchEvent(new Event('lifeos:notes-storage-updated'));
+          alert('Import successful! Page will reload.');
+          window.location.reload();
+        }
+      } else {
+        throw new Error('Invalid format: expected an array of tasks or a full backup object');
       }
     } catch (error) {
       console.error('Import failed:', error);

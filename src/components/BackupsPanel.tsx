@@ -10,16 +10,26 @@ type BackupEntry = {
   createdAt: string;
   tasks: Task[];
   notesPages?: unknown[];
+  plannerItems?: unknown[];
+  netWorthSnapshots?: unknown[];
+  subscriptions?: unknown[];
+  notifications?: unknown[];
+  currency?: string;
 };
 
 function isBackupEntry(value: unknown): value is BackupEntry {
   if (!value || typeof value !== 'object') return false;
-  const candidate = value as { id?: unknown; createdAt?: unknown; tasks?: unknown; notesPages?: unknown };
+  const candidate = value as Record<string, unknown>;
   return (
     typeof candidate.id === 'string' &&
     typeof candidate.createdAt === 'string' &&
     Array.isArray(candidate.tasks) &&
-    (candidate.notesPages === undefined || Array.isArray(candidate.notesPages))
+    (candidate.notesPages === undefined || Array.isArray(candidate.notesPages)) &&
+    (candidate.plannerItems === undefined || Array.isArray(candidate.plannerItems)) &&
+    (candidate.netWorthSnapshots === undefined || Array.isArray(candidate.netWorthSnapshots)) &&
+    (candidate.subscriptions === undefined || Array.isArray(candidate.subscriptions)) &&
+    (candidate.notifications === undefined || Array.isArray(candidate.notifications)) &&
+    (candidate.currency === undefined || typeof candidate.currency === 'string')
   );
 }
 
@@ -106,12 +116,25 @@ export function BackupsPanel() {
         window.localStorage.setItem(DASHBOARD_PAGES_STORAGE_KEY, JSON.stringify(entry.notesPages));
         window.dispatchEvent(new Event('lifeos:notes-storage-updated'));
       }
-      setStatus(
-        hasNotes
-          ? `Restored tasks and notes from ${backupLabel}.`
-          : `Restored tasks from ${backupLabel}.`
-      );
-      refreshBackups();
+
+      if (entry.plannerItems) {
+        window.localStorage.setItem('lifeos:planner-items:v1', JSON.stringify(entry.plannerItems));
+      }
+      if (entry.netWorthSnapshots) {
+        window.localStorage.setItem('lifeos:finance:netWorth:v1', JSON.stringify(entry.netWorthSnapshots));
+      }
+      if (entry.subscriptions) {
+        window.localStorage.setItem('lifeos:finance:subscriptions:v1', JSON.stringify(entry.subscriptions));
+      }
+      if (entry.notifications) {
+        window.localStorage.setItem('lifeos:notifications:v1', JSON.stringify(entry.notifications));
+      }
+      if (entry.currency) {
+        window.localStorage.setItem('lifeos:currency', entry.currency);
+      }
+
+      setStatus(`Restoring from ${backupLabel}, refreshing page...`);
+      window.location.reload();
     } catch (error) {
       console.error('Restore failed:', error);
       setStatus('Restore failed. Check console for details.');
@@ -125,12 +148,13 @@ export function BackupsPanel() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="fixed bottom-5 right-20 z-40 inline-flex items-center gap-2 rounded-xl border border-slate-300/80 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white shadow-lg"
+        className="relative p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+        title="Backups"
+        aria-label="Backups"
       >
-        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
           <path strokeLinecap="round" strokeLinejoin="round" d="M4 7h16M4 12h16M4 17h16" />
         </svg>
-        Backups
       </button>
 
       {open && (
@@ -186,7 +210,9 @@ export function BackupsPanel() {
                       </p>
                       <p className="text-xs text-slate-500 dark:text-slate-400">
                         {entry.tasks.length} tasks
-                        {Array.isArray(entry.notesPages) ? ` • ${entry.notesPages.length} notes` : ' • notes not included'}
+                        {Array.isArray(entry.notesPages) ? ` • ${entry.notesPages.length} notes` : ''}
+                        {Array.isArray(entry.plannerItems) ? ` • ${entry.plannerItems.length} planner` : ''}
+                        {Array.isArray(entry.netWorthSnapshots) ? ` • config & finance` : ''}
                       </p>
                     </div>
                   </div>

@@ -20,6 +20,8 @@ import { Breadcrumb } from './Breadcrumb';
 import { Column } from './Column';
 import { TaskCard } from './TaskCard';
 import { NotificationsTray } from './NotificationsTray';
+import { CurrencyToggle } from './CurrencyToggle';
+import { useCurrency } from '@/lib/currency-context';
 
 const CAREER_LINKS = {
   linkedin: 'https://www.linkedin.com/in/attarira',
@@ -115,6 +117,7 @@ export function KanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawer
     getArchivedTasks,
     currentParentId
   } = useTaskContext();
+  const { formatAmount } = useCurrency();
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const [netWorthSnapshots, setNetWorthSnapshots] = useState<NetWorthSnapshot[]>(() => loadNetWorthSnapshots());
@@ -391,6 +394,7 @@ export function KanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawer
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
             </button>
+            <CurrencyToggle />
             <NotificationsTray />
 
             {archivedCount > 0 && (
@@ -439,7 +443,7 @@ export function KanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawer
                   </div>
                   <div className="flex items-baseline gap-2.5">
                     <span className="text-2xl font-bold text-slate-900 dark:text-white tabular-nums">
-                      ${latestNetWorth.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                      {formatAmount(latestNetWorth, { maximumFractionDigits: 0 })}
                     </span>
                     {trendPercent !== null && (
                       <span className={`inline-flex items-center gap-0.5 text-xs font-semibold px-1.5 py-0.5 rounded-md ${trendPercent >= 0
@@ -458,13 +462,13 @@ export function KanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawer
                     <div className="flex items-center justify-between rounded-lg bg-slate-50 dark:bg-slate-900/50 px-3 py-2">
                       <span className="text-[11px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">Assets</span>
                       <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
-                        ${(latestSnapshot?.assets ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                        {formatAmount(latestSnapshot?.assets ?? 0, { maximumFractionDigits: 0 })}
                       </span>
                     </div>
                     <div className="flex items-center justify-between rounded-lg bg-slate-50 dark:bg-slate-900/50 px-3 py-2">
                       <span className="text-[11px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">Liabilities</span>
                       <span className="text-sm font-semibold text-rose-600 dark:text-rose-400 tabular-nums">
-                        ${(latestSnapshot?.liabilities ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                        {formatAmount(latestSnapshot?.liabilities ?? 0, { maximumFractionDigits: 0 })}
                       </span>
                     </div>
                   </div>
@@ -547,13 +551,13 @@ export function KanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawer
                                 <>
                                   <span className="text-xs text-slate-600 dark:text-slate-300 tabular-nums">{snap.date}</span>
                                   <span className="text-xs text-right font-medium tabular-nums text-emerald-600 dark:text-emerald-400">
-                                    ${snap.assets.toLocaleString()}
+                                    {formatAmount(snap.assets)}
                                   </span>
                                   <span className="text-xs text-right font-medium tabular-nums text-rose-600 dark:text-rose-400">
-                                    ${snap.liabilities.toLocaleString()}
+                                    {formatAmount(snap.liabilities)}
                                   </span>
                                   <span className={`text-xs text-right font-semibold tabular-nums ${net >= 0 ? 'text-slate-800 dark:text-slate-100' : 'text-rose-600 dark:text-rose-400'}`}>
-                                    ${net.toLocaleString()}
+                                    {formatAmount(net)}
                                   </span>
                                   <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                                     <button
@@ -780,7 +784,7 @@ export function KanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawer
                             </span>
                             {/* Cost */}
                             <span className="text-sm text-right font-medium tabular-nums text-slate-700 dark:text-slate-200">
-                              ${item.cost.toFixed(2)}
+                              {formatAmount(item.cost, { maximumFractionDigits: 2, minimumFractionDigits: 2 })}
                             </span>
                             {/* Billing */}
                             <span className="text-[11px] text-center text-slate-400 dark:text-slate-500">
@@ -826,7 +830,7 @@ export function KanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawer
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Total Monthly Burn</span>
                     <span className="text-lg font-bold text-slate-900 dark:text-white tabular-nums">
-                      ${monthlySubscriptionTotal.toFixed(2)}<span className="text-xs font-normal text-slate-400 dark:text-slate-500">/mo</span>
+                      {formatAmount(monthlySubscriptionTotal)}<span className="text-xs font-normal text-slate-400 dark:text-slate-500">/mo</span>
                     </span>
                   </div>
                 </div>

@@ -3,12 +3,15 @@
 import { TaskProvider } from '@/lib/task-context';
 import { Board } from '@/components';
 import { NotificationProvider } from '@/lib/notification-context';
+import { CurrencyProvider } from '@/lib/currency-context';
 
 export default function Home() {
   return (
     <TaskProvider>
       <NotificationProvider>
-        <Board />
+        <CurrencyProvider>
+          <Board />
+        </CurrencyProvider>
       </NotificationProvider>
     </TaskProvider>
   );
