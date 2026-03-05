@@ -23,6 +23,7 @@ import { NotificationsTray } from './NotificationsTray';
 import { CurrencyToggle } from './CurrencyToggle';
 import { BackupsPanel } from './BackupsPanel';
 import { FileSystemDrawer } from './FileSystemDrawer';
+import { TaskStatusRing } from './TaskStatusRing';
 
 type DragHandleProps = {
   ref: (el: HTMLElement | null) => void;
@@ -105,33 +106,6 @@ const AREA_BADGES: Record<string, string> = {
   default: 'bg-slate-100/70 text-slate-600 dark:bg-slate-800/60 dark:text-slate-300',
 };
 
-const STATUS_RING = [
-  { status: 'NOT_STARTED' as TaskStatus, color: 'rgba(148,163,184,0.75)' },
-  { status: 'IN_PROGRESS' as TaskStatus, color: 'rgba(56,189,248,0.75)' },
-  { status: 'ON_HOLD' as TaskStatus, color: 'rgba(245,158,11,0.75)' },
-  { status: 'COMPLETED' as TaskStatus, color: 'rgba(34,197,94,0.75)' },
-];
-
-
-function buildStatusRingSegments(
-  statusCounts: Record<TaskStatus, number>,
-  total: number,
-  circumference: number,
-  gapSize: number
-) {
-  if (!total) return [];
-
-  const segments = STATUS_RING.map(({ status, color }) => {
-    const count = statusCounts[status] || 0;
-    if (!count) return null;
-    const length = (count / total) * circumference;
-    const gap = Math.min(gapSize, length * 0.6);
-    return { color, length, gap };
-  }).filter(Boolean) as { color: string; length: number }[];
-
-  return segments;
-}
-
 
 
 function isDueWithinThreeDays(task: Task): boolean {
@@ -181,13 +155,6 @@ function LifeAreaCard({
     </svg>
   );
   const grad = AREA_GRADIENTS[toneKey] || { gradient: 'linear-gradient(135deg, #253040 0%, #141c28 100%)', iconBg: 'bg-slate-400/20', ringTrack: 'rgba(148,163,184,0.2)' };
-  const ringSize = 72;
-  const ringTrackStroke = 8;
-  const ringSegmentStroke = 6;
-  const ringSegmentGap = 2.2;
-  const ringRadius = (ringSize - ringTrackStroke) / 2;
-  const ringCircumference = 2 * Math.PI * ringRadius;
-  const ringSegments = buildStatusRingSegments(statusCounts, total, ringCircumference, ringSegmentGap);
 
   const firstHighlight = highlights[0];
 
@@ -259,43 +226,30 @@ function LifeAreaCard({
         </div>
 
         {/* Task count donut */}
-        <div className="relative flex-shrink-0 ml-3" style={{ width: ringSize, height: ringSize }}>
-          <svg width={ringSize} height={ringSize} viewBox={`0 0 ${ringSize} ${ringSize}`} className="block">
+        <div className="relative flex-shrink-0 ml-3 flex items-center justify-center" style={{ width: 72, height: 72 }}>
+          <svg width={72} height={72} viewBox="0 0 72 72" className="absolute inset-0 pointer-events-none">
             <circle
-              cx={ringSize / 2}
-              cy={ringSize / 2}
-              r={ringRadius}
+              cx={36}
+              cy={36}
+              r={32}
               stroke={grad.ringTrack}
-              strokeWidth={ringTrackStroke}
+              strokeWidth={8}
               fill="none"
             />
-            {(() => {
-              let offset = 0;
-              const hasGaps = ringSegments.length > 1;
-              return ringSegments.map((segment, index) => {
-                const visibleLength = hasGaps ? Math.max(segment.length - ringSegmentGap, 0) : segment.length;
-                const dashArray = `${visibleLength} ${ringCircumference - visibleLength}`;
-                const dashOffset = ringCircumference - offset;
-                offset += segment.length;
-                return (
-                  <circle
-                    key={`${segment.color}-${index}`}
-                    cx={ringSize / 2}
-                    cy={ringSize / 2}
-                    r={ringRadius}
-                    stroke={segment.color}
-                    strokeWidth={ringSegmentStroke}
-                    strokeLinecap="round"
-                    strokeDasharray={dashArray}
-                    strokeDashoffset={dashOffset}
-                    fill="none"
-                    transform={`rotate(-90 ${ringSize / 2} ${ringSize / 2})`}
-                  />
-                );
-              });
-            })()}
           </svg>
-          <div className="absolute inset-[8px] rounded-full bg-black/40 backdrop-blur-sm flex flex-col items-center justify-center text-center">
+          <TaskStatusRing
+            data={{
+              notStarted: statusCounts['NOT_STARTED'] || 0,
+              inProgress: statusCounts['IN_PROGRESS'] || 0,
+              onHold: statusCounts['ON_HOLD'] || 0,
+              completed: statusCounts['COMPLETED'] || 0,
+            }}
+            size={72}
+            innerRadius={28}
+            outerRadius={36}
+            className={`absolute inset-0 z-10 ${muted ? 'pointer-events-none' : ''}`}
+          />
+          <div className="absolute inset-[8px] rounded-full pointer-events-none bg-black/40 backdrop-blur-sm flex flex-col items-center justify-center text-center z-20">
             <div className={`text-[14px] font-bold ${grad.ringTextColor || 'text-white'}`}>{total}</div>
             <div className={`text-[8px] uppercase tracking-[0.2em] ${grad.ringEmptyColor || 'text-white/40'}`}>Tasks</div>
           </div>

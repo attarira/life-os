@@ -343,6 +343,7 @@ export function PlannerCard({ tasks, navigateTo, selectTask, createTask }: Plann
       title: trimmed,
       status: 'NOT_STARTED',
       priority: 'MEDIUM',
+      calendarOnly: true,
     });
 
     setEntries(prev => [
