@@ -2,6 +2,7 @@
 
 import React, { useRef } from 'react';
 import { useTaskContext } from '@/lib/task-context';
+import { FILE_SYSTEM_STORAGE_KEY, DASHBOARD_PAGES_STORAGE_KEY } from '@/lib/storage-keys';
 
 export function ImportExport() {
   const { importTasks, exportTasks } = useTaskContext();
@@ -10,7 +11,7 @@ export function ImportExport() {
   const handleExport = async () => {
     try {
       const tasks = await exportTasks();
-      const notesPages = JSON.parse(localStorage.getItem('lifeos:dashboard-pages:v1') || '[]');
+      const fileSystemNodes = JSON.parse(localStorage.getItem(FILE_SYSTEM_STORAGE_KEY) || '[]');
       const plannerItems = JSON.parse(localStorage.getItem('lifeos:planner-items:v1') || '[]');
       const netWorthSnapshots = JSON.parse(localStorage.getItem('lifeos:finance:netWorth:v1') || '[]');
       const subscriptions = JSON.parse(localStorage.getItem('lifeos:finance:subscriptions:v1') || '[]');
@@ -21,7 +22,7 @@ export function ImportExport() {
         id: 'export-' + Date.now(),
         createdAt: new Date().toISOString(),
         tasks,
-        notesPages,
+        fileSystemNodes,
         plannerItems,
         netWorthSnapshots,
         subscriptions,
@@ -63,14 +64,15 @@ export function ImportExport() {
         if (confirm(`Import full backup? This will replace all existing tasks, configurations, and data.`)) {
           await importTasks(data.tasks);
 
-          if (data.notesPages) localStorage.setItem('lifeos:dashboard-pages:v1', JSON.stringify(data.notesPages));
+          if (data.fileSystemNodes) localStorage.setItem(FILE_SYSTEM_STORAGE_KEY, JSON.stringify(data.fileSystemNodes));
+          if (data.notesPages) localStorage.setItem(DASHBOARD_PAGES_STORAGE_KEY, JSON.stringify(data.notesPages)); // Fallback
           if (data.plannerItems) localStorage.setItem('lifeos:planner-items:v1', JSON.stringify(data.plannerItems));
           if (data.netWorthSnapshots) localStorage.setItem('lifeos:finance:netWorth:v1', JSON.stringify(data.netWorthSnapshots));
           if (data.subscriptions) localStorage.setItem('lifeos:finance:subscriptions:v1', JSON.stringify(data.subscriptions));
           if (data.notifications) localStorage.setItem('lifeos:notifications:v1', JSON.stringify(data.notifications));
           if (data.currency) localStorage.setItem('lifeos:currency', data.currency);
 
-          window.dispatchEvent(new Event('lifeos:notes-storage-updated'));
+          window.dispatchEvent(new Event('lifeos:file-system-updated'));
           alert('Import successful! Page will reload.');
           window.location.reload();
         }

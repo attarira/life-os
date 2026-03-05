@@ -66,7 +66,7 @@ export function TaskProvider({ children }: TaskProviderProps) {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
-  const BACKUP_RETENTION_DAYS = 30;
+  const BACKUP_RETENTION_DAYS = 7;
 
   // Initialize on mount
   useEffect(() => {
