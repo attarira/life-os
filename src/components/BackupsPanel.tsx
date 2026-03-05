@@ -3,13 +3,13 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useTaskContext } from '@/lib/task-context';
 import { Task } from '@/lib/types';
-import { AUTO_BACKUP_KEY, DASHBOARD_PAGES_STORAGE_KEY } from '@/lib/storage-keys';
+import { AUTO_BACKUP_KEY, FILE_SYSTEM_STORAGE_KEY } from '@/lib/storage-keys';
 
 type BackupEntry = {
   id: string;
   createdAt: string;
   tasks: Task[];
-  notesPages?: unknown[];
+  fileSystemNodes?: unknown[];
   plannerItems?: unknown[];
   netWorthSnapshots?: unknown[];
   subscriptions?: unknown[];
@@ -24,7 +24,7 @@ function isBackupEntry(value: unknown): value is BackupEntry {
     typeof candidate.id === 'string' &&
     typeof candidate.createdAt === 'string' &&
     Array.isArray(candidate.tasks) &&
-    (candidate.notesPages === undefined || Array.isArray(candidate.notesPages)) &&
+    (candidate.fileSystemNodes === undefined || Array.isArray(candidate.fileSystemNodes)) &&
     (candidate.plannerItems === undefined || Array.isArray(candidate.plannerItems)) &&
     (candidate.netWorthSnapshots === undefined || Array.isArray(candidate.netWorthSnapshots)) &&
     (candidate.subscriptions === undefined || Array.isArray(candidate.subscriptions)) &&
@@ -100,10 +100,10 @@ export function BackupsPanel() {
 
   const handleRestore = async (entry: BackupEntry) => {
     const backupLabel = formatBackupTimestamp(entry.createdAt);
-    const hasNotes = Array.isArray(entry.notesPages);
+    const hasFiles = Array.isArray(entry.fileSystemNodes);
     const confirmed = window.confirm(
-      hasNotes
-        ? `Restore backup from ${backupLabel}? This will replace current tasks and notes.`
+      hasFiles
+        ? `Restore backup from ${backupLabel}? This will replace current tasks and files.`
         : `Restore backup from ${backupLabel}? This will replace current tasks.`
     );
     if (!confirmed) return;
@@ -112,9 +112,9 @@ export function BackupsPanel() {
       setStatus(null);
       setRestoringId(entry.id);
       await importTasks(entry.tasks);
-      if (hasNotes) {
-        window.localStorage.setItem(DASHBOARD_PAGES_STORAGE_KEY, JSON.stringify(entry.notesPages));
-        window.dispatchEvent(new Event('lifeos:notes-storage-updated'));
+      if (hasFiles) {
+        window.localStorage.setItem(FILE_SYSTEM_STORAGE_KEY, JSON.stringify(entry.fileSystemNodes));
+        window.dispatchEvent(new Event('lifeos:file-system-updated'));
       }
 
       if (entry.plannerItems) {
@@ -210,7 +210,7 @@ export function BackupsPanel() {
                       </p>
                       <p className="text-xs text-slate-500 dark:text-slate-400">
                         {entry.tasks.length} tasks
-                        {Array.isArray(entry.notesPages) ? ` • ${entry.notesPages.length} notes` : ''}
+                        {Array.isArray(entry.fileSystemNodes) ? ` • ${entry.fileSystemNodes.length} files/folders` : ''}
                         {Array.isArray(entry.plannerItems) ? ` • ${entry.plannerItems.length} planner` : ''}
                         {Array.isArray(entry.netWorthSnapshots) ? ` • config & finance` : ''}
                       </p>

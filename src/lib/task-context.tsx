@@ -4,7 +4,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, Rea
 import { Task, TaskStatus, ROOT_TASK_ID, CreateTaskInput, UpdateTaskInput, COMPLETED_HIDE_DAYS } from './types';
 import { taskStore } from './store';
 import { createSeedTasks, getSubtreeIds, getNextOrder, isCompletedOlderThan } from './tasks';
-import { AUTO_BACKUP_KEY, DASHBOARD_PAGES_STORAGE_KEY, LAST_BACKUP_KEY } from './storage-keys';
+import { AUTO_BACKUP_KEY, FILE_SYSTEM_STORAGE_KEY, LAST_BACKUP_KEY } from './storage-keys';
 import { storage, generateId } from '@/lib/utils';
 
 interface TaskContextValue {
@@ -96,12 +96,12 @@ export function TaskProvider({ children }: TaskProviderProps) {
       const todayKey = new Date().toISOString().split('T')[0];
       const lastBackup = storage.get(LAST_BACKUP_KEY, '');
       const existing = storage.get<any[]>(AUTO_BACKUP_KEY, []);
-      const hasTodayBackupWithNotes = Array.isArray(existing) && existing.some((entry: { createdAt?: string; notesPages?: unknown }) => (
+      const hasTodayBackupWithFiles = Array.isArray(existing) && existing.some((entry: { createdAt?: string; fileSystemNodes?: unknown }) => (
         typeof entry?.createdAt === 'string' &&
         entry.createdAt.split('T')[0] === todayKey &&
-        Array.isArray(entry.notesPages)
+        Array.isArray(entry.fileSystemNodes)
       ));
-      if (lastBackup === todayKey && hasTodayBackupWithNotes) return;
+      if (lastBackup === todayKey && hasTodayBackupWithFiles) return;
 
       const now = new Date();
       const cutoff = new Date(now);
@@ -113,8 +113,8 @@ export function TaskProvider({ children }: TaskProviderProps) {
         })
         : [];
 
-      const notesParsed = storage.get<any[]>(DASHBOARD_PAGES_STORAGE_KEY, []);
-      const notesPages = Array.isArray(notesParsed) ? notesParsed : [];
+      const filesParsed = storage.get<any[]>(FILE_SYSTEM_STORAGE_KEY, []);
+      const fileSystemNodes = Array.isArray(filesParsed) ? filesParsed : [];
 
       const plannerItemsParsed = storage.get<any[]>('lifeos:planner-items:v1', []);
       const plannerItems = Array.isArray(plannerItemsParsed) ? plannerItemsParsed : [];
@@ -138,7 +138,7 @@ export function TaskProvider({ children }: TaskProviderProps) {
           id,
           createdAt: now.toISOString(),
           tasks,
-          notesPages,
+          fileSystemNodes,
           plannerItems,
           netWorthSnapshots,
           notifications,

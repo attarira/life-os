@@ -15,13 +15,14 @@ import { CSS } from '@dnd-kit/utilities';
 import { useTaskContext } from '@/lib/task-context';
 import { COLUMNS, ROOT_TASK_ID, Task, TaskStatus } from '@/lib/types';
 import { getSubtreeIds, getTaskPath } from '@/lib/tasks';
-import { DASHBOARD_PAGES_STORAGE_KEY } from '@/lib/storage-keys';
+
 import { generateId, resolveAreaKey, storage } from '@/lib/utils';
 import { ChatPanel, AppContext } from './ChatPanel';
 import { PlannerCard } from './PlannerCard';
 import { NotificationsTray } from './NotificationsTray';
 import { CurrencyToggle } from './CurrencyToggle';
 import { BackupsPanel } from './BackupsPanel';
+import { FileSystemDrawer } from './FileSystemDrawer';
 
 type DragHandleProps = {
   ref: (el: HTMLElement | null) => void;
@@ -39,39 +40,7 @@ type AreaSnapshot = {
   highlights: string[];
 };
 
-type NotePage = {
-  id: string;
-  title: string;
-  content: string;
-  createdAt: string;
-  updatedAt: string;
-};
 
-function createPage(title = 'Untitled', content = ''): NotePage {
-  const nowIso = new Date().toISOString();
-  return {
-    id: generateId(),
-    title,
-    content,
-    createdAt: nowIso,
-    updatedAt: nowIso,
-  };
-}
-
-function loadPagesState() {
-  const defaultState = () => {
-    const starter = createPage();
-    return { pages: [starter], activePageId: starter.id };
-  };
-
-  const parsed = storage.get<any[]>(DASHBOARD_PAGES_STORAGE_KEY, []);
-  if (Array.isArray(parsed) && parsed.length > 0) {
-    const hydrated = parsed.filter(Boolean) as NotePage[];
-    return { pages: hydrated, activePageId: hydrated[0].id };
-  }
-
-  return defaultState();
-}
 
 const LIFE_AREA_ICONS: Record<string, React.JSX.Element> = {
   career: (
@@ -395,14 +364,7 @@ export function HomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDraw
   const [editorTitle, setEditorTitle] = useState('');
   const [editorDescription, setEditorDescription] = useState('');
 
-  const [initialPagesState] = useState(() => loadPagesState());
-  const [pages, setPages] = useState<NotePage[]>(initialPagesState.pages);
-  const [activePageId, setActivePageId] = useState<string | null>(initialPagesState.activePageId);
-  const [isNotesDrawerOpen, setIsNotesDrawerOpen] = useState(false);
-  const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
-  const [noteDraftTitle, setNoteDraftTitle] = useState('');
-  const noteEditorRef = useRef<HTMLDivElement>(null);
-  const noteDraftContentRef = useRef('');
+  const [isFilesDrawerOpen, setIsFilesDrawerOpen] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -414,150 +376,7 @@ export function HomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDraw
 
 
 
-  useEffect(() => {
-    if (pages.length === 0) return;
-    storage.set(DASHBOARD_PAGES_STORAGE_KEY, pages);
-  }, [pages]);
 
-  useEffect(() => {
-    const handleNotesStorageUpdated = () => {
-      const nextState = loadPagesState();
-      setPages(nextState.pages);
-      setActivePageId((prev) => (
-        nextState.pages.some((page) => page.id === prev) ? prev : nextState.activePageId
-      ));
-    };
-
-    window.addEventListener('lifeos:notes-storage-updated', handleNotesStorageUpdated);
-    return () => window.removeEventListener('lifeos:notes-storage-updated', handleNotesStorageUpdated);
-  }, []);
-
-  const activePage = useMemo(
-    () => pages.find((page) => page.id === activePageId) || null,
-    [pages, activePageId]
-  );
-
-  useEffect(() => {
-    if (!isNoteModalOpen || !noteEditorRef.current) return;
-    noteEditorRef.current.innerHTML = noteDraftContentRef.current || '<p><br></p>';
-  }, [isNoteModalOpen, activePageId]);
-
-  const setDraftFromPage = (page: NotePage | null) => {
-    if (!page) return;
-    setNoteDraftTitle(page.title || 'Untitled');
-    noteDraftContentRef.current = page.content || '';
-  };
-
-  const commitNoteDraft = () => {
-    if (!activePage) return;
-    const nextTitle = noteDraftTitle.trim() || 'Untitled';
-    const nextContent = noteDraftContentRef.current;
-    const currentContent = activePage.content || '';
-    if (nextTitle === activePage.title && nextContent === currentContent) return;
-    const nowIso = new Date().toISOString();
-    setPages((prev) => prev.map((page) => (
-      page.id === activePage.id
-        ? { ...page, title: nextTitle, content: nextContent, updatedAt: nowIso }
-        : page
-    )));
-  };
-
-  const handleCreatePage = () => {
-    const next = createPage();
-    setPages((prev) => [next, ...prev]);
-    setActivePageId(next.id);
-    setDraftFromPage(next);
-    setIsNoteModalOpen(true);
-  };
-
-  const handleRenamePage = () => {
-    const nextTitle = prompt('Rename note', noteDraftTitle || activePage?.title || 'Untitled');
-    if (nextTitle === null) return;
-    const trimmed = nextTitle.trim();
-    if (!trimmed) return;
-    setNoteDraftTitle(trimmed);
-  };
-
-  const handleDeletePage = () => {
-    if (!activePage) return;
-    const confirmed = confirm(`Delete page "${activePage.title}"?`);
-    if (!confirmed) return;
-
-    setPages((prev) => {
-      const next = prev.filter((page) => page.id !== activePage.id);
-      if (next.length > 0) {
-        setActivePageId(next[0].id);
-        if (isNoteModalOpen) {
-          setDraftFromPage(next[0]);
-        }
-        return next;
-      }
-      const fallback = createPage();
-      setActivePageId(fallback.id);
-      if (isNoteModalOpen) {
-        setDraftFromPage(fallback);
-      }
-      return [fallback];
-    });
-  };
-
-  const handleDuplicatePage = () => {
-    if (!activePage) return;
-    const nowIso = new Date().toISOString();
-    const sourceTitle = noteDraftTitle.trim() || activePage.title || 'Untitled';
-    const sourceContent = noteDraftContentRef.current || activePage.content || '';
-    const copy: NotePage = {
-      ...activePage,
-      id: generateId(),
-      title: `${sourceTitle} Copy`,
-      content: sourceContent,
-      createdAt: nowIso,
-      updatedAt: nowIso,
-    };
-    setPages((prev) => {
-      const next = prev.map((page) => (
-        page.id === activePage.id
-          ? { ...page, title: sourceTitle, content: sourceContent, updatedAt: nowIso }
-          : page
-      ));
-      return [copy, ...next];
-    });
-    setActivePageId(copy.id);
-    setDraftFromPage(copy);
-    setIsNoteModalOpen(true);
-  };
-
-  const handlePageTitleChange = (value: string) => {
-    setNoteDraftTitle(value);
-  };
-
-  const handlePageContentChange = (value: string) => {
-    noteDraftContentRef.current = value;
-  };
-
-  const sortedPages = useMemo(
-    () => pages.slice().sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
-    [pages]
-  );
-
-  const applyPageCommand = (command: 'bold' | 'italic' | 'insertUnorderedList') => {
-    document.execCommand(command);
-  };
-
-  const openNoteModal = (pageId: string) => {
-    if (isNoteModalOpen) {
-      commitNoteDraft();
-    }
-    const page = pages.find((candidate) => candidate.id === pageId) || null;
-    setDraftFromPage(page);
-    setActivePageId(pageId);
-    setIsNoteModalOpen(true);
-  };
-
-  const closeNoteModal = () => {
-    commitNoteDraft();
-    setIsNoteModalOpen(false);
-  };
 
   const lifeAreas = useMemo(
     () => tasks.filter(t => t.parentId === ROOT_TASK_ID && !t.calendarOnly).sort((a, b) => a.order - b.order),
@@ -771,9 +590,9 @@ export function HomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDraw
     [tasks, navigateTo, selectTask]
   );
 
-  // Dynamic padding for left (chat) + right (notes) drawers
+  // Dynamic padding for left (chat) + right (notes/files) drawers
   const leftPad = isChatDrawerOpen ? (isChatExpanded ? 'xl:pl-[600px]' : 'xl:pl-[330px]') : 'xl:pl-[56px]';
-  const rightPad = isNotesDrawerOpen ? 'xl:pr-[330px]' : 'xl:pr-[56px]';
+  const rightPad = isFilesDrawerOpen ? 'xl:pr-[330px]' : 'xl:pr-[56px]';
 
   return (
     <div className="flex flex-col h-full bg-slate-950">
@@ -811,78 +630,8 @@ export function HomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDraw
       </header>
 
       <main className="flex-1 overflow-auto">
-        {/* ─── Notes Drawer (RIGHT) ─── */}
-        <aside
-          className={`hidden xl:block fixed right-0 top-[73px] bottom-0 z-30 transition-[width] duration-200 ${isNotesDrawerOpen ? 'w-[330px]' : 'w-[56px]'
-            }`}
-        >
-          <div className="h-full w-full rounded-l-2xl border-l border-t border-b border-slate-800 bg-slate-950/95 shadow-2xl backdrop-blur-sm">
-            {!isNotesDrawerOpen ? (
-              <button
-                type="button"
-                onClick={() => setIsNotesDrawerOpen(true)}
-                className="h-full w-full flex flex-col items-center justify-center gap-3 text-slate-400 hover:text-slate-100"
-                aria-label="Open notes drawer"
-              >
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                </svg>
-                <span className="text-[10px] uppercase tracking-[0.22em] [writing-mode:vertical-rl] rotate-180">
-                  Notes
-                </span>
-              </button>
-            ) : (
-              <div className="h-full flex flex-col">
-                <div className="px-4 py-3 border-b border-slate-800">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.16em] text-slate-400">NOTES</p>
-                      <p className="text-[11px] text-slate-400">{sortedPages.length} total</p>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={handleCreatePage}
-                        className="inline-flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium bg-white text-slate-900"
-                      >
-                        New
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setIsNotesDrawerOpen(false)}
-                        className="h-8 w-8 rounded-md border border-slate-700 text-slate-300 hover:bg-slate-800"
-                        aria-label="Collapse notes drawer"
-                      >
-                        <svg className="w-4 h-4 mx-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 5l-7 7 7 7" />
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                  {sortedPages.map((page) => {
-                    const isActive = page.id === activePageId;
-                    return (
-                      <button
-                        key={page.id}
-                        type="button"
-                        onClick={() => openNoteModal(page.id)}
-                        className={`w-full text-left rounded-lg px-2.5 py-2 transition-colors ${isActive
-                          ? 'bg-slate-800 text-white'
-                          : 'hover:bg-slate-800/70 text-slate-300'
-                          }`}
-                      >
-                        <p className="text-sm font-medium truncate">{page.title || 'Untitled'}</p>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-        </aside>
+        {/* ─── Files Drawer (RIGHT) ─── */}
+        <FileSystemDrawer isOpen={isFilesDrawerOpen} setIsOpen={setIsFilesDrawerOpen} />
 
         <div className={`max-w-[1600px] mx-auto p-6 ${leftPad} ${rightPad}`}>
           {/* ─── Two-Panel Layout ─── */}
@@ -1056,119 +805,7 @@ export function HomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDraw
             </div>
           )}
 
-          {isNoteModalOpen && activePage && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-8">
-              <div
-                className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-                onClick={closeNoteModal}
-              />
-              <div className="relative w-full max-w-2xl rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-2xl p-5 space-y-4">
-                <div className="flex items-center justify-between gap-3">
-                  <input
-                    value={noteDraftTitle}
-                    onChange={(e) => handlePageTitleChange(e.target.value)}
-                    className="flex-1 bg-transparent text-lg font-semibold text-slate-900 dark:text-white focus:outline-none border-b border-slate-200 dark:border-slate-700 pb-1"
-                  />
-                  <button
-                    type="button"
-                    onClick={closeNoteModal}
-                    className="h-8 w-8 rounded-lg text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
-                    aria-label="Close note"
-                  >
-                    <svg className="w-4 h-4 mx-auto" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" fill="none">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M18 6 6 18M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
 
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => applyPageCommand('bold')}
-                      className="h-8 w-8 rounded-md border border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
-                      aria-label="Bold"
-                    >
-                      B
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => applyPageCommand('italic')}
-                      className="h-8 w-8 rounded-md border border-slate-200 dark:border-slate-700 text-sm italic font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
-                      aria-label="Italic"
-                    >
-                      I
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => applyPageCommand('insertUnorderedList')}
-                      className="h-8 w-8 rounded-md border border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
-                      aria-label="Bullet list"
-                    >
-                      •
-                    </button>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs">
-                    <button
-                      type="button"
-                      onClick={handleRenamePage}
-                      className="px-2 py-1 rounded-md text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
-                    >
-                      Rename
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleDuplicatePage}
-                      className="px-2 py-1 rounded-md text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
-                    >
-                      Duplicate
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleDeletePage}
-                      className="px-2 py-1 rounded-md text-red-600 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-
-                <div
-                  ref={noteEditorRef}
-                  contentEditable
-                  suppressContentEditableWarning
-                  onInput={(e) => handlePageContentChange((e.currentTarget as HTMLDivElement).innerHTML)}
-                  onPaste={(e) => {
-                    e.preventDefault();
-                    const html = e.clipboardData.getData('text/html');
-                    if (html) {
-                      const parser = new DOMParser();
-                      const doc = parser.parseFromString(html, 'text/html');
-                      const walk = (node: Node) => {
-                        if (node.nodeType === Node.ELEMENT_NODE) {
-                          const el = node as HTMLElement;
-                          el.removeAttribute('style');
-                          el.removeAttribute('class');
-                          el.removeAttribute('font');
-                          el.removeAttribute('color');
-                          el.removeAttribute('size');
-                          el.removeAttribute('face');
-                          el.removeAttribute('bgcolor');
-                        }
-                        node.childNodes.forEach(walk);
-                      };
-                      walk(doc.body);
-                      document.execCommand('insertHTML', false, doc.body.innerHTML);
-                    } else {
-                      const text = e.clipboardData.getData('text/plain');
-                      document.execCommand('insertText', false, text);
-                    }
-                  }}
-                  className="note-editor-content min-h-[300px] max-h-[60vh] overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/40 px-3 py-2 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-300 dark:focus:ring-slate-700"
-                />
-              </div>
-            </div>
-          )}
 
         </div>
       </main>
