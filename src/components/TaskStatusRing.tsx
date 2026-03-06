@@ -49,7 +49,7 @@ type ChartData = {
 export function TaskStatusRing({
   data,
   size = 120,
-  innerRadius = 40,
+  innerRadius = 44,
   outerRadius = 50,
   onStatusClick,
   className = '',

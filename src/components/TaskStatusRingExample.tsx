@@ -39,7 +39,7 @@ export function TaskStatusRingExample() {
         <TaskStatusRing
           data={data}
           size={160}
-          innerRadius={48}
+          innerRadius={54}
           outerRadius={64}
           onStatusClick={(status) => setClicked(status)}
         />

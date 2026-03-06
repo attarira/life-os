@@ -180,11 +180,10 @@ function LifeAreaCard({
           </div>
           <h3 className={`text-[15px] font-semibold leading-tight ${grad.titleColor || 'text-white'}`}>{area.title}</h3>
           {dueSoon && (
-            <span className="inline-flex items-center rounded-full bg-red-500/20 text-red-500 dark:text-red-300 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide">
-              <svg className="w-2.5 h-2.5 mr-0.5" viewBox="0 0 24 24" fill="currentColor">
+            <span className="inline-flex items-center rounded-full bg-red-500/10 text-red-400 dark:text-red-400 p-1.5" title="Due soon">
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M12 2a1 1 0 01.894.553l9 18A1 1 0 0121 22H3a1 1 0 01-.894-1.447l9-18A1 1 0 0112 2zm0 6a1 1 0 00-1 1v4a1 1 0 001 1h.01a1 1 0 001-1V9a1 1 0 00-1.01-1zM12 17a1.25 1.25 0 100-2.5A1.25 1.25 0 0012 17z" />
               </svg>
-              Due soon
             </span>
           )}
         </div>
@@ -231,9 +230,9 @@ function LifeAreaCard({
             <circle
               cx={36}
               cy={36}
-              r={32}
+              r={33}
               stroke={grad.ringTrack}
-              strokeWidth={8}
+              strokeWidth={6}
               fill="none"
             />
           </svg>
@@ -245,7 +244,7 @@ function LifeAreaCard({
               completed: statusCounts['COMPLETED'] || 0,
             }}
             size={72}
-            innerRadius={28}
+            innerRadius={30}
             outerRadius={36}
             className={`absolute inset-0 z-10 ${muted ? 'pointer-events-none' : ''}`}
           />
