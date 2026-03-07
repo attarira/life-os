@@ -155,3 +155,93 @@ export function validateTitle(title: string): string | null {
   }
   return null;
 }
+
+/**
+ * Compute an importance score for a task based on priority, urgency, and recency.
+ */
+export function computeTaskImportance(task: Task): number {
+  let score = 0;
+
+  // 1. Priority scoring
+  switch (task.priority) {
+    case 'HIGH':
+      score += 30;
+      break;
+    case 'MEDIUM':
+      score += 15;
+      break;
+    case 'LOW':
+      score += 0;
+      break;
+  }
+
+  // 2. Due Date scoring
+  if (task.dueDate && task.status !== 'COMPLETED') {
+    const dueTime = new Date(task.dueDate).getTime();
+    const nowTime = new Date().getTime();
+    const diffDays = (dueTime - nowTime) / (1000 * 60 * 60 * 24);
+
+    if (diffDays < 0) {
+      score += 20; // Overdue
+    } else if (diffDays <= 1) {
+      score += 15; // Due today
+    } else if (diffDays <= 3) {
+      score += 10; // Due within 3 days
+    } else if (diffDays <= 7) {
+      score += 5; // Due within a week
+    }
+  }
+
+  // 3. Recent Activity scoring
+  const updatedTime = new Date(task.updatedAt || task.createdAt).getTime();
+  const nowTime = new Date().getTime();
+  const diffDaysUpdated = (nowTime - updatedTime) / (1000 * 60 * 60 * 24);
+
+  if (diffDaysUpdated <= 1) {
+    score += 10;
+  } else if (diffDaysUpdated <= 3) {
+    score += 5;
+  }
+
+  return score;
+}
+
+/**
+ * Identify a good candidate for the "Next Suggested Task". 
+ */
+export function getSuggestedNextTask(tasks: Task[], _currentParentId: string): Task | null {
+  // We filter all tasks that belong to the current area hierarchy
+  // (Assuming caller passes allAreaTasks correctly)
+  const candidates = tasks.filter(t => 
+    (t.status === 'NOT_STARTED' || t.status === 'ON_HOLD') && 
+    !t.calendarOnly
+  );
+
+  if (candidates.length === 0) return null;
+
+  // Determine which tasks are leaves
+  const isParent = new Set(tasks.map(t => t.parentId));
+  const leafCandidates = candidates.filter(t => t.isLeaf !== undefined ? t.isLeaf : !isParent.has(t.id));
+
+  // If we have leaf candidates, use them; otherwise fallback to any undone task
+  const applicablePool = leafCandidates.length > 0 ? leafCandidates : candidates;
+
+  const scoredPool = applicablePool.map(t => {
+    let score = computeTaskImportance(t);
+
+    // Neglect boost for suggestions
+    const updatedTime = new Date(t.updatedAt || t.createdAt).getTime();
+    const nowTime = new Date().getTime();
+    const diffDaysUpdated = (nowTime - updatedTime) / (1000 * 60 * 60 * 24);
+    
+    if (diffDaysUpdated > 7) {
+      score += 10;
+    }
+
+    return { task: t, score };
+  });
+
+  scoredPool.sort((a, b) => b.score - a.score);
+  return scoredPool[0]?.task || null;
+}
+

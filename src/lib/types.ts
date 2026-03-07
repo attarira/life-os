@@ -39,6 +39,7 @@ export interface Task {
   tags?: string[];
   frequency?: string;
   recurrence?: TaskRecurrence;
+  isLeaf?: boolean;
 }
 
 // Task creation input (without auto-generated fields)

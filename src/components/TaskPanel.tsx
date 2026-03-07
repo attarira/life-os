@@ -16,6 +16,7 @@ export function TaskPanel() {
   const [frequency, setFrequency] = useState('');
   const [recurrence, setRecurrence] = useState<TaskRecurrence | undefined>();
   const [isRecurring, setIsRecurring] = useState(false);
+  const [isLeaf, setIsLeaf] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
@@ -34,7 +35,11 @@ export function TaskPanel() {
       setFrequency(task.frequency || '');
       setRecurrence(task.recurrence);
       setIsRecurring(!!task.frequency || !!task.recurrence);
+      
+      const hasChildren = tasks.some(t => t.parentId === task.id);
+      setIsLeaf(task.isLeaf !== undefined ? !!task.isLeaf : !hasChildren);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [task]);
 
   useEffect(() => {
@@ -463,107 +468,131 @@ export function TaskPanel() {
             {/* ── Divider ── */}
             <div className="border-t border-slate-800/50" />
 
-            {/* ── Subtasks ── */}
+            {/* ── Subtasks Toggle ── */}
             <div>
               <div className="flex items-center justify-between mb-3">
+                <label className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                  Leaf Task
+                </label>
                 <button
                   type="button"
-                  onClick={() => setSubtasksOpen(!subtasksOpen)}
-                  className="flex items-center gap-2 group"
-                  aria-expanded={subtasksOpen}
+                  onClick={async () => {
+                    const nextVal = !isLeaf;
+                    setIsLeaf(nextVal);
+                    await updateTask(task.id, { isLeaf: nextVal });
+                    if (nextVal) {
+                      setSubtasksOpen(false);
+                    }
+                  }}
+                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/50 ${isLeaf ? 'bg-blue-500' : 'bg-slate-700'}`}
                 >
-                  <svg
-                    className={`w-3.5 h-3.5 text-slate-500 transition-transform ${subtasksOpen ? 'rotate-90' : ''}`}
-                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400 group-hover:text-slate-200 transition-colors">
-                    Subtasks
-                  </span>
-                  {totalSubtasks > 0 && (
-                    <span className="text-[10px] text-slate-500 font-mono">
-                      {completedCount}/{totalSubtasks}
-                    </span>
-                  )}
+                  <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${isLeaf ? 'translate-x-[18px]' : 'translate-x-1'}`} />
                 </button>
               </div>
 
-              {/* Add subtask input */}
-              <div className="flex items-center gap-2">
-                <div className="flex-1 relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600">
-                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14m7-7H5" />
-                    </svg>
-                  </span>
-                  <input
-                    type="text"
-                    value={newSubtaskTitle}
-                    onChange={(e) => setNewSubtaskTitle(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleAddSubtask();
-                      }
-                    }}
-                    onFocus={() => setSubtasksOpen(true)}
-                    placeholder="Add a subtask..."
-                    className="w-full rounded-xl bg-slate-800/40 border border-slate-700/50 pl-9 pr-4 py-2 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500/40 transition-all"
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={handleAddSubtask}
-                  disabled={!newSubtaskTitle.trim()}
-                  className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all ${newSubtaskTitle.trim()
-                    ? 'bg-blue-500/15 text-blue-400 hover:bg-blue-500/25 hover:text-blue-300 border border-blue-500/20'
-                    : 'bg-slate-800/40 text-slate-600 border border-slate-700/30 cursor-not-allowed'
-                    }`}
-                  aria-label="Add subtask"
-                >
-                  Add
-                </button>
-              </div>
+              {!isLeaf && (
+                <div className="space-y-4 mt-2 bg-slate-800/20 p-4 rounded-xl border border-slate-700/30">
+                  <div className="flex items-center justify-between mb-3">
+                    <button
+                      type="button"
+                      onClick={() => setSubtasksOpen(!subtasksOpen)}
+                      className="flex items-center gap-2 group"
+                      aria-expanded={subtasksOpen}
+                    >
+                      <svg
+                        className={`w-3.5 h-3.5 text-slate-500 transition-transform ${subtasksOpen ? 'rotate-90' : ''}`}
+                        fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                      <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400 group-hover:text-slate-200 transition-colors">
+                        Subtasks
+                      </span>
+                      {totalSubtasks > 0 && (
+                        <span className="text-[10px] text-slate-500 font-mono">
+                          {completedCount}/{totalSubtasks}
+                        </span>
+                      )}
+                    </button>
+                  </div>
 
-              {/* Subtask list */}
-              {subtasksOpen && (
-                <div className="mt-3 space-y-0.5">
-                  {subtasks.length === 0 ? (
-                    <p className="text-xs text-slate-600 py-2 pl-1">No subtasks yet.</p>
-                  ) : (
-                    <div className="space-y-0.5">
-                      {subtasks.map(subtask => (
-                        <div
-                          key={subtask.id}
-                          className="flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-slate-800/50 transition-colors group"
-                        >
-                          <button
-                            type="button"
-                            onClick={() => handleToggleSubtask(subtask)}
-                            className={`w-[18px] h-[18px] rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all ${subtask.status === 'COMPLETED'
-                              ? 'bg-emerald-500 border-emerald-500'
-                              : 'border-slate-600 hover:border-slate-400'
-                              }`}
-                          >
-                            {subtask.status === 'COMPLETED' && (
-                              <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                              </svg>
-                            )}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => selectTask(subtask.id)}
-                            className={`text-sm text-left flex-1 transition-colors ${subtask.status === 'COMPLETED'
-                              ? 'text-slate-500 line-through'
-                              : 'text-slate-200 hover:text-white'
-                              }`}
-                          >
-                            {subtask.title}
-                          </button>
+                  {/* Add subtask input */}
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600">
+                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14m7-7H5" />
+                        </svg>
+                      </span>
+                      <input
+                        type="text"
+                        value={newSubtaskTitle}
+                        onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAddSubtask();
+                          }
+                        }}
+                        onFocus={() => setSubtasksOpen(true)}
+                        placeholder="Add a subtask..."
+                        className="w-full rounded-xl bg-slate-800/40 border border-slate-700/50 pl-9 pr-4 py-2 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500/40 transition-all"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleAddSubtask}
+                      disabled={!newSubtaskTitle.trim()}
+                      className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all ${newSubtaskTitle.trim()
+                        ? 'bg-blue-500/15 text-blue-400 hover:bg-blue-500/25 hover:text-blue-300 border border-blue-500/20'
+                        : 'bg-slate-800/40 text-slate-600 border border-slate-700/30 cursor-not-allowed'
+                        }`}
+                      aria-label="Add subtask"
+                    >
+                      Add
+                    </button>
+                  </div>
+
+                  {/* Subtask list */}
+                  {subtasksOpen && (
+                    <div className="mt-3 space-y-0.5">
+                      {subtasks.length === 0 ? (
+                        <p className="text-xs text-slate-600 py-2 pl-1">No subtasks yet.</p>
+                      ) : (
+                        <div className="space-y-0.5">
+                          {subtasks.map(subtask => (
+                            <div
+                              key={subtask.id}
+                              className="flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-slate-800/50 transition-colors group"
+                            >
+                              <button
+                                type="button"
+                                onClick={() => handleToggleSubtask(subtask)}
+                                className={`w-[18px] h-[18px] rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all ${subtask.status === 'COMPLETED'
+                                  ? 'bg-emerald-500 border-emerald-500'
+                                  : 'border-slate-600 hover:border-slate-400'
+                                  }`}
+                              >
+                                {subtask.status === 'COMPLETED' && (
+                                  <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                )}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => selectTask(subtask.id)}
+                                className={`text-sm text-left flex-1 transition-colors ${subtask.status === 'COMPLETED'
+                                  ? 'text-slate-500 line-through'
+                                  : 'text-slate-200 hover:text-white'
+                                  }`}
+                              >
+                                {subtask.title}
+                              </button>
+                            </div>
+                          ))}
                         </div>
-                      ))}
+                      )}
                     </div>
                   )}
                 </div>

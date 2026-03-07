@@ -246,7 +246,8 @@ export function PlannerCard({ tasks, navigateTo, selectTask, createTask }: Plann
 
   // Auto-populate recurring tasks & handle daily rollover
   useEffect(() => {
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const d = new Date();
+    const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     const storedDate = typeof window !== 'undefined' ? localStorage.getItem(PLANNER_DATE_STORAGE_KEY) : todayStr;
 
     setEntries(prev => {
@@ -276,6 +277,23 @@ export function PlannerCard({ tasks, navigateTo, selectTask, createTask }: Plann
   useEffect(() => {
     savePlannerEntries(entries);
   }, [entries]);
+
+  // Listen for global planner add events
+  useEffect(() => {
+    const handlePlannerAdd = (e: Event) => {
+      const customEvent = e as CustomEvent<{ task: Task }>;
+      if (!customEvent.detail?.task) return;
+      
+      const t = customEvent.detail.task;
+      setEntries(prev => {
+        if (prev.some(entry => entry.taskId === t.id)) return prev;
+        return [...prev, { id: buildId(), taskId: t.id, label: t.title, completed: false }];
+      });
+    };
+    
+    window.addEventListener('lifeos:planner-add', handlePlannerAdd);
+    return () => window.removeEventListener('lifeos:planner-add', handlePlannerAdd);
+  }, []);
 
   // Close dropdown when clicking outside
   useEffect(() => {

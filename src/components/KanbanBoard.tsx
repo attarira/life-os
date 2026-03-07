@@ -75,12 +75,16 @@ function loadNetWorthSnapshots(): NetWorthSnapshot[] {
   if (Array.isArray(parsed)) {
     return parsed
       .filter(Boolean)
-      .map((item) => ({
-        id: String(item.id || generateId()),
-        date: String(item.date || new Date().toISOString().slice(0, 10)),
-        assets: Number(item.assets || 0),
-        liabilities: Number(item.liabilities || 0),
-      }));
+      .map((item) => {
+        const d = new Date();
+        const fallbackDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        return {
+          id: String(item.id || generateId()),
+          date: String(item.date || fallbackDate),
+          assets: Number(item.assets || 0),
+          liabilities: Number(item.liabilities || 0),
+        };
+      });
   }
   return [];
 }
@@ -122,7 +126,9 @@ export function KanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawer
   const [activeId, setActiveId] = useState<string | null>(null);
   const [netWorthSnapshots, setNetWorthSnapshots] = useState<NetWorthSnapshot[]>(() => loadNetWorthSnapshots());
   const [subscriptions, setSubscriptions] = useState<SubscriptionItem[]>(() => loadSubscriptions());
-  const [snapshotDate, setSnapshotDate] = useState(new Date().toISOString().slice(0, 10));
+  const d = new Date();
+  const initialSnapshotDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const [snapshotDate, setSnapshotDate] = useState(initialSnapshotDate);
   const [snapshotAssets, setSnapshotAssets] = useState('');
   const [snapshotLiabilities, setSnapshotLiabilities] = useState('');
   const [showNetWorthHistory, setShowNetWorthHistory] = useState(false);

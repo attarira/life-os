@@ -14,7 +14,7 @@ import { arrayMove, SortableContext, rectSortingStrategy, useSortable } from '@d
 import { CSS } from '@dnd-kit/utilities';
 import { useTaskContext } from '@/lib/task-context';
 import { COLUMNS, ROOT_TASK_ID, Task, TaskStatus } from '@/lib/types';
-import { getSubtreeIds, getTaskPath } from '@/lib/tasks';
+import { getSubtreeIds, getTaskPath, computeTaskImportance, getSuggestedNextTask } from '@/lib/tasks';
 
 import { generateId, resolveAreaKey, storage } from '@/lib/utils';
 import { ChatPanel, AppContext } from './ChatPanel';
@@ -39,6 +39,8 @@ type AreaSnapshot = {
   weekCount: number;
   dueSoon: boolean;
   highlights: string[];
+  nextSuggestion?: string;
+  calloutTaskData?: Task | null;
 };
 
 
@@ -123,8 +125,11 @@ function LifeAreaCard({
   weekCount,
   dueSoon,
   highlights = [],
+  nextSuggestion,
+  calloutTaskData,
   onOpen,
   onEdit,
+  onCalloutClick,
   cardRef,
   style,
   dragHandleProps,
@@ -139,8 +144,11 @@ function LifeAreaCard({
   weekCount: number;
   dueSoon: boolean;
   highlights?: string[];
+  nextSuggestion?: string;
+  calloutTaskData?: Task | null;
   onOpen: () => void;
   onEdit?: () => void;
+  onCalloutClick?: (task: Task) => void;
   cardRef?: (node: HTMLElement | null) => void;
   style?: React.CSSProperties;
   dragHandleProps?: DragHandleProps;
@@ -156,7 +164,7 @@ function LifeAreaCard({
   );
   const grad = AREA_GRADIENTS[toneKey] || { gradient: 'linear-gradient(135deg, #253040 0%, #141c28 100%)', iconBg: 'bg-slate-400/20', ringTrack: 'rgba(148,163,184,0.2)' };
 
-  const firstHighlight = highlights[0];
+  const calloutTask = nextSuggestion || highlights[0];
 
   return (
     <div
@@ -216,11 +224,23 @@ function LifeAreaCard({
       <div className="flex items-end justify-between p-4 pt-0">
         {/* "Next:" callout */}
         <div className="min-w-0 flex-1">
-          {firstHighlight && (
-            <div className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] max-w-full truncate ${grad.titleColor ? 'bg-slate-100/50 text-slate-500' : 'bg-white/[0.07] backdrop-blur-sm text-white/50'}`}>
-              <span className={`font-medium shrink-0 ${grad.titleColor ? 'text-slate-600' : 'text-white/70'}`}>Next:</span>
-              <span className="truncate">{firstHighlight}</span>
-            </div>
+          {calloutTask && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (calloutTaskData && onCalloutClick) {
+                  onCalloutClick(calloutTaskData);
+                }
+              }}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] max-w-full truncate transition-colors ${grad.titleColor ? 'bg-slate-100/50 text-slate-500 hover:bg-slate-200/50' : 'bg-white/[0.07] backdrop-blur-sm text-white/50 hover:bg-white/[0.12]'}`}
+            >
+              <span className={`font-medium shrink-0 ${grad.titleColor ? 'text-slate-600' : 'text-white/70'}`}>
+                Next:
+              </span>
+              <span className="truncate">{calloutTask}</span>
+            </button>
           )}
         </div>
 
@@ -263,11 +283,13 @@ function SortableLifeAreaCard({
   onOpen,
   onEdit,
   isActive,
+  onCalloutClick,
 }: {
   snapshot: AreaSnapshot;
   onOpen: () => void;
   onEdit: () => void;
   isActive: boolean;
+  onCalloutClick?: (task: Task) => void;
 }) {
   const {
     attributes,
@@ -295,8 +317,11 @@ function SortableLifeAreaCard({
       weekCount={snapshot.weekCount}
       dueSoon={snapshot.dueSoon}
       highlights={snapshot.highlights}
+      nextSuggestion={snapshot.nextSuggestion}
+      calloutTaskData={snapshot.calloutTaskData}
       onOpen={onOpen}
       onEdit={onEdit}
+      onCalloutClick={onCalloutClick}
       isActive={isActive}
       cardRef={setNodeRef}
       dragHandleProps={{ listeners, attributes, ref: setActivatorNodeRef }}
@@ -381,45 +406,24 @@ export function HomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDraw
 
       const dueSoon = allAreaTasks.some(isDueWithinThreeDays);
 
-      const getPriorityValue = (p: string | undefined) => {
-        if (p === 'HIGH') return 1;
-        if (p === 'MEDIUM') return 2;
-        if (p === 'LOW') return 3;
-        return 4;
-      };
-
       const highlightCandidates = allAreaTasks
-        .filter(t => t.status === 'IN_PROGRESS' || isDueWithinThreeDays(t))
-        .filter((t, _, arr) => {
-          // If this task has a child that is ALSO in our highlight candidates pool,
-          // prefer the child instead since it's the actionable next step.
-          const hasChildInPool = arr.some(possibleChild => possibleChild.parentId === t.id);
-          return !hasChildInPool;
-        })
+        .filter(t => t.status === 'IN_PROGRESS' || t.status === 'NOT_STARTED' || t.status === 'ON_HOLD')
+        .filter(t => !parentIdsWithChildren.has(t.id))
         .sort((a, b) => {
-          // In-progress first
+          // In-progress boost
           if (a.status === 'IN_PROGRESS' && b.status !== 'IN_PROGRESS') return -1;
           if (b.status === 'IN_PROGRESS' && a.status !== 'IN_PROGRESS') return 1;
 
-          // Then by priority
-          const aPri = getPriorityValue(a.priority);
-          const bPri = getPriorityValue(b.priority);
-          if (aPri !== bPri) return aPri - bPri;
+          // Rank by computed importance
+          const scoreA = computeTaskImportance(a);
+          const scoreB = computeTaskImportance(b);
+          if (scoreA !== scoreB) return scoreB - scoreA; // Descending
 
-          // Then by due date
-          const ad = a.dueDate ? a.dueDate.getTime() : Number.MAX_SAFE_INTEGER;
-          const bd = b.dueDate ? b.dueDate.getTime() : Number.MAX_SAFE_INTEGER;
-
-          if (ad === bd) {
-            const hour = new Date().getHours();
-            const scoreA = (a.id.charCodeAt(0) + hour) % 3;
-            const scoreB = (b.id.charCodeAt(0) + hour) % 3;
-            return scoreA - scoreB;
-          }
-
-          return ad - bd;
+          return a.order - b.order;
         })
         .slice(0, 2);
+        
+      const suggestion = getSuggestedNextTask(allAreaTasks, area.id);
 
       return {
         area,
@@ -429,9 +433,11 @@ export function HomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDraw
         weekCount,
         dueSoon,
         highlights: highlightCandidates.map(t => t.title),
+        nextSuggestion: suggestion?.title,
+        calloutTaskData: suggestion || highlightCandidates[0] || null,
       };
     });
-  }, [lifeAreas, tasks]);
+  }, [lifeAreas, tasks, tasksByParentId, parentIdsWithChildren]);
 
   const primaryAreaId = useMemo(() => {
     if (areaSnapshots.length === 0) return null;
@@ -602,6 +608,10 @@ export function HomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDraw
                         onOpen={() => navigateTo(snapshot.area.id)}
                         onEdit={() => openEditor(snapshot.area)}
                         isActive={primaryAreaId === snapshot.area.id}
+                        onCalloutClick={(task) => {
+                          const event = new CustomEvent('lifeos:planner-add', { detail: { task } });
+                          window.dispatchEvent(event);
+                        }}
                       />
                     ))}
                     {lifeAreas.length === 0 && (
