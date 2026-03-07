@@ -414,51 +414,42 @@ export function TaskPanel() {
                     <label className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400 mb-2.5">
                       Planner Recurrence
                     </label>
-                    <select
-                      value={recurrence?.rule || 'none'}
-                      onChange={async (e) => {
-                        const rule = e.target.value;
-                        if (rule === 'none') {
-                          await setRecurrenceAndUpdate(undefined);
-                        } else {
-                          await setRecurrenceAndUpdate({ rule: rule as TaskRecurrence['rule'], daysOfWeek: recurrence?.daysOfWeek || [] });
+                    <div className="flex gap-1.5 flex-wrap">
+                      {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, idx) => {
+                        let activeDays: number[] = [];
+                        if (recurrence) {
+                          if (recurrence.rule === 'custom') activeDays = recurrence.daysOfWeek || [];
+                          else if (recurrence.rule === 'daily') activeDays = [0, 1, 2, 3, 4, 5, 6];
+                          else if (recurrence.rule === 'weekdays') activeDays = [1, 2, 3, 4, 5];
+                          else if (recurrence.rule === 'weekends') activeDays = [0, 6];
+                          else if (recurrence.rule === 'mwf') activeDays = [1, 3, 5];
+                          else if (recurrence.rule === 'tth') activeDays = [2, 4];
                         }
-                      }}
-                      className="w-full rounded-xl bg-slate-800/40 border border-slate-700/50 px-4 py-2 text-[13px] text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition-all cursor-pointer"
-                    >
-                      <option value="none">Does not repeat</option>
-                      <option value="daily">Daily</option>
-                      <option value="weekdays">Weekdays</option>
-                      <option value="weekends">Weekends</option>
-                      <option value="mwf">Mon, Wed, Fri</option>
-                      <option value="tth">Tue, Thu</option>
-                      <option value="custom">Custom Days</option>
-                    </select>
-
-                    {recurrence?.rule === 'custom' && (
-                      <div className="flex gap-1.5 flex-wrap mt-2.5">
-                        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, idx) => {
-                          const isSelected = recurrence.daysOfWeek?.includes(idx);
-                          return (
-                            <button
-                              key={day}
-                              type="button"
-                              onClick={async () => {
-                                const currentDays = recurrence.daysOfWeek || [];
-                                const nextDays = isSelected
-                                  ? currentDays.filter(d => d !== idx)
-                                  : [...currentDays, idx].sort((a, b) => a - b);
-                                await setRecurrenceAndUpdate({ ...recurrence, daysOfWeek: nextDays });
-                              }}
-                              className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${isSelected ? 'bg-blue-500 text-white shadow-sm shadow-blue-500/20' : 'bg-slate-800 border border-slate-700/50 text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
-                                }`}
-                            >
-                              {day}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
+                        const isSelected = activeDays.includes(idx);
+                        
+                        return (
+                          <button
+                            key={day}
+                            type="button"
+                            onClick={async () => {
+                              const nextDays = isSelected
+                                ? activeDays.filter(d => d !== idx)
+                                : [...activeDays, idx].sort((a, b) => a - b);
+                                
+                              if (nextDays.length === 0) {
+                                await setRecurrenceAndUpdate(undefined);
+                              } else {
+                                await setRecurrenceAndUpdate({ rule: 'custom', daysOfWeek: nextDays });
+                              }
+                            }}
+                            className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${isSelected ? 'bg-blue-500 text-white shadow-sm shadow-blue-500/20' : 'bg-slate-800 border border-slate-700/50 text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                              }`}
+                          >
+                            {day}
+                          </button>
+                        );
+                      })}
+                    </div>
                     <p className="mt-2 text-[11px] text-slate-500">Scheduled task will automatically appear on the daily planner.</p>
                   </div>
                 </div>

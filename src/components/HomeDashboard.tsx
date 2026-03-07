@@ -108,7 +108,41 @@ const AREA_BADGES: Record<string, string> = {
   default: 'bg-slate-100/70 text-slate-600 dark:bg-slate-800/60 dark:text-slate-300',
 };
 
+const BIRTHDAYS: Array<{ name: string; date: string }> = [
+  { name: 'Mom', date: '03-11' },
+  { name: 'Dad', date: '12-27' },
+  { name: 'Sanaya', date: '12-09' },
+  { name: 'Nani', date: '01-18' },
+  { name: 'Adi', date: '01-18' },
+  { name: 'Amaan', date: '09-15' },
+  { name: 'Aamir', date: '11-02' },
+  { name: 'Arman', date: '02-21' },
+  { name: 'Ilhaam', date: '03-05' },
+  { name: 'Abizer', date: '03-07' },
+  { name: 'Mehreen', date: '03-07' },
+];
 
+function getUpcomingBirthday(): string | null {
+  const now = new Date();
+  
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const todayKey = `${month}-${day}`;
+  
+  const todayBirthdays = BIRTHDAYS.filter(b => b.date === todayKey).map(b => b.name);
+  if (todayBirthdays.length > 0) return todayBirthdays.join(', ');
+
+  const tomorrow = new Date(now);
+  tomorrow.setDate(now.getDate() + 1);
+  const monthT = String(tomorrow.getMonth() + 1).padStart(2, '0');
+  const dayT = String(tomorrow.getDate()).padStart(2, '0');
+  const tomorrowKey = `${monthT}-${dayT}`;
+  
+  const tomorrowBirthdays = BIRTHDAYS.filter(b => b.date === tomorrowKey).map(b => b.name);
+  if (tomorrowBirthdays.length > 0) return tomorrowBirthdays.join(', ');
+
+  return null;
+}
 
 function isDueWithinThreeDays(task: Task): boolean {
   if (!task.dueDate || task.status === 'COMPLETED') return false;
@@ -165,6 +199,7 @@ function LifeAreaCard({
   const grad = AREA_GRADIENTS[toneKey] || { gradient: 'linear-gradient(135deg, #253040 0%, #141c28 100%)', iconBg: 'bg-slate-400/20', ringTrack: 'rgba(148,163,184,0.2)' };
 
   const calloutTask = nextSuggestion || highlights[0];
+  const upcomingBirthday = toneKey === 'relationships' ? getUpcomingBirthday() : null;
 
   return (
     <div
@@ -222,8 +257,8 @@ function LifeAreaCard({
 
       {/* Bottom row: action hint | donut ring */}
       <div className="flex items-end justify-between p-4 pt-0">
-        {/* "Next:" callout */}
-        <div className="min-w-0 flex-1">
+        {/* "Next:" callout and Birthday Pill */}
+        <div className="min-w-0 flex-1 flex flex-col items-start gap-1.5">
           {calloutTask && (
             <button
               type="button"
@@ -234,13 +269,27 @@ function LifeAreaCard({
                   onCalloutClick(calloutTaskData);
                 }
               }}
-              className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] max-w-full truncate transition-colors ${grad.titleColor ? 'bg-slate-100/50 text-slate-500 hover:bg-slate-200/50' : 'bg-white/[0.07] backdrop-blur-sm text-white/50 hover:bg-white/[0.12]'}`}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] max-w-full truncate transition-colors border ${grad.titleColor ? 'bg-slate-100/50 text-slate-500 hover:bg-slate-200/50 border-transparent' : 'bg-white/[0.07] backdrop-blur-sm text-white/50 hover:bg-white/[0.12] border-white/5'}`}
             >
-              <span className={`font-medium shrink-0 ${grad.titleColor ? 'text-slate-600' : 'text-white/70'}`}>
-                Next:
+              <span className={`flex-shrink-0 ${grad.titleColor ? 'text-slate-500' : 'text-white/60'}`}>
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M5 12h14" />
+                  <path d="m12 5 7 7-7 7" />
+                </svg>
               </span>
               <span className="truncate">{calloutTask}</span>
             </button>
+          )}
+          {upcomingBirthday && (
+            <div className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] max-w-full truncate transition-colors border ${grad.titleColor ? 'bg-rose-100/50 text-rose-600 border-rose-200' : 'bg-red-500/20 text-red-200 border-red-500/30 backdrop-blur-sm'}`}>
+              <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="8" width="18" height="4" rx="1" />
+                <path d="M12 8v13" />
+                <path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7" />
+                <path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5" />
+              </svg>
+              <span className="truncate font-medium">{upcomingBirthday}</span>
+            </div>
           )}
         </div>
 
