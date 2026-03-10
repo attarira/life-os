@@ -22,6 +22,7 @@ import { TaskCard } from './TaskCard';
 import { NotificationsTray } from './NotificationsTray';
 import { CurrencyToggle } from './CurrencyToggle';
 import { useCurrency } from '@/lib/currency-context';
+import Link from 'next/link';
 
 const CAREER_LINKS = {
   linkedin: 'https://www.linkedin.com/in/attarira',
@@ -221,8 +222,10 @@ export function KanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawer
   const activeTask = activeId ? tasks.find(t => t.id === activeId) : null;
   const path = getTaskPath(tasks, currentParentId);
   const rootArea = path[0];
-  const showCareerResources = rootArea ? resolveAreaKey(rootArea.title || rootArea.id) === 'career' : false;
-  const showFinanceSections = rootArea ? resolveAreaKey(rootArea.title || rootArea.id) === 'finances' : false;
+  const areaKey = rootArea ? resolveAreaKey(rootArea.title || rootArea.id) : '';
+  const showCareerResources = areaKey === 'career';
+  const showFinanceSections = areaKey === 'finances';
+  const showRecreationMaps = areaKey === 'recreation';
 
   useEffect(() => {
     storage.set(FINANCE_NET_WORTH_KEY, netWorthSnapshots);
@@ -391,6 +394,23 @@ export function KanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawer
                 </a>
               </div>
             )}
+            
+            {showRecreationMaps && (
+              <div className="flex items-center mr-1 text-slate-500">
+                <Link
+                  href="/recreation/map"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-orange-600 dark:hover:text-orange-400 font-medium transition-colors"
+                  title="Places I've Visited"
+                >
+                  <svg className="w-4.5 h-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                    <circle cx="12" cy="10" r="3"></circle>
+                  </svg>
+                  <span className="text-[13px] hidden sm:inline">Travel Map</span>
+                </Link>
+              </div>
+            )}
+
             <button
               onClick={() => setSearchOpen(true)}
               className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
