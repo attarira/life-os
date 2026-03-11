@@ -19,9 +19,7 @@ import { getSubtreeIds, getTaskPath, computeTaskImportance, getSuggestedNextTask
 import { generateId, resolveAreaKey, storage } from '@/lib/utils';
 import { ChatPanel, AppContext } from './ChatPanel';
 import { PlannerCard } from './PlannerCard';
-import { NotificationsTray } from './NotificationsTray';
-import { CurrencyToggle } from './CurrencyToggle';
-import { BackupsPanel } from './BackupsPanel';
+import { GlobalTray } from './GlobalTray';
 import { FileSystemDrawer } from './FileSystemDrawer';
 import { TaskStatusRing } from './TaskStatusRing';
 
@@ -383,7 +381,7 @@ function SortableLifeAreaCard({
 
 
 export function HomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawerOpen: boolean, isChatExpanded?: boolean }) {
-  const { navigateTo, tasks, setSearchOpen, createTask, reorderTasks, updateTask, deleteTask } = useTaskContext();
+  const { navigateTo, tasks, createTask, reorderTasks, updateTask, deleteTask } = useTaskContext();
   const { selectTask } = useTaskContext();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
@@ -621,18 +619,7 @@ export function HomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDraw
             </div>
           </div>
           <div className="flex items-center gap-1 bg-slate-900/40 border border-slate-700/50 rounded-xl p-1 shadow-sm">
-            <button
-              onClick={() => setSearchOpen(true)}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-              title="Search Tasks"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            </button>
-            <CurrencyToggle />
-            <NotificationsTray />
-            <BackupsPanel />
+            <GlobalTray />
           </div>
         </div>
       </header>

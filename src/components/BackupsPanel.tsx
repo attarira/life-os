@@ -66,7 +66,7 @@ function formatBackupTimestamp(iso: string): string {
 
 
 
-export function BackupsPanel() {
+export function BackupsPanel({ inline }: { inline?: boolean } = {}) {
   const { importTasks } = useTaskContext();
   const [open, setOpen] = useState(false);
   const [backups, setBackups] = useState<BackupEntry[]>([]);
@@ -77,10 +77,15 @@ export function BackupsPanel() {
     setBackups(loadBackupEntries());
   }, []);
 
+  // When inline, load on mount; otherwise load when open
   useEffect(() => {
+    if (inline) {
+      refreshBackups();
+      return;
+    }
     if (!open) return;
     refreshBackups();
-  }, [open, refreshBackups]);
+  }, [open, inline, refreshBackups]);
 
 
 
@@ -129,6 +134,50 @@ export function BackupsPanel() {
     }
   };
 
+  // ── Inline mode: render compact list embedded inside settings ──
+  if (inline) {
+    return (
+      <div className="rounded-lg bg-slate-800/50 max-h-48 overflow-y-auto">
+        {status && (
+          <div className="px-2 py-1.5">
+            <div className="rounded border border-blue-900/50 bg-blue-950/30 px-2 py-1 text-[10px] font-medium text-blue-300">
+              {status}
+            </div>
+          </div>
+        )}
+        {backups.length === 0 ? (
+          <div className="px-3 py-4 text-center text-[11px] text-slate-500">
+            No backups found yet.
+          </div>
+        ) : (
+          <div className="divide-y divide-slate-700/40">
+            {backups.map(entry => (
+              <div key={entry.id} className="flex items-center justify-between gap-2 px-3 py-2 hover:bg-slate-800/60 transition-colors">
+                <div className="min-w-0 flex-1">
+                  <p className="text-[12px] font-medium text-slate-200 truncate">
+                    {formatBackupTimestamp(entry.createdAt)}
+                  </p>
+                  <p className="text-[10px] text-slate-500 leading-tight">
+                    {entry.tasks.length} tasks
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleRestore(entry)}
+                  disabled={restoringId === entry.id}
+                  className="shrink-0 rounded border border-slate-600 px-2 py-1 text-[10px] font-medium text-slate-300 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {restoringId === entry.id ? '...' : 'Restore'}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── Standalone mode: trigger button + floating popover ──
   return (
     <div className="relative">
       <button

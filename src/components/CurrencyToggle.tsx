@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useCurrency, CURRENCIES, CurrencyCode } from '@/lib/currency-context';
 
-export function CurrencyToggle() {
+export function CurrencyToggle({ inline }: { inline?: boolean } = {}) {
   const { currencyCode, setCurrency } = useCurrency();
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -25,6 +25,43 @@ export function CurrencyToggle() {
   // Render a stable placeholder or skeleton if context isn't ready
   if (!selectedCurrency) return null;
 
+  // ── Inline mode: render compact list embedded in settings ──
+  if (inline) {
+    return (
+      <div className="rounded-lg bg-slate-800/50 py-1">
+        {(Object.keys(CURRENCIES) as CurrencyCode[]).map((code) => {
+          const curr = CURRENCIES[code];
+          const isSelected = currencyCode === code;
+
+          return (
+            <button
+              key={code}
+              onClick={() => setCurrency(code)}
+              className={`w-full text-left px-3 py-1.5 text-[12px] flex items-center justify-between transition-colors
+                ${isSelected
+                  ? 'bg-blue-500/10 text-blue-400'
+                  : 'text-slate-300 hover:bg-slate-700/50 hover:text-white'
+                }`}
+            >
+              <div className="flex items-center gap-2">
+                <span className={`w-4 text-center font-medium ${isSelected ? 'opacity-100' : 'opacity-60'}`}>
+                  {curr.symbol}
+                </span>
+                <span>{curr.code}</span>
+              </div>
+              {isSelected && (
+                <svg className="w-3.5 h-3.5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // ── Standalone mode: trigger button + dropdown ──
   return (
     <div className="relative" ref={containerRef}>
       <button
@@ -80,3 +117,4 @@ export function CurrencyToggle() {
     </div>
   );
 }
+
