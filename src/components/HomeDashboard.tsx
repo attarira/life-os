@@ -497,6 +497,24 @@ export function HomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDraw
     return scored[0]?.id || null;
   }, [areaSnapshots, lifeAreas]);
 
+  const globalStats = useMemo(() => {
+    const stats = {
+      totalActive: 0,
+      inProgress: 0,
+      onHold: 0,
+      completed: 0
+    };
+    
+    areaSnapshots.forEach(snapshot => {
+      stats.totalActive += snapshot.activeCount;
+      stats.inProgress += snapshot.statusCounts['IN_PROGRESS'] || 0;
+      stats.onHold += snapshot.statusCounts['ON_HOLD'] || 0;
+      stats.completed += snapshot.statusCounts['COMPLETED'] || 0;
+    });
+    
+    return stats;
+  }, [areaSnapshots]);
+
 
 
 
@@ -633,6 +651,27 @@ export function HomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDraw
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-8">
             {/* ─── LEFT: Focus Areas ─── */}
             <div className="space-y-5">
+              
+              {/* Aggregate Statistics */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="rounded-2xl border border-slate-800/60 bg-slate-900/50 p-4 flex flex-col justify-center">
+                  <span className="text-2xl font-bold text-white">{globalStats.totalActive}</span>
+                  <span className="text-xs font-medium text-slate-500 uppercase tracking-wider mt-1">Total Active</span>
+                </div>
+                <div className="rounded-2xl border border-slate-800/60 bg-slate-900/50 p-4 flex flex-col justify-center">
+                  <span className="text-2xl font-bold text-amber-400">{globalStats.inProgress}</span>
+                  <span className="text-xs font-medium text-amber-500/70 uppercase tracking-wider mt-1">In Progress</span>
+                </div>
+                <div className="rounded-2xl border border-slate-800/60 bg-slate-900/50 p-4 flex flex-col justify-center">
+                  <span className="text-2xl font-bold text-blue-400">{globalStats.onHold}</span>
+                  <span className="text-xs font-medium text-blue-500/70 uppercase tracking-wider mt-1">On Hold</span>
+                </div>
+                <div className="rounded-2xl border border-slate-800/60 bg-slate-900/50 p-4 flex flex-col justify-center">
+                  <span className="text-2xl font-bold text-emerald-400">{globalStats.completed}</span>
+                  <span className="text-xs font-medium text-emerald-500/70 uppercase tracking-wider mt-1">Completed</span>
+                </div>
+              </div>
+
               <h2 className="text-[15px] font-semibold text-white tracking-tight">Focus Areas</h2>
               <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
                 <SortableContext items={lifeAreas.map(area => area.id)} strategy={rectSortingStrategy}>
@@ -683,6 +722,7 @@ export function HomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDraw
                 navigateTo={navigateTo}
                 selectTask={selectTask}
                 createTask={createTask}
+                updateTask={updateTask}
               />
 
               {/* Upcoming */}
