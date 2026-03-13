@@ -20,7 +20,8 @@ import { Breadcrumb } from './Breadcrumb';
 import { Column } from './Column';
 import { TaskCard } from './TaskCard';
 import { GlobalTray } from './GlobalTray';
-import { LocalTray, CAREER_TRAY_ITEMS, RECREATION_TRAY_ITEMS } from './LocalTray';
+import { LocalTray, CAREER_TRAY_ITEMS, RECREATION_TRAY_ITEMS, LocalTrayItem } from './LocalTray';
+import { BirthdayModal } from './BirthdayModal';
 import { useCurrency } from '@/lib/currency-context';
 
 type NetWorthSnapshot = {
@@ -132,6 +133,8 @@ export function KanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawer
   const [subscriptionDueDate, setSubscriptionDueDate] = useState('');
   const [showAddSubscription, setShowAddSubscription] = useState(false);
 
+  const [isBirthdayModalOpen, setIsBirthdayModalOpen] = useState(false);
+
   const visibleChildren = getVisibleChildren();
 
   // Group tasks by status
@@ -214,6 +217,23 @@ export function KanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawer
   const showCareerResources = areaKey === 'career';
   const showFinanceSections = areaKey === 'finances';
   const showRecreationMaps = areaKey === 'recreation';
+  const showRelationshipsTray = areaKey === 'relationships';
+
+  const RELATIONSHIPS_TRAY_ITEMS: LocalTrayItem[] = useMemo(() => [
+    {
+      type: 'button',
+      onClick: () => setIsBirthdayModalOpen(true),
+      label: 'Birthdays',
+      icon: (
+        <svg className="w-4.5 h-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <rect x="3" y="8" width="18" height="4" rx="1" />
+          <path d="M12 8v13" />
+          <path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7" />
+          <path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5" />
+        </svg>
+      )
+    }
+  ], []);
 
   useEffect(() => {
     storage.set(FINANCE_NET_WORTH_KEY, netWorthSnapshots);
@@ -344,6 +364,7 @@ export function KanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawer
 
           <div className="flex items-center gap-2 flex-shrink-0">
             {showCareerResources && <LocalTray items={CAREER_TRAY_ITEMS} />}
+            {showRelationshipsTray && <LocalTray items={RELATIONSHIPS_TRAY_ITEMS} />}
             {showRecreationMaps && <LocalTray items={RECREATION_TRAY_ITEMS} />}
             <GlobalTray />
           </div>
@@ -805,6 +826,9 @@ export function KanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawer
           </div>
         </div>
       </div>
+      
+      {/* Modals placed here */}
+      <BirthdayModal isOpen={isBirthdayModalOpen} onClose={() => setIsBirthdayModalOpen(false)} />
     </div>
   );
 }

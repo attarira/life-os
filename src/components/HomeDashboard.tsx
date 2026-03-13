@@ -105,42 +105,7 @@ const AREA_BADGES: Record<string, string> = {
   recreation: 'bg-amber-100/70 text-amber-700 dark:bg-amber-500/20 dark:text-amber-200',
   default: 'bg-slate-100/70 text-slate-600 dark:bg-slate-800/60 dark:text-slate-300',
 };
-
-const BIRTHDAYS: Array<{ name: string; date: string }> = [
-  { name: 'Mom', date: '03-11' },
-  { name: 'Dad', date: '12-27' },
-  { name: 'Sanaya', date: '12-09' },
-  { name: 'Nani', date: '01-18' },
-  { name: 'Adi', date: '01-18' },
-  { name: 'Amaan', date: '09-15' },
-  { name: 'Aamir', date: '11-02' },
-  { name: 'Arman', date: '02-21' },
-  { name: 'Ilhaam', date: '03-05' },
-  { name: 'Abizer', date: '03-07' },
-  { name: 'Mehreen', date: '03-07' },
-];
-
-function getUpcomingBirthday(): string | null {
-  const now = new Date();
-  
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  const todayKey = `${month}-${day}`;
-  
-  const todayBirthdays = BIRTHDAYS.filter(b => b.date === todayKey).map(b => b.name);
-  if (todayBirthdays.length > 0) return todayBirthdays.join(', ');
-
-  const tomorrow = new Date(now);
-  tomorrow.setDate(now.getDate() + 1);
-  const monthT = String(tomorrow.getMonth() + 1).padStart(2, '0');
-  const dayT = String(tomorrow.getDate()).padStart(2, '0');
-  const tomorrowKey = `${monthT}-${dayT}`;
-  
-  const tomorrowBirthdays = BIRTHDAYS.filter(b => b.date === tomorrowKey).map(b => b.name);
-  if (tomorrowBirthdays.length > 0) return tomorrowBirthdays.join(', ');
-
-  return null;
-}
+import { useBirthdays } from '@/lib/birthdays';
 
 function isDueWithinThreeDays(task: Task): boolean {
   if (!task.dueDate || task.status === 'COMPLETED') return false;
@@ -188,6 +153,7 @@ function LifeAreaCard({
   muted?: boolean;
   isActive?: boolean;
 }) {
+  const { getUpcomingBirthday } = useBirthdays();
   const toneKey = resolveAreaKey(area.title || area.id || '');
   const icon = LIFE_AREA_ICONS[toneKey] || (
     <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
@@ -198,6 +164,7 @@ function LifeAreaCard({
 
   const calloutTask = nextSuggestion || highlights[0];
   const upcomingBirthday = toneKey === 'relationships' ? getUpcomingBirthday() : null;
+
 
   return (
     <div
@@ -722,7 +689,6 @@ export function HomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDraw
                 navigateTo={navigateTo}
                 selectTask={selectTask}
                 createTask={createTask}
-                updateTask={updateTask}
               />
 
               {/* Upcoming */}
