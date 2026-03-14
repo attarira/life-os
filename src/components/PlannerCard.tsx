@@ -86,6 +86,56 @@ const AREA_BADGES: Record<string, string> = {
   default: 'bg-slate-500/15 text-slate-400',
 };
 
+const AREA_ICONS: Record<string, React.JSX.Element> = {
+  career: (
+    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="4" y="8" width="16" height="10" rx="2" />
+      <path d="M9 8V6a2 2 0 012-2h2a2 2 0 012 2v2" />
+      <path d="M10 13h4" />
+    </svg>
+  ),
+  health: (
+    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 4v16" />
+      <path d="M4 12h16" />
+    </svg>
+  ),
+  finances: (
+    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="8" />
+      <path d="M12 7v10" />
+    </svg>
+  ),
+  relationships: (
+    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M7 10a4 4 0 110-8 4 4 0 010 8z" />
+      <path d="M17 12a3 3 0 110-6 3 3 0 010 6z" />
+      <path d="M3 22v-1.5A5.5 5.5 0 018.5 15H10" />
+      <path d="M14 22v-1a5 5 0 015-5h1" />
+    </svg>
+  ),
+  growth: (
+    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M5 20c3-6 5-9 7-9s3 2 7 9" />
+      <path d="M12 11V4" />
+      <path d="M10 6l2-2 2 2" />
+    </svg>
+  ),
+  recreation: (
+    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M5 19l7-14 7 14H5z" />
+      <path d="M9 15h6" />
+    </svg>
+  ),
+  default: (
+    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 8v8" />
+      <path d="M8 12h8" />
+    </svg>
+  )
+};
+
 function resolveAreaKey(title: string) {
   const lower = title.toLowerCase();
   if (lower.includes('career') || lower.includes('job') || lower.includes('work')) return 'career';
@@ -97,11 +147,85 @@ function resolveAreaKey(title: string) {
   return 'default';
 }
 
+function getTaskIcon(label: string) {
+  const lowerLabel = label.toLowerCase();
+  const isWorkout = lowerLabel.includes('workout') || lowerLabel.includes('exercise');
+  const isShave = lowerLabel.includes('shave');
+  const isLaundry = lowerLabel.includes('laundry');
+  const isGroceries = lowerLabel.includes('groceries') || lowerLabel.includes('grocery');
+  const isHaircut = lowerLabel.includes('haircut');
+  const isSkincare = lowerLabel.includes('skincare') || lowerLabel.includes('skin care');
+  const isCallDad = lowerLabel.includes('call dad');
+  const isCallMom = lowerLabel.includes('call mom');
+  
+  if (isWorkout) return (
+     <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M6 5v14" /><path d="M18 5v14" />
+        <path d="M2 7h4" /><path d="M2 17h4" />
+        <path d="M18 7h4" /><path d="M18 17h4" />
+        <path d="M6 12h12" />
+     </svg>
+  );
+  if (isShave) return (
+     <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+       <circle cx="6" cy="6" r="3" />
+       <path d="M8 12h8" />
+       <path d="M10 16h4" />
+       <path d="M11 20h2" />
+       <path d="M12 12v8" />
+       <path d="M17 5L15 9" />
+       <path d="M19 8l-2 4" />
+     </svg>
+  );
+  if (isLaundry) return (
+     <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+       <polyline points="7 10 12 15 17 10" />
+       <line x1="12" y1="15" x2="12" y2="3" />
+     </svg>
+  );
+  if (isGroceries) return (
+     <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+       <circle cx="9" cy="21" r="1" />
+       <circle cx="20" cy="21" r="1" />
+       <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+     </svg>
+  );
+  if (isHaircut) return (
+     <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+       <circle cx="6" cy="6" r="3"/>
+       <circle cx="6" cy="18" r="3"/>
+       <line x1="20" y1="4" x2="8.12" y2="15.88"/>
+       <line x1="14.47" y1="14.48" x2="20" y2="20"/>
+       <line x1="8.12" y1="8.12" x2="12" y2="12"/>
+     </svg>
+  );
+  if (isSkincare) return (
+     <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+       <path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z" />
+     </svg>
+  );
+  if (isCallMom || isCallDad) return (
+     <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+       <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+     </svg>
+  );
+  return (
+     <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+       <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+       <line x1="16" y1="2" x2="16" y2="6" />
+       <line x1="8" y1="2" x2="8" y2="6" />
+       <line x1="3" y1="10" x2="21" y2="10" />
+     </svg>
+  );
+}
+
 // ─── Sortable Row ────────────────────────────────────────────────────────────
 
 function SortablePlannerRow({
   entry,
   linkedTask,
+  areaKey,
   areaLabel,
   areaBadge,
   onToggle,
@@ -110,12 +234,14 @@ function SortablePlannerRow({
 }: {
   entry: PlannerEntry;
   linkedTask: Task | null;
+  areaKey: string;
   areaLabel: string;
   areaBadge: string;
   onToggle: () => void;
   onRemove: () => void;
   onNavigate: () => void;
 }) {
+  const isCalendarOnly = linkedTask?.calendarOnly === true;
   const {
     attributes,
     listeners,
@@ -177,14 +303,15 @@ function SortablePlannerRow({
 
       {/* Label + area badge */}
       <div
-        className="flex-1 min-w-0 cursor-pointer"
+        className="flex-1 min-w-0 flex items-center gap-2 cursor-pointer"
         onClick={onNavigate}
       >
         <span
-          className={`text-[13px] leading-snug block truncate transition-all ${entry.completed
-            ? 'text-slate-500 line-through'
-            : 'text-slate-100'
-            }`}
+          className={`leading-snug block truncate transition-all text-[13px] ${
+            entry.completed
+              ? 'text-slate-500 line-through'
+              : 'text-slate-100'
+          }`}
         >
           {entry.label}
         </span>
@@ -192,8 +319,11 @@ function SortablePlannerRow({
 
       {/* Area badge */}
       {areaLabel && areaLabel !== 'Task' && (
-        <span className={`flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded-md ${areaBadge}`}>
-          {areaLabel}
+        <span 
+          className={`flex-shrink-0 flex items-center justify-center p-1.5 rounded-md ${areaBadge}`}
+          title={areaLabel}
+        >
+          {AREA_ICONS[areaKey] || AREA_ICONS.default}
         </span>
       )}
 
@@ -435,6 +565,18 @@ export function PlannerCard({ tasks, navigateTo, selectTask, createTask }: Plann
 
   // ─── Render ──────────────────────────────────────────────────────────────
 
+  const routineEntries: PlannerEntry[] = [];
+  const standardEntries: PlannerEntry[] = [];
+
+  entries.forEach(e => {
+    const linkedTask = e.taskId ? tasks.find(t => t.id === e.taskId) : null;
+    if (linkedTask && (linkedTask.calendarOnly || linkedTask.recurrence)) {
+      routineEntries.push(e);
+    } else {
+      standardEntries.push(e);
+    }
+  });
+
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
       {/* Header */}
@@ -508,8 +650,8 @@ export function PlannerCard({ tasks, navigateTo, selectTask, createTask }: Plann
                     </svg>
                     <span className="truncate flex-1">{task.title}</span>
                     {areaLabel && (
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded ${areaBadge}`}>
-                        {areaLabel}
+                      <span className={`flex-shrink-0 p-1 rounded ${areaBadge}`} title={areaLabel}>
+                        {AREA_ICONS[areaKey] || AREA_ICONS.default}
                       </span>
                     )}
                   </button>
@@ -541,12 +683,33 @@ export function PlannerCard({ tasks, navigateTo, selectTask, createTask }: Plann
           )}
         </div>
       </div>
+      
+      {/* Routine/Calendar Tasks (Chips) */}
+      {routineEntries.length > 0 && (
+        <div className="px-5 pb-3 flex flex-wrap gap-2">
+          {routineEntries.map(entry => (
+            <button
+              key={entry.id}
+              onClick={() => removeEntry(entry.id)}
+              title="Click to dismiss"
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-700/60 transition-colors cursor-pointer group hover:bg-emerald-500/20 hover:border-emerald-500/30 bg-slate-800/40 ${entry.completed ? 'opacity-40' : ''}`}
+            >
+              <span className="text-slate-400 group-hover:text-emerald-400 transition-colors">
+                 {getTaskIcon(entry.label)}
+              </span>
+              <span className="text-[11px] font-medium text-slate-300 group-hover:text-emerald-300 transition-colors">
+                {entry.label}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
 
-      {/* Task List */}
-      {entries.length === 0 ? (
+      {/* Standard Task List */}
+      {standardEntries.length === 0 ? (
         <div className="px-5 pb-5 pt-1">
           <p className="text-[13px] text-slate-600">
-            Add tasks to start planning your day.
+            {routineEntries.length > 0 ? "Add standard tasks for your day." : "Add tasks to start planning your day."}
           </p>
         </div>
       ) : (
@@ -556,11 +719,11 @@ export function PlannerCard({ tasks, navigateTo, selectTask, createTask }: Plann
           onDragEnd={handleDragEnd}
         >
           <SortableContext
-            items={entries.map(e => e.id)}
+            items={standardEntries.map(e => e.id)}
             strategy={verticalListSortingStrategy}
           >
             <div className="border-t border-slate-800/60">
-              {entries.map(entry => {
+              {standardEntries.map(entry => {
                 const linkedTask = entry.taskId
                   ? tasks.find(t => t.id === entry.taskId) || null
                   : null;
@@ -575,6 +738,7 @@ export function PlannerCard({ tasks, navigateTo, selectTask, createTask }: Plann
                     key={entry.id}
                     entry={entry}
                     linkedTask={linkedTask}
+                    areaKey={areaKey}
                     areaLabel={areaLabel}
                     areaBadge={areaBadge}
                     onToggle={() => toggleEntry(entry.id)}

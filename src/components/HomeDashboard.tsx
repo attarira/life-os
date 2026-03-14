@@ -614,6 +614,18 @@ export function HomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDraw
         <FileSystemDrawer isOpen={isFilesDrawerOpen} setIsOpen={setIsFilesDrawerOpen} />
 
         <div className={`max-w-[1600px] mx-auto p-6 ${leftPad} ${rightPad}`}>
+          {/* Greeting */}
+          <div className="mb-6">
+            <h1 className="text-xl font-semibold text-white tracking-tight">
+              {(() => {
+                const hour = new Date().getHours();
+                if (hour < 12) return 'Good morning, Rayaan';
+                if (hour < 17) return 'Good afternoon, Rayaan';
+                return 'Good evening, Rayaan';
+              })()}
+            </h1>
+          </div>
+
           {/* ─── Two-Panel Layout ─── */}
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-8">
             {/* ─── LEFT: Focus Areas ─── */}
@@ -638,8 +650,6 @@ export function HomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDraw
                   <span className="text-xs font-medium text-emerald-500/70 uppercase tracking-wider mt-1">Completed</span>
                 </div>
               </div>
-
-              <h2 className="text-[15px] font-semibold text-white tracking-tight">Focus Areas</h2>
               <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
                 <SortableContext items={lifeAreas.map(area => area.id)} strategy={rectSortingStrategy}>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -681,7 +691,6 @@ export function HomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDraw
 
             {/* ─── RIGHT: Planner & Upcoming ─── */}
             <div className="space-y-5 lg:sticky lg:top-0 lg:self-start">
-              <h2 className="text-[15px] font-semibold text-white tracking-tight">Planner &amp; Upcoming</h2>
 
               {/* Planner */}
               <PlannerCard

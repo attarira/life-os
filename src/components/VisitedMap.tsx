@@ -14,7 +14,7 @@ interface VisitedMapProps {
 
 const mapConfig = {
   world: {
-    geoUrl: '/maps/world-110m.json',
+    geoUrl: '/maps/world-50m.json',
     title: 'Countries visited',
     getRegionName: (geo: any) => geo.properties.name,
     projection: 'geoMercator',

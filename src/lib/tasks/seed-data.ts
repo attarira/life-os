@@ -52,5 +52,71 @@ export function createSeedTasks(): Task[] {
   // Finances
   addTask('f1', 'finances', 'Budget Review', 'ON_HOLD', 0, 'HIGH');
 
+  // Routine Calendar tasks
+  tasks.push({
+    id: 'health-workout',
+    parentId: 'health',
+    title: 'Workout',
+    status: 'NOT_STARTED',
+    priority: 'MEDIUM',
+    createdAt: now,
+    updatedAt: now,
+    order: 2,
+    calendarOnly: true,
+    recurrence: { rule: 'mwf' },
+  });
+
+  tasks.push({
+    id: 'health-shave',
+    parentId: 'health',
+    title: 'Shave',
+    status: 'NOT_STARTED',
+    priority: 'MEDIUM',
+    createdAt: now,
+    updatedAt: now,
+    order: 3,
+    calendarOnly: true,
+    recurrence: { rule: 'custom', daysOfWeek: [1, 4] }, // Mon, Thu
+  });
+
+  tasks.push({
+    id: 'health-haircut',
+    parentId: 'health',
+    title: 'Haircut',
+    status: 'NOT_STARTED',
+    priority: 'MEDIUM',
+    createdAt: now,
+    updatedAt: now,
+    order: 4,
+    calendarOnly: true,
+    // Provide a dummy recurrence here or just rely on manual creation for haircut, but we will test calendar-only ui
+  });
+
+  tasks.push({
+    id: 'home-laundry',
+    parentId: ROOT_TASK_ID, // Use root for generic routines without specific areas, or recreation
+    title: 'Laundry',
+    status: 'NOT_STARTED',
+    priority: 'MEDIUM',
+    createdAt: now,
+    updatedAt: now,
+    order: 5,
+    calendarOnly: true,
+    recurrence: { rule: 'custom', daysOfWeek: [6] }, // Saturday
+  });
+
+  tasks.push({
+    id: 'home-groceries',
+    parentId: ROOT_TASK_ID,
+    title: 'Groceries',
+    status: 'NOT_STARTED',
+    priority: 'MEDIUM',
+    createdAt: now,
+    updatedAt: now,
+    order: 6,
+    calendarOnly: true,
+    recurrence: { rule: 'custom', daysOfWeek: [0] }, // Sunday
+  });
+
   return tasks;
 }

@@ -79,7 +79,21 @@ export function TaskProvider({ children }: TaskProviderProps) {
           await taskStore.importTasks(seedTasks);
           await taskStore.setInitialized();
         }
-        const allTasks = await taskStore.getAllTasks();
+        
+        let allTasks = await taskStore.getAllTasks();
+        
+        // Auto-inject missing generic routine tasks for existing test setups
+        if (initialized) {
+          const hasRoutines = allTasks.some(t => t.calendarOnly && t.recurrence);
+          if (!hasRoutines) {
+             const rt = createSeedTasks().filter(t => t.calendarOnly);
+             for (const r of rt) {
+                 await taskStore.createTask(r);
+             }
+             allTasks = await taskStore.getAllTasks();
+          }
+        }
+        
         setTasks(allTasks);
       } catch (error) {
         console.error('Failed to initialize tasks:', error);
