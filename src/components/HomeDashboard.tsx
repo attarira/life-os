@@ -22,6 +22,7 @@ import { PlannerCard } from './PlannerCard';
 import { GlobalTray } from './GlobalTray';
 import { FileSystemDrawer } from './FileSystemDrawer';
 import { TaskStatusRing } from './TaskStatusRing';
+import { HierarchyModal } from './HierarchyModal';
 
 type DragHandleProps = {
   ref: (el: HTMLElement | null) => void;
@@ -126,6 +127,7 @@ function LifeAreaCard({
   calloutTaskData,
   onOpen,
   onEdit,
+  onHierarchy,
   onCalloutClick,
   cardRef,
   style,
@@ -145,6 +147,7 @@ function LifeAreaCard({
   calloutTaskData?: Task | null;
   onOpen: () => void;
   onEdit?: () => void;
+  onHierarchy?: () => void;
   onCalloutClick?: (task: Task) => void;
   cardRef?: (node: HTMLElement | null) => void;
   style?: React.CSSProperties;
@@ -195,16 +198,31 @@ function LifeAreaCard({
             </span>
           )}
         </div>
-        {onEdit && (
-          <button
-            onClick={(e) => { e.stopPropagation(); onEdit(); }}
-            className={`flex-shrink-0 h-7 w-7 rounded-lg grid place-items-center transition-colors ${grad.titleColor ? 'text-slate-400 hover:text-slate-600 hover:bg-slate-200/50' : 'text-white/30 hover:text-white/70 hover:bg-white/10'}`}
-          >
-            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" fill="none">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-            </svg>
-          </button>
-        )}
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {onHierarchy && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onHierarchy(); }}
+              className={`flex-shrink-0 h-7 w-7 rounded-lg grid place-items-center transition-colors ${grad.titleColor ? 'text-slate-400 hover:text-slate-600 hover:bg-slate-200/50' : 'text-white/30 hover:text-white/70 hover:bg-white/10'}`}
+              title="View Hierarchy"
+            >
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                <line x1="9" y1="3" x2="9" y2="21" />
+              </svg>
+            </button>
+          )}
+          {onEdit && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onEdit(); }}
+              className={`flex-shrink-0 h-7 w-7 rounded-lg grid place-items-center transition-colors ${grad.titleColor ? 'text-slate-400 hover:text-slate-600 hover:bg-slate-200/50' : 'text-white/30 hover:text-white/70 hover:bg-white/10'}`}
+              title="Edit Area"
+            >
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+              </svg>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Middle: highlight tasks */}
@@ -296,12 +314,14 @@ function SortableLifeAreaCard({
   snapshot,
   onOpen,
   onEdit,
+  onHierarchy,
   isActive,
   onCalloutClick,
 }: {
   snapshot: AreaSnapshot;
   onOpen: () => void;
   onEdit: () => void;
+  onHierarchy: () => void;
   isActive: boolean;
   onCalloutClick?: (task: Task) => void;
 }) {
@@ -335,6 +355,7 @@ function SortableLifeAreaCard({
       calloutTaskData={snapshot.calloutTaskData}
       onOpen={onOpen}
       onEdit={onEdit}
+      onHierarchy={onHierarchy}
       onCalloutClick={onCalloutClick}
       isActive={isActive}
       cardRef={setNodeRef}
@@ -353,6 +374,7 @@ export function HomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDraw
   const [activeId, setActiveId] = useState<string | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingArea, setEditingArea] = useState<Task | null>(null);
+  const [hierarchyArea, setHierarchyArea] = useState<Task | null>(null);
   const [editorTitle, setEditorTitle] = useState('');
   const [editorDescription, setEditorDescription] = useState('');
 
@@ -659,6 +681,7 @@ export function HomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDraw
                         snapshot={snapshot}
                         onOpen={() => navigateTo(snapshot.area.id)}
                         onEdit={() => openEditor(snapshot.area)}
+                        onHierarchy={() => setHierarchyArea(snapshot.area)}
                         isActive={primaryAreaId === snapshot.area.id}
                         onCalloutClick={(task) => {
                           const event = new CustomEvent('lifeos:planner-add', { detail: { task } });
@@ -698,6 +721,7 @@ export function HomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDraw
                 navigateTo={navigateTo}
                 selectTask={selectTask}
                 createTask={createTask}
+                updateTask={updateTask}
               />
 
               {/* Upcoming */}
@@ -821,6 +845,13 @@ export function HomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDraw
 
 
 
+          {hierarchyArea && (
+            <HierarchyModal
+              area={hierarchyArea}
+              tasks={tasks}
+              onClose={() => setHierarchyArea(null)}
+            />
+          )}
         </div>
       </main>
     </div>

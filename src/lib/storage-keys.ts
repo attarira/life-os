@@ -3,6 +3,7 @@ export const LAST_BACKUP_KEY = 'lifeos:lastBackupDate';
 export const DASHBOARD_PAGES_STORAGE_KEY = 'lifeos:dashboard-pages:v1'; // Legacy
 export const PLANNER_ITEMS_STORAGE_KEY = 'lifeos:planner-items:v1';
 export const PLANNER_DATE_STORAGE_KEY = 'lifeos:planner-date:v1';
+export const PLANNER_DISMISSED_STORAGE_KEY = 'lifeos:planner-dismissed:v1';
 export const NOTIFICATIONS_STORAGE_KEY = 'lifeos:notifications:v1';
 export const LAST_DAILY_SUMMARY_KEY = 'lifeos:lastDailySummaryDate';
 export const LAST_WEEKLY_SUMMARY_KEY = 'lifeos:lastWeeklySummaryWeek';

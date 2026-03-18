@@ -5,6 +5,7 @@ import { storage, generateId } from '@/lib/utils';
 import { DASHBOARD_PAGES_STORAGE_KEY, FILE_SYSTEM_STORAGE_KEY } from '@/lib/storage-keys';
 
 export type FileNodeType = 'file' | 'folder';
+export type FolderMode = 'edit' | 'read-only';
 
 export interface FileSystemNode {
   id: string;
@@ -14,6 +15,7 @@ export interface FileSystemNode {
   createdAt: string;
   updatedAt: string;
   content?: string; // only for files
+  folderMode?: FolderMode; // only for folders — inherited by children
 }
 
 export const ROOT_FOLDER_ID = 'root';
@@ -21,14 +23,15 @@ export const ROOT_FOLDER_ID = 'root';
 interface FileSystemContextValue {
   nodes: FileSystemNode[];
   isLoading: boolean;
-  createFolder: (name: string, parentId?: string | null) => void;
-  createFile: (name: string, content?: string, parentId?: string | null) => void;
+  createFolder: (name: string, parentId?: string | null, folderMode?: FolderMode) => string;
+  createFile: (name: string, content?: string, parentId?: string | null) => string;
   renameNode: (id: string, newName: string) => void;
   updateFileContent: (id: string, content: string) => void;
   deleteNode: (id: string) => void;
   getFolderChildren: (folderId: string | null) => FileSystemNode[];
   getNode: (id: string | null) => FileSystemNode | null;
   getBreadcrumbs: (id: string | null) => FileSystemNode[];
+  getEffectiveMode: (nodeId: string | null) => FolderMode;
 }
 
 const FileSystemContext = createContext<FileSystemContextValue | null>(null);
@@ -55,18 +58,28 @@ export function FileSystemProvider({ children }: { children: ReactNode }) {
       const now = new Date().toISOString();
       const initialNodes: FileSystemNode[] = [];
 
-      // Create Root 'Notes' Folder if there are existing notes, or just to have it
+      // Seed folders with default modes
+      const seedFolders: { name: string; mode: FolderMode }[] = [
+        { name: 'Notes', mode: 'edit' },
+        { name: 'Prompt Library', mode: 'read-only' },
+        { name: 'Read-Only', mode: 'read-only' },
+        { name: 'Recipes', mode: 'read-only' },
+      ];
+
       const notesFolderId = generateId();
-      initialNodes.push({
-        id: notesFolderId,
-        name: 'Notes',
-        type: 'folder',
-        parentId: null,
-        createdAt: now,
-        updatedAt: now,
+      seedFolders.forEach((sf, idx) => {
+        initialNodes.push({
+          id: idx === 0 ? notesFolderId : generateId(),
+          name: sf.name,
+          type: 'folder',
+          parentId: null,
+          createdAt: now,
+          updatedAt: now,
+          folderMode: sf.mode,
+        });
       });
 
-      // Migrate existing notes into this folder
+      // Migrate existing notes into the Notes folder
       if (Array.isArray(existingNotes) && existingNotes.length > 0) {
         existingNotes.forEach(note => {
           if (note && note.id) {
@@ -85,6 +98,53 @@ export function FileSystemProvider({ children }: { children: ReactNode }) {
 
       savedNodes = initialNodes;
       storage.set(FILE_SYSTEM_STORAGE_KEY, savedNodes);
+    } else {
+      // Migration v2: ensure existing folders have folderMode set
+      let migrated = false;
+      const MODE_DEFAULTS: Record<string, FolderMode> = {
+        'notes': 'edit',
+        'prompt library': 'read-only',
+        'read-only': 'read-only',
+        'recipes': 'read-only',
+      };
+      savedNodes = savedNodes.map(n => {
+        let newMode = n.folderMode as any;
+        if (newMode === 'copy' || newMode === 'view') {
+           newMode = 'read-only';
+           migrated = true;
+        }
+
+        if (n.type === 'folder' && !newMode) {
+          const defaultMode = MODE_DEFAULTS[n.name.toLowerCase()];
+          if (defaultMode) {
+            migrated = true;
+            return { ...n, folderMode: defaultMode };
+          }
+        }
+        
+        if (newMode && newMode !== n.folderMode) {
+          return { ...n, folderMode: newMode };
+        }
+        return n;
+      });
+      // Also ensure the four seed folders exist
+      const existingNames = new Set(savedNodes.filter(n => n.type === 'folder' && n.parentId === null).map(n => n.name.toLowerCase()));
+      const now = new Date().toISOString();
+      for (const [name, mode] of Object.entries(MODE_DEFAULTS)) {
+        if (!existingNames.has(name)) {
+          savedNodes.push({
+            id: generateId(),
+            name: name.split(' ').map(w => w[0].toUpperCase() + w.slice(1)).join(' '),
+            type: 'folder',
+            parentId: null,
+            createdAt: now,
+            updatedAt: now,
+            folderMode: mode,
+          });
+          migrated = true;
+        }
+      }
+      if (migrated) storage.set(FILE_SYSTEM_STORAGE_KEY, savedNodes);
     }
 
     setNodes(savedNodes);
@@ -98,27 +158,31 @@ export function FileSystemProvider({ children }: { children: ReactNode }) {
     }
   }, [nodes, isLoading]);
 
-  const createFolder = useCallback((name: string, parentId: string | null = null) => {
+  const createFolder = useCallback((name: string, parentId: string | null = null, folderMode: FolderMode = 'edit') => {
+    const id = generateId();
     const now = new Date().toISOString();
     setNodes(prev => [
       ...prev,
       {
-        id: generateId(),
+        id,
         name: name.trim() || 'New Folder',
         type: 'folder',
         parentId,
         createdAt: now,
         updatedAt: now,
+        folderMode,
       }
     ]);
+    return id;
   }, []);
 
   const createFile = useCallback((name: string, content: string = '', parentId: string | null = null) => {
+    const id = generateId();
     const now = new Date().toISOString();
     setNodes(prev => [
       ...prev,
       {
-        id: generateId(),
+        id,
         name: name.trim() || 'Untitled Document',
         type: 'file',
         parentId,
@@ -127,6 +191,7 @@ export function FileSystemProvider({ children }: { children: ReactNode }) {
         content,
       }
     ]);
+    return id;
   }, []);
 
   const renameNode = useCallback((id: string, newName: string) => {
@@ -186,6 +251,17 @@ export function FileSystemProvider({ children }: { children: ReactNode }) {
     return breadcrumbs;
   }, [getNode]);
 
+  /** Walk up the parent chain to find the nearest folderMode; default to 'edit' */
+  const getEffectiveMode = useCallback((nodeId: string | null): FolderMode => {
+    if (!nodeId) return 'edit';
+    let current = nodes.find(n => n.id === nodeId) || null;
+    while (current) {
+      if (current.type === 'folder' && current.folderMode) return current.folderMode;
+      current = current.parentId ? nodes.find(n => n.id === current!.parentId) || null : null;
+    }
+    return 'edit';
+  }, [nodes]);
+
   const value = useMemo(() => ({
     nodes,
     isLoading,
@@ -197,7 +273,8 @@ export function FileSystemProvider({ children }: { children: ReactNode }) {
     getFolderChildren,
     getNode,
     getBreadcrumbs,
-  }), [nodes, isLoading, createFolder, createFile, renameNode, updateFileContent, deleteNode, getFolderChildren, getNode, getBreadcrumbs]);
+    getEffectiveMode,
+  }), [nodes, isLoading, createFolder, createFile, renameNode, updateFileContent, deleteNode, getFolderChildren, getNode, getBreadcrumbs, getEffectiveMode]);
 
   return (
     <FileSystemContext.Provider value={value}>

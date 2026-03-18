@@ -17,8 +17,8 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Task, ROOT_TASK_ID, TaskRecurrence } from '@/lib/types';
-import { PLANNER_ITEMS_STORAGE_KEY, PLANNER_DATE_STORAGE_KEY } from '@/lib/storage-keys';
+import { Task, ROOT_TASK_ID, TaskRecurrence, UpdateTaskInput } from '@/lib/types';
+import { PLANNER_ITEMS_STORAGE_KEY, PLANNER_DATE_STORAGE_KEY, PLANNER_DISMISSED_STORAGE_KEY } from '@/lib/storage-keys';
 import { getTaskPath } from '@/lib/tasks';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -35,6 +35,7 @@ type PlannerCardProps = {
   navigateTo: (id: string) => void;
   selectTask: (id: string | null) => void;
   createTask: (input: any) => Promise<Task>;
+  updateTask: (id: string, updates: UpdateTaskInput) => Promise<Task>;
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -58,6 +59,22 @@ function loadPlannerEntries(): PlannerEntry[] {
 function savePlannerEntries(entries: PlannerEntry[]) {
   try {
     localStorage.setItem(PLANNER_ITEMS_STORAGE_KEY, JSON.stringify(entries));
+  } catch { }
+}
+
+function loadDismissedIds(): Set<string> {
+  if (typeof window === 'undefined') return new Set();
+  try {
+    const raw = localStorage.getItem(PLANNER_DISMISSED_STORAGE_KEY);
+    return raw ? new Set(JSON.parse(raw)) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+function saveDismissedIds(ids: Set<string>) {
+  try {
+    localStorage.setItem(PLANNER_DISMISSED_STORAGE_KEY, JSON.stringify([...ids]));
   } catch { }
 }
 
@@ -220,6 +237,132 @@ function getTaskIcon(label: string) {
   );
 }
 
+// ─── Recurrence Day Editor ───────────────────────────────────────────────────
+
+const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+/** Convert any recurrence rule to its corresponding day-of-week numbers */
+function recurrenceToDays(rec?: TaskRecurrence): number[] {
+  if (!rec) return [];
+  switch (rec.rule) {
+    case 'daily': return [0, 1, 2, 3, 4, 5, 6];
+    case 'weekdays': return [1, 2, 3, 4, 5];
+    case 'weekends': return [0, 6];
+    case 'mwf': return [1, 3, 5];
+    case 'tth': return [2, 4];
+    case 'custom': return rec.daysOfWeek ?? [];
+  }
+  return [];
+}
+
+function RecurrenceEditor({
+  task,
+  anchorRect,
+  onSave,
+  onClose,
+}: {
+  task: Task;
+  anchorRect: DOMRect;
+  onSave: (recurrence: TaskRecurrence) => void;
+  onClose: () => void;
+}) {
+  const [selectedDays, setSelectedDays] = useState<number[]>(() => recurrenceToDays(task.recurrence));
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // Close on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [onClose]);
+
+  // Close on Escape
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [onClose]);
+
+  const toggleDay = (day: number) => {
+    setSelectedDays(prev =>
+      prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day].sort()
+    );
+  };
+
+  const handleSave = () => {
+    const rec: TaskRecurrence = { rule: 'custom', daysOfWeek: selectedDays };
+    onSave(rec);
+  };
+
+  // Position below the anchor chip
+  const style: React.CSSProperties = {
+    position: 'fixed',
+    top: anchorRect.bottom + 6,
+    left: Math.max(8, Math.min(anchorRect.left, window.innerWidth - 280)),
+    zIndex: 50,
+    width: 264,
+  };
+
+  return (
+    <div ref={panelRef} style={style} className="rounded-xl border border-slate-700/80 bg-slate-900 shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+      {/* Header */}
+      <div className="px-3.5 pt-3 pb-2 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-slate-400">{getTaskIcon(task.title)}</span>
+          <span className="text-[13px] font-medium text-slate-200 truncate">{task.title}</span>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="p-1 rounded-md text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-colors"
+        >
+          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Day toggles */}
+      <div className="px-3.5 pb-2.5">
+        <div className="flex gap-1">
+          {DAY_LABELS.map((dayLabel, idx) => (
+            <button
+              key={idx}
+              type="button"
+              onClick={() => toggleDay(idx)}
+              className={`flex-1 py-1.5 rounded-md text-[10px] font-semibold tracking-wide transition-all ${
+                selectedDays.includes(idx)
+                  ? 'bg-blue-500/25 text-blue-300 border border-blue-500/40'
+                  : 'bg-slate-800/60 text-slate-500 border border-slate-700/40 hover:text-slate-400 hover:border-slate-600'
+              }`}
+            >
+              {dayLabel}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Save */}
+      <div className="px-3.5 pb-3">
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={selectedDays.length === 0}
+          className="w-full py-1.5 rounded-lg text-[12px] font-medium bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          Save
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Sortable Row ────────────────────────────────────────────────────────────
 
 function SortablePlannerRow({
@@ -361,12 +504,13 @@ function PlannerRowPreview({ entry }: { entry: PlannerEntry }) {
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 
-export function PlannerCard({ tasks, navigateTo, selectTask, createTask }: PlannerCardProps) {
+export function PlannerCard({ tasks, navigateTo, selectTask, createTask, updateTask }: PlannerCardProps) {
   const [entries, setEntries] = useState<PlannerEntry[]>(() => loadPlannerEntries());
   const [draft, setDraft] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const [highlightIndex, setHighlightIndex] = useState(-1);
   const [dragId, setDragId] = useState<string | null>(null);
+  const [editingRecurrence, setEditingRecurrence] = useState<{ task: Task; rect: DOMRect } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -379,21 +523,24 @@ export function PlannerCard({ tasks, navigateTo, selectTask, createTask }: Plann
     const d = new Date();
     const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     const storedDate = typeof window !== 'undefined' ? localStorage.getItem(PLANNER_DATE_STORAGE_KEY) : todayStr;
+    const dismissed = loadDismissedIds();
 
     setEntries(prev => {
       let next = [...prev];
       let changed = false;
 
-      // Handle daily rollover
+      // Handle daily rollover — clear dismissed set too
       if (storedDate !== todayStr && typeof window !== 'undefined') {
         next = next.filter(e => !e.completed);
         localStorage.setItem(PLANNER_DATE_STORAGE_KEY, todayStr);
+        saveDismissedIds(new Set());
+        dismissed.clear();
         changed = true;
       }
 
       const autoTasks = tasks.filter(t => t.recurrence && matchesToday(t.recurrence));
       autoTasks.forEach(rt => {
-        if (!next.some(e => e.taskId === rt.id)) {
+        if (!next.some(e => e.taskId === rt.id) && !dismissed.has(rt.id)) {
           next.push({ id: buildId(), taskId: rt.id, label: rt.title, completed: false });
           changed = true;
         }
@@ -515,8 +662,20 @@ export function PlannerCard({ tasks, navigateTo, selectTask, createTask }: Plann
   }, []);
 
   const removeEntry = useCallback((entryId: string) => {
-    setEntries(prev => prev.filter(e => e.id !== entryId));
-  }, []);
+    setEntries(prev => {
+      const entry = prev.find(e => e.id === entryId);
+      // If it's a recurring task, remember the dismissal for the rest of the day
+      if (entry?.taskId) {
+        const linkedTask = tasks.find(t => t.id === entry.taskId);
+        if (linkedTask?.recurrence) {
+          const dismissed = loadDismissedIds();
+          dismissed.add(entry.taskId);
+          saveDismissedIds(dismissed);
+        }
+      }
+      return prev.filter(e => e.id !== entryId);
+    });
+  }, [tasks]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'ArrowDown') {
@@ -687,22 +846,62 @@ export function PlannerCard({ tasks, navigateTo, selectTask, createTask }: Plann
       {/* Routine/Calendar Tasks (Chips) */}
       {routineEntries.length > 0 && (
         <div className="px-5 pb-3 flex flex-wrap gap-2">
-          {routineEntries.map(entry => (
-            <button
-              key={entry.id}
-              onClick={() => removeEntry(entry.id)}
-              title="Click to dismiss"
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-700/60 transition-colors cursor-pointer group hover:bg-emerald-500/20 hover:border-emerald-500/30 bg-slate-800/40 ${entry.completed ? 'opacity-40' : ''}`}
-            >
-              <span className="text-slate-400 group-hover:text-emerald-400 transition-colors">
-                 {getTaskIcon(entry.label)}
-              </span>
-              <span className="text-[11px] font-medium text-slate-300 group-hover:text-emerald-300 transition-colors">
-                {entry.label}
-              </span>
-            </button>
-          ))}
+          {routineEntries.map(entry => {
+            const linkedTask = entry.taskId ? tasks.find(t => t.id === entry.taskId) : null;
+            return (
+              <div
+                key={entry.id}
+                className={`group/chip flex items-center rounded-lg border border-slate-700/60 transition-colors bg-slate-800/40 ${entry.completed ? 'opacity-40' : ''}`}
+              >
+                {/* Clickable pill body → opens recurrence editor */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    if (!linkedTask) return;
+                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                    setEditingRecurrence({ task: linkedTask, rect });
+                  }}
+                  title="Edit recurrence"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 cursor-pointer hover:bg-blue-500/15 rounded-l-lg transition-colors"
+                >
+                  <span className="text-slate-400 group-hover/chip:text-blue-400 transition-colors">
+                    {getTaskIcon(entry.label)}
+                  </span>
+                  <span className="text-[11px] font-medium text-slate-300 group-hover/chip:text-blue-200 transition-colors">
+                    {entry.label}
+                  </span>
+                </button>
+                {/* Dismiss (X) button */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeEntry(entry.id);
+                  }}
+                  title="Dismiss"
+                  className="px-1.5 py-1.5 opacity-0 group-hover/chip:opacity-100 text-slate-500 hover:text-red-400 transition-all rounded-r-lg hover:bg-red-500/10"
+                >
+                  <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            );
+          })}
         </div>
+      )}
+
+      {/* Recurrence Editor Popover */}
+      {editingRecurrence && (
+        <RecurrenceEditor
+          task={editingRecurrence.task}
+          anchorRect={editingRecurrence.rect}
+          onClose={() => setEditingRecurrence(null)}
+          onSave={async (rec) => {
+            await updateTask(editingRecurrence.task.id, { recurrence: rec });
+            setEditingRecurrence(null);
+          }}
+        />
       )}
 
       {/* Standard Task List */}
