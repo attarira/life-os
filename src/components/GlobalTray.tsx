@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { ReactNode, useState, useRef, useEffect } from 'react';
 import { useTaskContext } from '@/lib/task-context';
 import { NotificationsTray } from './NotificationsTray';
 import { CurrencyToggle } from './CurrencyToggle';
 import { BackupsPanel } from './BackupsPanel';
+import { ArchiveInlinePanel } from './CompletedArchive';
 
 /**
  * GlobalTray – always visible on every page.
@@ -15,17 +16,23 @@ import { BackupsPanel } from './BackupsPanel';
  *  • Settings gear (consolidated popover with Archives, Backups, Display Currency)
  */
 export function GlobalTray() {
-  const { setSearchOpen, setArchiveOpen, getArchivedTasks } = useTaskContext();
+  const { setSearchOpen, getArchivedTasks } = useTaskContext();
   const archivedCount = getArchivedTasks().length;
 
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [expandedSection, setExpandedSection] = useState<'archive' | 'backups' | 'currency' | null>(null);
   const settingsRef = useRef<HTMLDivElement>(null);
+
+  const closeSettings = () => {
+    setSettingsOpen(false);
+    setExpandedSection(null);
+  };
 
   useEffect(() => {
     if (!settingsOpen) return;
     const handleClickOutside = (e: MouseEvent) => {
       if (settingsRef.current && !settingsRef.current.contains(e.target as Node)) {
-        setSettingsOpen(false);
+        closeSettings();
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -51,7 +58,13 @@ export function GlobalTray() {
       {/* Settings gear */}
       <div className="relative" ref={settingsRef}>
         <button
-          onClick={() => setSettingsOpen(!settingsOpen)}
+          onClick={() => {
+            if (settingsOpen) {
+              closeSettings();
+              return;
+            }
+            setSettingsOpen(true);
+          }}
           className={`p-2 rounded-lg transition-colors ${settingsOpen ? 'text-white bg-slate-800' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
           title="Settings"
           aria-label="Settings"
@@ -66,36 +79,62 @@ export function GlobalTray() {
           <>
             <div
               className="fixed inset-0 z-40"
-              onClick={() => setSettingsOpen(false)}
+              onClick={closeSettings}
             />
-            <div className="absolute right-0 top-full mt-2 w-56 z-50 rounded-xl border border-slate-700/60 bg-slate-900 shadow-2xl overflow-hidden ring-1 ring-white/5">
+            <div className="absolute right-0 top-full mt-2 w-72 z-50 rounded-xl border border-slate-700/60 bg-slate-900 shadow-2xl overflow-hidden ring-1 ring-white/5">
               <div className="px-3 py-2.5 border-b border-slate-800 bg-slate-900/80">
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Settings</span>
               </div>
 
               <div className="p-1.5 space-y-0.5">
-                {/* Archive */}
-                <button
-                  onClick={() => {
-                    setArchiveOpen(true);
-                    setSettingsOpen(false);
-                  }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
-                >
-                  <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-                  </svg>
-                  <span>Archive</span>
-                  {archivedCount > 0 && (
-                    <span className="ml-auto text-[10px] font-semibold bg-slate-800 text-slate-400 rounded-full px-1.5 py-0.5 tabular-nums">{archivedCount}</span>
+                <SettingsExpandableRow
+                  label="Archive"
+                  isExpanded={expandedSection === 'archive'}
+                  onToggle={() => setExpandedSection(current => current === 'archive' ? null : 'archive')}
+                  badge={archivedCount > 0 ? (
+                    <span className="text-[10px] font-semibold bg-slate-800 text-slate-400 rounded-full px-1.5 py-0.5 tabular-nums">
+                      {archivedCount}
+                    </span>
+                  ) : null}
+                  icon={(
+                    <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                    </svg>
                   )}
-                </button>
+                >
+                  <ArchiveInlinePanel onNavigate={closeSettings} />
+                </SettingsExpandableRow>
 
-                {/* Backups – renders its own popover, we wrap it to fit menu style */}
-                <SettingsBackupsRow onClose={() => setSettingsOpen(false)} />
+                <SettingsExpandableRow
+                  label="Backups"
+                  isExpanded={expandedSection === 'backups'}
+                  onToggle={() => setExpandedSection(current => current === 'backups' ? null : 'backups')}
+                  icon={(
+                    <svg className="w-4 h-4 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  )}
+                >
+                  <div className="px-1.5 pb-1">
+                    <BackupsPanel inline />
+                  </div>
+                </SettingsExpandableRow>
 
-                {/* Currency – renders inline in the menu */}
-                <SettingsCurrencyRow />
+                <SettingsExpandableRow
+                  label="Display Currency"
+                  isExpanded={expandedSection === 'currency'}
+                  onToggle={() => setExpandedSection(current => current === 'currency' ? null : 'currency')}
+                  icon={(
+                    <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.8">
+                      <circle cx="12" cy="12" r="8" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 7v10M9 9.5c.5-.5 1.5-1 3-1s2.5.5 3 1.5-1 2-3 2-2.5.5-3 1.5 1 1.5 3 1.5 2.5-.5 3-1" />
+                    </svg>
+                  )}
+                >
+                  <div className="px-1 pb-1">
+                    <CurrencyToggle inline />
+                  </div>
+                </SettingsExpandableRow>
               </div>
             </div>
           </>
@@ -105,73 +144,40 @@ export function GlobalTray() {
   );
 }
 
-/**
- * Renders backups as a settings menu row that opens the BackupsPanel.
- */
-function SettingsBackupsRow({ onClose }: { onClose: () => void }) {
-  const [showBackups, setShowBackups] = useState(false);
-
+function SettingsExpandableRow({
+  label,
+  icon,
+  badge,
+  isExpanded,
+  onToggle,
+  children,
+}: {
+  label: string;
+  icon: ReactNode;
+  badge?: ReactNode;
+  isExpanded: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
   return (
-    <div className="relative">
+    <div>
       <button
-        onClick={() => setShowBackups(!showBackups)}
+        onClick={onToggle}
         className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
       >
-        <svg className="w-4 h-4 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-        <span>Backups</span>
-        <svg className={`w-3.5 h-3.5 ml-auto text-slate-500 transition-transform ${showBackups ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-        </svg>
-      </button>
-
-      {showBackups && (
-        <div className="mt-1">
-          <BackupsInlinePanel />
+        {icon}
+        <span>{label}</span>
+        <div className="ml-auto flex items-center gap-2">
+          {badge}
+          <svg className={`w-3.5 h-3.5 text-slate-500 transition-transform ${isExpanded ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
         </div>
-      )}
-    </div>
-  );
-}
-
-/**
- * Inline backup list embedded in the settings dropdown.
- */
-function BackupsInlinePanel() {
-  // We reuse BackupsPanel's logic by just embedding it
-  return (
-    <div className="px-1.5 pb-1">
-      <BackupsPanel inline />
-    </div>
-  );
-}
-
-/**
- * Currency selector row in the settings menu.
- */
-function SettingsCurrencyRow() {
-  const [expanded, setExpanded] = useState(false);
-
-  return (
-    <div className="relative">
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
-      >
-        <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.8">
-          <circle cx="12" cy="12" r="8" />
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 7v10M9 9.5c.5-.5 1.5-1 3-1s2.5.5 3 1.5-1 2-3 2-2.5.5-3 1.5 1 1.5 3 1.5 2.5-.5 3-1" />
-        </svg>
-        <span>Display Currency</span>
-        <svg className={`w-3.5 h-3.5 ml-auto text-slate-500 transition-transform ${expanded ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-        </svg>
       </button>
 
-      {expanded && (
-        <div className="px-1 pb-1">
-          <CurrencyToggle inline />
+      {isExpanded && (
+        <div className="mt-1">
+          {children}
         </div>
       )}
     </div>

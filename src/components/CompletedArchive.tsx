@@ -4,6 +4,77 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useTaskContext } from '@/lib/task-context';
 import { getTaskPath, formatBreadcrumb, getCompletedAgoText } from '@/lib/tasks';
 
+export function ArchiveInlinePanel({ onNavigate }: { onNavigate?: () => void }) {
+  const { tasks, navigateTo, getArchivedTasks } = useTaskContext();
+  const [searchQuery, setSearchQuery] = useState('');
+  const archivedTasks = getArchivedTasks();
+
+  const filteredTasks = searchQuery.trim()
+    ? archivedTasks.filter(task =>
+      task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (task.description && task.description.toLowerCase().includes(searchQuery.toLowerCase()))
+    )
+    : archivedTasks;
+
+  const handleNavigate = (taskId: string) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    navigateTo(task.parentId);
+    onNavigate?.();
+  };
+
+  return (
+    <div className="rounded-lg bg-slate-800/50 overflow-hidden">
+      <div className="p-2 border-b border-slate-700/60">
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search archived tasks..."
+          className="w-full px-3 py-2 rounded-lg border border-slate-700 bg-slate-900 text-[12px] text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-600"
+        />
+      </div>
+
+      <div className="max-h-56 overflow-y-auto p-2">
+        {filteredTasks.length === 0 ? (
+          <p className="py-6 text-center text-[11px] text-slate-500">
+            {searchQuery ? 'No matching archived tasks' : 'No archived tasks (older than 7 days)'}
+          </p>
+        ) : (
+          <div className="space-y-1.5">
+            {filteredTasks.map(task => {
+              const path = getTaskPath(tasks, task.id);
+              const breadcrumb = formatBreadcrumb(path.slice(0, -1), 32);
+
+              return (
+                <button
+                  key={task.id}
+                  onClick={() => handleNavigate(task.id)}
+                  className="w-full text-left rounded-lg bg-slate-900/80 px-3 py-2 transition-colors hover:bg-slate-900"
+                >
+                  <div className="text-[10px] text-slate-500">{breadcrumb}</div>
+                  <div className="mt-1 text-[12px] font-medium text-slate-100">{task.title}</div>
+                  <div className="mt-1 flex items-center gap-1 text-[10px] text-green-400">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    {getCompletedAgoText(task)}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <div className="border-t border-slate-700/60 px-3 py-2 text-[10px] text-slate-500">
+        {archivedTasks.length} task{archivedTasks.length !== 1 ? 's' : ''} completed more than 7 days ago
+      </div>
+    </div>
+  );
+}
+
 export function CompletedArchive() {
   const { tasks, archiveOpen, setArchiveOpen, navigateTo, getArchivedTasks } = useTaskContext();
   const [searchQuery, setSearchQuery] = useState('');

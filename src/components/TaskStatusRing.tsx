@@ -2,7 +2,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable react-hooks/exhaustive-deps */
 import React, { useEffect, useRef, useState, useMemo } from 'react';
-import { createPortal } from 'react-dom';
 import * as d3 from 'd3';
 
 export type TaskStatusData = {
@@ -56,21 +55,6 @@ export function TaskStatusRing({
 }: TaskStatusRingProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [tooltip, setTooltip] = useState<{
-    visible: boolean;
-    x: number;
-    y: number;
-    label: string;
-    value: number;
-    percentage: string;
-  }>({
-    visible: false,
-    x: 0,
-    y: 0,
-    label: '',
-    value: 0,
-    percentage: '0%',
-  });
 
   const chartData: ChartData[] = useMemo(() => {
     return Object.entries(data)
@@ -82,11 +66,6 @@ export function TaskStatusRing({
         color: COLOR_MAP[key] || '#cccccc',
       }));
   }, [JSON.stringify(data)]);
-
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const total = useMemo(() => chartData.reduce((sum, d) => sum + d.value, 0), [chartData]);
 
@@ -218,23 +197,6 @@ export function TaskStatusRing({
           .attr('d', arcHover as any)
           .style('filter', 'url(#ring-glow)');
 
-        const percentage = total === 0 ? '0%' : ((d.data.value / total) * 100).toFixed(0) + '%';
-
-        setTooltip({
-          visible: true,
-          x: event.clientX,
-          y: event.clientY,
-          label: d.data.label,
-          value: d.data.value,
-          percentage
-        });
-      })
-      .on('mousemove', function (event) {
-        setTooltip(prev => ({
-          ...prev,
-          x: event.clientX,
-          y: event.clientY
-        }));
       })
       .on('mouseleave', function (event, d) {
         d3.select(this)
@@ -243,8 +205,6 @@ export function TaskStatusRing({
           .ease(d3.easeCubicOut)
           .attr('d', arc as any)
           .style('filter', null);
-
-        setTooltip(prev => ({ ...prev, visible: false }));
       })
       .on('click', function (event, d) {
         if (onStatusClick) {
@@ -302,21 +262,6 @@ export function TaskStatusRing({
         height={size}
         className={`overflow-visible transition-opacity duration-300 ${total === 0 ? 'opacity-0' : 'opacity-100'}`}
       />
-
-      {mounted && tooltip.visible && createPortal(
-        <div
-          className="fixed z-[99999] pointer-events-none bg-zinc-900/90 dark:bg-zinc-100/90 backdrop-blur-sm text-white dark:text-zinc-900 rounded-md shadow-sm border border-black/10 dark:border-white/10 px-2.5 py-1 flex items-center gap-1.5 text-[11px] transform -translate-x-1/2 -translate-y-[calc(100%+8px)] transition-all duration-150 animate-in fade-in zoom-in-95"
-          style={{
-            left: tooltip.x,
-            top: tooltip.y,
-          }}
-        >
-          <span className="font-semibold">{tooltip.label}:</span>
-          <span className="opacity-80">{tooltip.value}</span>
-          <span className="opacity-50">({tooltip.percentage})</span>
-        </div>,
-        document.body
-      )}
     </div>
   );
 }

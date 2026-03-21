@@ -36,6 +36,7 @@ type AreaSnapshot = {
   total: number;
   activeCount: number;
   weekCount: number;
+  recurringCount: number;
   dueSoon: boolean;
   highlights: string[];
   nextSuggestion?: string;
@@ -119,8 +120,6 @@ function LifeAreaCard({
   area,
   statusCounts,
   total,
-  activeCount,
-  weekCount,
   dueSoon,
   highlights = [],
   nextSuggestion,
@@ -139,8 +138,6 @@ function LifeAreaCard({
   area: Task;
   statusCounts: Record<TaskStatus, number>;
   total: number;
-  activeCount: number;
-  weekCount: number;
   dueSoon: boolean;
   highlights?: string[];
   nextSuggestion?: string;
@@ -347,8 +344,6 @@ function SortableLifeAreaCard({
       area={snapshot.area}
       statusCounts={snapshot.statusCounts}
       total={snapshot.total}
-      activeCount={snapshot.activeCount}
-      weekCount={snapshot.weekCount}
       dueSoon={snapshot.dueSoon}
       highlights={snapshot.highlights}
       nextSuggestion={snapshot.nextSuggestion}
@@ -430,6 +425,7 @@ export function HomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDraw
       }, {} as Record<TaskStatus, number>);
 
       const activeCount = allAreaTasks.filter(t => t.status !== 'COMPLETED').length;
+      const recurringCount = allAreaTasks.filter(t => Boolean(t.recurrence)).length;
       const now = new Date();
       const weekEnd = new Date(now);
       weekEnd.setDate(now.getDate() + 7);
@@ -467,6 +463,7 @@ export function HomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDraw
         total: allAreaTasks.length,
         activeCount,
         weekCount,
+        recurringCount,
         dueSoon,
         highlights: highlightCandidates.map(t => t.title),
         nextSuggestion: suggestion?.title,
@@ -491,7 +488,8 @@ export function HomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDraw
       totalActive: 0,
       inProgress: 0,
       onHold: 0,
-      completed: 0
+      completed: 0,
+      recurring: 0,
     };
     
     areaSnapshots.forEach(snapshot => {
@@ -499,6 +497,7 @@ export function HomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDraw
       stats.inProgress += snapshot.statusCounts['IN_PROGRESS'] || 0;
       stats.onHold += snapshot.statusCounts['ON_HOLD'] || 0;
       stats.completed += snapshot.statusCounts['COMPLETED'] || 0;
+      stats.recurring += snapshot.recurringCount;
     });
     
     return stats;
@@ -654,22 +653,31 @@ export function HomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDraw
             <div className="space-y-5">
               
               {/* Aggregate Statistics */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <div className="rounded-2xl border border-slate-800/60 bg-slate-900/50 p-4 flex flex-col justify-center">
-                  <span className="text-2xl font-bold text-white">{globalStats.totalActive}</span>
-                  <span className="text-xs font-medium text-slate-500 uppercase tracking-wider mt-1">Total Active</span>
-                </div>
-                <div className="rounded-2xl border border-slate-800/60 bg-slate-900/50 p-4 flex flex-col justify-center">
-                  <span className="text-2xl font-bold text-amber-400">{globalStats.inProgress}</span>
-                  <span className="text-xs font-medium text-amber-500/70 uppercase tracking-wider mt-1">In Progress</span>
-                </div>
-                <div className="rounded-2xl border border-slate-800/60 bg-slate-900/50 p-4 flex flex-col justify-center">
-                  <span className="text-2xl font-bold text-blue-400">{globalStats.onHold}</span>
-                  <span className="text-xs font-medium text-blue-500/70 uppercase tracking-wider mt-1">On Hold</span>
-                </div>
-                <div className="rounded-2xl border border-slate-800/60 bg-slate-900/50 p-4 flex flex-col justify-center">
-                  <span className="text-2xl font-bold text-emerald-400">{globalStats.completed}</span>
-                  <span className="text-xs font-medium text-emerald-500/70 uppercase tracking-wider mt-1">Completed</span>
+              <div className="rounded-2xl border border-slate-800/60 bg-slate-900/50 overflow-hidden">
+                <div className="flex flex-col lg:flex-row">
+                  <div className="px-5 py-4 lg:px-6 lg:py-5 lg:min-w-[220px] flex flex-col justify-center border-b border-slate-800/60 lg:border-b-0 lg:border-r lg:border-slate-800/60 bg-slate-950/30">
+                    <span className="text-3xl lg:text-4xl font-bold text-white leading-none">{globalStats.totalActive}</span>
+                    <span className="text-xs font-medium text-slate-500 uppercase tracking-[0.2em] mt-2">Total Active</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 flex-1">
+                    <div className="px-4 py-4 flex flex-col justify-center sm:border-r border-slate-800/60">
+                      <span className="text-2xl font-bold text-amber-400">{globalStats.inProgress}</span>
+                      <span className="text-xs font-medium text-amber-500/70 uppercase tracking-wider mt-1">In Progress</span>
+                    </div>
+                    <div className="px-4 py-4 flex flex-col justify-center border-l border-slate-800/60 sm:border-l-0 sm:border-r">
+                      <span className="text-2xl font-bold text-blue-400">{globalStats.onHold}</span>
+                      <span className="text-xs font-medium text-blue-500/70 uppercase tracking-wider mt-1">On Hold</span>
+                    </div>
+                    <div className="px-4 py-4 flex flex-col justify-center border-t sm:border-t-0 border-slate-800/60 sm:border-r">
+                      <span className="text-2xl font-bold text-emerald-400">{globalStats.completed}</span>
+                      <span className="text-xs font-medium text-emerald-500/70 uppercase tracking-wider mt-1">Completed</span>
+                    </div>
+                    <div className="px-4 py-4 flex flex-col justify-center border-l border-t sm:border-t-0 border-slate-800/60">
+                      <span className="text-2xl font-bold text-fuchsia-400">{globalStats.recurring}</span>
+                      <span className="text-xs font-medium text-fuchsia-500/70 uppercase tracking-wider mt-1">Recurring</span>
+                    </div>
+                  </div>
                 </div>
               </div>
               <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
@@ -701,8 +709,6 @@ export function HomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDraw
                       area={activeArea.area}
                       statusCounts={activeArea.statusCounts}
                       total={activeArea.total}
-                      activeCount={activeArea.activeCount}
-                      weekCount={activeArea.weekCount}
                       dueSoon={activeArea.dueSoon}
                       onOpen={() => { }}
                       muted

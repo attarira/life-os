@@ -57,7 +57,7 @@ export function HierarchyModal({ area, tasks, onClose }: HierarchyModalProps) {
   }, [area, tasks]);
 
   useEffect(() => {
-    if (!rootNode || !svgRef.current) return;
+    if (!rootNode || !svgRef.current || dimensions.width === 0 || dimensions.height === 0) return;
 
     // Clear previous render
     d3.select(svgRef.current).selectAll('*').remove();
@@ -84,7 +84,7 @@ export function HierarchyModal({ area, tasks, onClose }: HierarchyModalProps) {
     });
 
     const svg = d3.select(svgRef.current)
-      .attr('viewBox', [y0 - 50, x0 - 50, (y1 - y0) + 350, (x1 - x0) + 100].join(' '))
+      .attr('viewBox', `0 0 ${dimensions.width} ${dimensions.height}`)
       .style('width', '100%')
       .style('height', '100%')
       .style('cursor', 'grab');
@@ -99,9 +99,24 @@ export function HierarchyModal({ area, tasks, onClose }: HierarchyModalProps) {
       });
       
     svg.call(zoom);
-    
-    // Initial center if the tree is small
-    const initialTransform = d3.zoomIdentity.translate(50, (dimensions.height / 2) - ((x0 + x1) / 2));
+
+    const contentWidth = Math.max(y1 - y0, 1);
+    const contentHeight = Math.max(x1 - x0, 1);
+    const paddingX = 140;
+    const paddingY = 80;
+    const fitScale = Math.min(
+      1.4,
+      (dimensions.width - paddingX * 2) / contentWidth,
+      (dimensions.height - paddingY * 2) / contentHeight
+    );
+    const clampedScale = Math.max(0.5, fitScale);
+    const initialTransform = d3.zoomIdentity
+      .translate(
+        (dimensions.width / 2) - clampedScale * ((y0 + y1) / 2),
+        (dimensions.height / 2) - clampedScale * ((x0 + x1) / 2)
+      )
+      .scale(clampedScale);
+
     svg.call(zoom.transform, initialTransform);
 
     // Links
