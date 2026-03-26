@@ -127,23 +127,6 @@ export function FileSystemProvider({ children }: { children: ReactNode }) {
         }
         return n;
       });
-      // Also ensure the four seed folders exist
-      const existingNames = new Set(savedNodes.filter(n => n.type === 'folder' && n.parentId === null).map(n => n.name.toLowerCase()));
-      const now = new Date().toISOString();
-      for (const [name, mode] of Object.entries(MODE_DEFAULTS)) {
-        if (!existingNames.has(name)) {
-          savedNodes.push({
-            id: generateId(),
-            name: name.split(' ').map(w => w[0].toUpperCase() + w.slice(1)).join(' '),
-            type: 'folder',
-            parentId: null,
-            createdAt: now,
-            updatedAt: now,
-            folderMode: mode,
-          });
-          migrated = true;
-        }
-      }
       if (migrated) storage.set(FILE_SYSTEM_STORAGE_KEY, savedNodes);
     }
 

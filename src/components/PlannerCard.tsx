@@ -20,6 +20,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { Task, ROOT_TASK_ID, TaskRecurrence, UpdateTaskInput } from '@/lib/types';
 import { PLANNER_ITEMS_STORAGE_KEY, PLANNER_DATE_STORAGE_KEY, PLANNER_DISMISSED_STORAGE_KEY } from '@/lib/storage-keys';
 import { getTaskPath } from '@/lib/tasks';
+import { resolveAreaKey } from '@/lib/utils';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -144,97 +145,58 @@ const AREA_ICONS: Record<string, React.JSX.Element> = {
       <path d="M9 15h6" />
     </svg>
   ),
+  home: (
+    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 9h6V4H4v5zM14 9h6V4h-6v5zM4 20h6v-5H4v5zM14 20h6v-5h-6v5z" />
+    </svg>
+  ),
   default: (
     <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="10" />
-      <path d="M12 8v8" />
-      <path d="M8 12h8" />
+      <path d="M4 9h6V4H4v5zM14 9h6V4h-6v5zM4 20h6v-5H4v5zM14 20h6v-5h-6v5z" />
     </svg>
   )
 };
 
-function resolveAreaKey(title: string) {
-  const lower = title.toLowerCase();
-  if (lower.includes('career') || lower.includes('job') || lower.includes('work')) return 'career';
-  if (lower.includes('health') || lower.includes('fitness') || lower.includes('wellness')) return 'health';
-  if (lower.includes('financ') || lower.includes('money') || lower.includes('budget')) return 'finances';
-  if (lower.includes('relat') || lower.includes('family') || lower.includes('social')) return 'relationships';
-  if (lower.includes('learn') || lower.includes('growth') || lower.includes('develop')) return 'growth';
-  if (lower.includes('fun') || lower.includes('hobby') || lower.includes('recreation')) return 'recreation';
-  return 'default';
+function getTaskArea(task: Task, tasks: Task[]) {
+  const path = getTaskPath(tasks, task.id);
+  const areaTask = path[0];
+  const areaKey = resolveAreaKey(areaTask?.title || 'default');
+  return {
+    areaKey,
+    areaLabel: areaTask?.title || 'Task',
+  };
 }
 
-function getTaskIcon(label: string) {
-  const lowerLabel = label.toLowerCase();
-  const isWorkout = lowerLabel.includes('workout') || lowerLabel.includes('exercise');
-  const isShave = lowerLabel.includes('shave');
-  const isLaundry = lowerLabel.includes('laundry');
-  const isGroceries = lowerLabel.includes('groceries') || lowerLabel.includes('grocery');
-  const isHaircut = lowerLabel.includes('haircut');
-  const isSkincare = lowerLabel.includes('skincare') || lowerLabel.includes('skin care');
-  const isCallDad = lowerLabel.includes('call dad');
-  const isCallMom = lowerLabel.includes('call mom');
-  
-  if (isWorkout) return (
-     <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M6 5v14" /><path d="M18 5v14" />
-        <path d="M2 7h4" /><path d="M2 17h4" />
-        <path d="M18 7h4" /><path d="M18 17h4" />
-        <path d="M6 12h12" />
-     </svg>
-  );
-  if (isShave) return (
-     <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-       <circle cx="6" cy="6" r="3" />
-       <path d="M8 12h8" />
-       <path d="M10 16h4" />
-       <path d="M11 20h2" />
-       <path d="M12 12v8" />
-       <path d="M17 5L15 9" />
-       <path d="M19 8l-2 4" />
-     </svg>
-  );
-  if (isLaundry) return (
-     <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-       <polyline points="7 10 12 15 17 10" />
-       <line x1="12" y1="15" x2="12" y2="3" />
-     </svg>
-  );
-  if (isGroceries) return (
-     <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-       <circle cx="9" cy="21" r="1" />
-       <circle cx="20" cy="21" r="1" />
-       <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
-     </svg>
-  );
-  if (isHaircut) return (
-     <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-       <circle cx="6" cy="6" r="3"/>
-       <circle cx="6" cy="18" r="3"/>
-       <line x1="20" y1="4" x2="8.12" y2="15.88"/>
-       <line x1="14.47" y1="14.48" x2="20" y2="20"/>
-       <line x1="8.12" y1="8.12" x2="12" y2="12"/>
-     </svg>
-  );
-  if (isSkincare) return (
-     <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-       <path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z" />
-     </svg>
-  );
-  if (isCallMom || isCallDad) return (
-     <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-       <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
-     </svg>
-  );
-  return (
-     <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-       <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-       <line x1="16" y1="2" x2="16" y2="6" />
-       <line x1="8" y1="2" x2="8" y2="6" />
-       <line x1="3" y1="10" x2="21" y2="10" />
-     </svg>
-  );
+function getImmediateParentLabel(task: Task, tasks: Task[]): string | null {
+  const parent = tasks.find(candidate => candidate.id === task.parentId);
+  if (!parent || parent.parentId === ROOT_TASK_ID) return null;
+  return parent.title;
+}
+
+function renderParentIndicator(label: string, className: string) {
+  if (label === 'Read a Book') {
+    return (
+      <span className={`inline-flex items-center justify-center self-center ${className}`} title={label} aria-label={label}>
+        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+        </svg>
+      </span>
+    );
+  }
+
+  if (label === 'Watch Movies/Shows') {
+    return (
+      <span className={`inline-flex items-center justify-center self-center ${className}`} title={label} aria-label={label}>
+        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="2" y="7" width="20" height="15" rx="2" ry="2" />
+          <path d="M17 2l-5 5-5-5" />
+        </svg>
+      </span>
+    );
+  }
+
+  return <span className={className}>{label}</span>;
 }
 
 // ─── Recurrence Day Editor ───────────────────────────────────────────────────
@@ -257,17 +219,20 @@ function recurrenceToDays(rec?: TaskRecurrence): number[] {
 
 function RecurrenceEditor({
   task,
+  tasks,
   anchorRect,
   onSave,
   onClose,
 }: {
   task: Task;
+  tasks: Task[];
   anchorRect: DOMRect;
   onSave: (recurrence: TaskRecurrence) => void;
   onClose: () => void;
 }) {
   const [selectedDays, setSelectedDays] = useState<number[]>(() => recurrenceToDays(task.recurrence));
   const panelRef = useRef<HTMLDivElement>(null);
+  const { areaKey } = useMemo(() => getTaskArea(task, tasks), [task, tasks]);
 
   // Close on outside click
   useEffect(() => {
@@ -314,7 +279,7 @@ function RecurrenceEditor({
       {/* Header */}
       <div className="px-3.5 pt-3 pb-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-slate-400">{getTaskIcon(task.title)}</span>
+          <span className="text-slate-400">{AREA_ICONS[areaKey] || AREA_ICONS.default}</span>
           <span className="text-[13px] font-medium text-slate-200 truncate">{task.title}</span>
         </div>
         <button
@@ -368,6 +333,7 @@ function RecurrenceEditor({
 function SortablePlannerRow({
   entry,
   linkedTask,
+  parentLabel,
   areaKey,
   areaLabel,
   areaBadge,
@@ -377,6 +343,7 @@ function SortablePlannerRow({
 }: {
   entry: PlannerEntry;
   linkedTask: Task | null;
+  parentLabel: string | null;
   areaKey: string;
   areaLabel: string;
   areaBadge: string;
@@ -449,15 +416,20 @@ function SortablePlannerRow({
         className="flex-1 min-w-0 flex items-center gap-2 cursor-pointer"
         onClick={onNavigate}
       >
-        <span
-          className={`leading-snug block truncate transition-all text-[13px] ${
-            entry.completed
-              ? 'text-slate-500 line-through'
-              : 'text-slate-100'
-          }`}
-        >
-          {entry.label}
-        </span>
+        <div className="flex min-w-0 items-baseline gap-1.5">
+          <span
+            className={`leading-snug block truncate transition-all text-[13px] ${
+              entry.completed
+                ? 'text-slate-500 line-through'
+                : 'text-slate-100'
+            }`}
+          >
+            {entry.label}
+          </span>
+          {parentLabel && (
+            renderParentIndicator(parentLabel, 'flex-shrink-0 text-[11px] text-slate-500')
+          )}
+        </div>
       </div>
 
       {/* Area badge */}
@@ -612,8 +584,6 @@ export function PlannerCard({ tasks, navigateTo, selectTask, createTask, updateT
   // ─── Handlers ────────────────────────────────────────────────────────────
 
   const attachTask = useCallback((task: Task) => {
-    const path = getTaskPath(tasks, task.id);
-    const areaTask = path[0];
     setEntries(prev => [
       ...prev,
       {
@@ -626,7 +596,7 @@ export function PlannerCard({ tasks, navigateTo, selectTask, createTask, updateT
     setDraft('');
     setShowDropdown(false);
     setHighlightIndex(-1);
-  }, [tasks]);
+  }, []);
 
   const quickCreate = useCallback(async (title: string) => {
     const trimmed = title.trim();
@@ -787,10 +757,7 @@ export function PlannerCard({ tasks, navigateTo, selectTask, createTask, updateT
               className="absolute left-0 right-0 top-full mt-1 z-20 rounded-lg border border-slate-700/60 bg-slate-900 shadow-xl overflow-hidden"
             >
               {searchResults.map((task, idx) => {
-                const path = getTaskPath(tasks, task.id);
-                const areaTask = path[0];
-                const areaKey = resolveAreaKey(areaTask?.title || '');
-                const areaLabel = areaTask?.title || '';
+                const { areaKey, areaLabel } = getTaskArea(task, tasks);
                 const areaBadge = AREA_BADGES[areaKey] || AREA_BADGES.default;
                 return (
                   <button
@@ -848,6 +815,7 @@ export function PlannerCard({ tasks, navigateTo, selectTask, createTask, updateT
         <div className="px-5 pb-3 flex flex-wrap gap-2">
           {routineEntries.map(entry => {
             const linkedTask = entry.taskId ? tasks.find(t => t.id === entry.taskId) : null;
+            const areaKey = linkedTask ? getTaskArea(linkedTask, tasks).areaKey : 'default';
             return (
               <div
                 key={entry.id}
@@ -865,7 +833,7 @@ export function PlannerCard({ tasks, navigateTo, selectTask, createTask, updateT
                   className="flex items-center gap-1.5 px-2.5 py-1.5 cursor-pointer hover:bg-blue-500/15 rounded-l-lg transition-colors"
                 >
                   <span className="text-slate-400 group-hover/chip:text-blue-400 transition-colors">
-                    {getTaskIcon(entry.label)}
+                    {AREA_ICONS[areaKey] || AREA_ICONS.default}
                   </span>
                   <span className="text-[11px] font-medium text-slate-300 group-hover/chip:text-blue-200 transition-colors">
                     {entry.label}
@@ -895,6 +863,7 @@ export function PlannerCard({ tasks, navigateTo, selectTask, createTask, updateT
       {editingRecurrence && (
         <RecurrenceEditor
           task={editingRecurrence.task}
+          tasks={tasks}
           anchorRect={editingRecurrence.rect}
           onClose={() => setEditingRecurrence(null)}
           onSave={async (rec) => {
@@ -926,17 +895,18 @@ export function PlannerCard({ tasks, navigateTo, selectTask, createTask, updateT
                 const linkedTask = entry.taskId
                   ? tasks.find(t => t.id === entry.taskId) || null
                   : null;
-                const path = linkedTask ? getTaskPath(tasks, linkedTask.id) : [];
-                const areaTask = path[0];
-                const areaKey = resolveAreaKey(areaTask?.title || '');
-                const areaLabel = areaTask?.title || 'Task';
+                const { areaKey, areaLabel } = linkedTask
+                  ? getTaskArea(linkedTask, tasks)
+                  : { areaKey: 'default', areaLabel: 'Task' };
                 const areaBadge = AREA_BADGES[areaKey] || AREA_BADGES.default;
+                const parentLabel = linkedTask ? getImmediateParentLabel(linkedTask, tasks) : null;
 
                 return (
                   <SortablePlannerRow
                     key={entry.id}
                     entry={entry}
                     linkedTask={linkedTask}
+                    parentLabel={parentLabel}
                     areaKey={areaKey}
                     areaLabel={areaLabel}
                     areaBadge={areaBadge}

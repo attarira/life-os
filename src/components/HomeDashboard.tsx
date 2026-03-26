@@ -32,15 +32,60 @@ type DragHandleProps = {
 
 type AreaSnapshot = {
   area: Task;
+  tasks: Task[];
+  leafTasks: Task[];
   statusCounts: Record<TaskStatus, number>;
   total: number;
   activeCount: number;
   weekCount: number;
   recurringCount: number;
   dueSoon: boolean;
-  highlights: string[];
-  nextSuggestion?: string;
+  highlights: Task[];
+  nextSuggestion?: Task;
   calloutTaskData?: Task | null;
+  taskMap: Map<string, Task>;
+};
+
+type AreaActivitySummary = {
+  area: Task;
+  score: number;
+  completedToday: number;
+  updatedToday: number;
+  reason: string;
+};
+
+type AreaAttentionKind = 'overdue' | 'dueSoon' | 'onHold' | 'neglected';
+
+type AreaAttentionSummary = {
+  area: Task;
+  score: number;
+  kind: AreaAttentionKind;
+  reason: string;
+};
+
+type FocusSuggestion = {
+  area: Task;
+  task: Task;
+  score: number;
+  reason: string;
+};
+
+type DashboardAnalysis = {
+  mostActiveToday: AreaActivitySummary | null;
+  needsAttention: AreaAttentionSummary | null;
+  suggestedFocus: FocusSuggestion[];
+};
+
+const DEFAULT_AREA_ICON = (
+  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+    <path d="M4 9h6V4H4v5zM14 9h6V4h-6v5zM4 20h6v-5H4v5zM14 20h6v-5h-6v5z" />
+  </svg>
+);
+
+const DEFAULT_AREA_GRADIENT = {
+  gradient: 'linear-gradient(135deg, #253040 0%, #141c28 100%)',
+  iconBg: 'bg-slate-400/20',
+  ringTrack: 'rgba(148,163,184,0.2)',
 };
 
 
@@ -116,12 +161,211 @@ function isDueWithinThreeDays(task: Task): boolean {
   return diffDays <= 3;
 }
 
+function isSameLocalDay(date: Date | undefined, now: Date): boolean {
+  if (!date) return false;
+  return (
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate()
+  );
+}
+
+function getAreaMeta(area: Pick<Task, 'id' | 'title'>) {
+  const toneKey = resolveAreaKey(area.title || area.id || '');
+  return {
+    toneKey,
+    icon: LIFE_AREA_ICONS[toneKey] || DEFAULT_AREA_ICON,
+    grad: AREA_GRADIENTS[toneKey] || DEFAULT_AREA_GRADIENT,
+  };
+}
+
+function getImmediateParentLabel(task: Task, taskMap: Map<string, Task>): string | null {
+  const parent = taskMap.get(task.parentId);
+  if (!parent || parent.parentId === ROOT_TASK_ID) return null;
+  return parent.title;
+}
+
+function renderParentIndicator(label: string, className: string) {
+  if (label === 'Read a Book') {
+    return (
+      <span className={`inline-flex items-center justify-center self-center ${className}`} title={label} aria-label={label}>
+        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+        </svg>
+      </span>
+    );
+  }
+
+  if (label === 'Watch Movies/Shows') {
+    return (
+      <span className={`inline-flex items-center justify-center self-center ${className}`} title={label} aria-label={label}>
+        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="2" y="7" width="20" height="15" rx="2" ry="2" />
+          <path d="M17 2l-5 5-5-5" />
+        </svg>
+      </span>
+    );
+  }
+
+  return <span className={className}>{label}</span>;
+}
+
+function formatCount(count: number, noun: string): string {
+  return `${count} ${noun}${count === 1 ? '' : 's'}`;
+}
+
+function getAreaActivitySummary(snapshot: AreaSnapshot, now: Date): AreaActivitySummary | null {
+  const relevantTasks = snapshot.tasks.filter(task => !task.calendarOnly);
+  let completedToday = 0;
+  let updatedToday = 0;
+
+  relevantTasks.forEach(task => {
+    if (isSameLocalDay(task.completedAt, now)) {
+      completedToday += 1;
+      return;
+    }
+
+    if (isSameLocalDay(task.updatedAt, now)) {
+      updatedToday += 1;
+    }
+  });
+
+  const score = completedToday * 3 + updatedToday;
+  if (score === 0) return null;
+
+  const reasonParts: string[] = [];
+  if (completedToday > 0) reasonParts.push(formatCount(completedToday, 'completed task'));
+  if (updatedToday > 0) reasonParts.push(formatCount(updatedToday, 'updated task'));
+
+  return {
+    area: snapshot.area,
+    score,
+    completedToday,
+    updatedToday,
+    reason: `${reasonParts.join(', ')} today`,
+  };
+}
+
+function getAreaAttentionSummary(snapshot: AreaSnapshot, now: Date): AreaAttentionSummary | null {
+  const openLeafTasks = snapshot.leafTasks.filter(task => !task.calendarOnly && task.status !== 'COMPLETED');
+  if (openLeafTasks.length === 0) return null;
+
+  const threeDayWindow = new Date(now);
+  threeDayWindow.setDate(now.getDate() + 3);
+  const weekWindow = new Date(now);
+  weekWindow.setDate(now.getDate() + 7);
+
+  const overdueCount = openLeafTasks.filter(task => task.dueDate && task.dueDate < now).length;
+  const dueSoonCount = openLeafTasks.filter(task => task.dueDate && task.dueDate >= now && task.dueDate <= threeDayWindow).length;
+  const onHoldCount = openLeafTasks.filter(task => task.status === 'ON_HOLD').length;
+  const hasInProgressTask = openLeafTasks.some(task => task.status === 'IN_PROGRESS');
+  const hasPendingImportantTask = !hasInProgressTask && openLeafTasks.some(task =>
+    task.priority === 'HIGH' ||
+    Boolean(task.dueDate && task.dueDate <= weekWindow) ||
+    computeTaskImportance(task) >= 20
+  );
+
+  const score = overdueCount * 4 + dueSoonCount * 2 + onHoldCount * 2 + (hasPendingImportantTask ? 1 : 0);
+  if (score === 0) return null;
+
+  if (overdueCount > 0) {
+    return {
+      area: snapshot.area,
+      score,
+      kind: 'overdue',
+      reason: `${snapshot.area.title} has ${formatCount(overdueCount, 'overdue task')}`,
+    };
+  }
+
+  if (dueSoonCount > 0) {
+    return {
+      area: snapshot.area,
+      score,
+      kind: 'dueSoon',
+      reason: `${snapshot.area.title} has ${formatCount(dueSoonCount, 'task')} due soon`,
+    };
+  }
+
+  if (onHoldCount > 0) {
+    return {
+      area: snapshot.area,
+      score,
+      kind: 'onHold',
+      reason: `${snapshot.area.title} has ${formatCount(onHoldCount, 'task')} on hold`,
+    };
+  }
+
+  return {
+    area: snapshot.area,
+    score,
+    kind: 'neglected',
+    reason: `${snapshot.area.title} has important work with no active momentum`,
+  };
+}
+
+function getSuggestedFocusReason(task: Task, now: Date): string {
+  const weekWindow = new Date(now);
+  weekWindow.setDate(now.getDate() + 7);
+
+  if (task.dueDate && task.dueDate < now) return 'overdue';
+  if (task.dueDate && task.dueDate <= weekWindow) return 'due this week';
+
+  const staleDays = (now.getTime() - task.updatedAt.getTime()) / (1000 * 60 * 60 * 24);
+  if (task.status === 'ON_HOLD' || staleDays > 7) return 'stalled';
+  if (task.priority === 'HIGH') return 'high priority';
+
+  return 'easy win';
+}
+
+function getSuggestedFocusAreas(
+  snapshots: AreaSnapshot[],
+  mostActiveAreaId: string | null,
+  lifeAreaOrder: Map<string, number>,
+  now: Date
+): FocusSuggestion[] {
+  const suggestions = snapshots
+    .map(snapshot => {
+      const eligibleTasks = snapshot.tasks.filter(task => !task.calendarOnly);
+      if (eligibleTasks.length === 0) return null;
+
+      const task = getSuggestedNextTask(eligibleTasks, snapshot.area.id);
+      if (!task || task.status === 'COMPLETED' || task.calendarOnly) return null;
+
+      const attention = getAreaAttentionSummary(snapshot, now);
+      const score = computeTaskImportance(task) + (attention?.score || 0) + (task.priority === 'HIGH' ? 2 : 0);
+
+      return {
+        area: snapshot.area,
+        task,
+        score,
+        reason: getSuggestedFocusReason(task, now),
+      };
+    })
+    .filter((candidate): candidate is FocusSuggestion => Boolean(candidate))
+    .sort((a, b) => {
+      if (a.score !== b.score) return b.score - a.score;
+      return (lifeAreaOrder.get(a.area.id) ?? Number.MAX_SAFE_INTEGER) - (lifeAreaOrder.get(b.area.id) ?? Number.MAX_SAFE_INTEGER);
+    });
+
+  if (suggestions.length > 1 && mostActiveAreaId && suggestions[0]?.area.id === mostActiveAreaId) {
+    const alternateIndex = suggestions.findIndex(suggestion => suggestion.area.id !== mostActiveAreaId);
+    if (alternateIndex > 0) {
+      const [alternate] = suggestions.splice(alternateIndex, 1);
+      suggestions.unshift(alternate);
+    }
+  }
+
+  return suggestions.slice(0, 3);
+}
+
 function LifeAreaCard({
   area,
   statusCounts,
   total,
   dueSoon,
   highlights = [],
+  taskMap,
   nextSuggestion,
   calloutTaskData,
   onOpen,
@@ -139,8 +383,9 @@ function LifeAreaCard({
   statusCounts: Record<TaskStatus, number>;
   total: number;
   dueSoon: boolean;
-  highlights?: string[];
-  nextSuggestion?: string;
+  highlights?: Task[];
+  taskMap: Map<string, Task>;
+  nextSuggestion?: Task;
   calloutTaskData?: Task | null;
   onOpen: () => void;
   onEdit?: () => void;
@@ -154,13 +399,7 @@ function LifeAreaCard({
   isActive?: boolean;
 }) {
   const { getUpcomingBirthday } = useBirthdays();
-  const toneKey = resolveAreaKey(area.title || area.id || '');
-  const icon = LIFE_AREA_ICONS[toneKey] || (
-    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-      <path d="M4 9h6V4H4v5zM14 9h6V4h-6v5zM4 20h6v-5H4v5zM14 20h6v-5h-6v5z" />
-    </svg>
-  );
-  const grad = AREA_GRADIENTS[toneKey] || { gradient: 'linear-gradient(135deg, #253040 0%, #141c28 100%)', iconBg: 'bg-slate-400/20', ringTrack: 'rgba(148,163,184,0.2)' };
+  const { toneKey, icon, grad } = getAreaMeta(area);
 
   const calloutTask = nextSuggestion || highlights[0];
   const upcomingBirthday = toneKey === 'relationships' ? getUpcomingBirthday() : null;
@@ -226,9 +465,17 @@ function LifeAreaCard({
       <div className="flex-1 px-4 pt-3 pb-2 flex flex-col justify-center">
         {highlights.length > 0 ? (
           <div className="flex flex-col gap-1">
-            {highlights.slice(0, 3).map((item, idx) => (
-              <div key={idx} className={`text-[13px] leading-snug truncate ${grad.subtitleColor || 'text-white/60'}`}>{item}</div>
-            ))}
+            {highlights.slice(0, 3).map((task) => {
+              const parentLabel = getImmediateParentLabel(task, taskMap);
+              return (
+                <div key={task.id} className={`flex items-baseline gap-1.5 min-w-0 ${grad.subtitleColor || 'text-white/60'}`}>
+                  <span className="truncate text-[13px] leading-snug">{task.title}</span>
+                  {parentLabel && (
+                    renderParentIndicator(parentLabel, 'flex-shrink-0 text-[11px] text-white/40')
+                  )}
+                </div>
+              );
+            })}
           </div>
         ) : (
           <p className={`text-[13px] ${grad.ringEmptyColor || 'text-white/30'}`}>No active focus.</p>
@@ -257,7 +504,15 @@ function LifeAreaCard({
                   <path d="m12 5 7 7-7 7" />
                 </svg>
               </span>
-              <span className="truncate">{calloutTask}</span>
+              <span className="flex min-w-0 items-baseline gap-1.5">
+                <span className="truncate">{calloutTask.title}</span>
+                {(() => {
+                  const parentLabel = getImmediateParentLabel(calloutTask, taskMap);
+                  return parentLabel
+                    ? renderParentIndicator(parentLabel, `flex-shrink-0 text-[10px] ${grad.titleColor ? 'text-slate-400' : 'text-white/40'}`)
+                    : null;
+                })()}
+              </span>
             </button>
           )}
           {upcomingBirthday && (
@@ -348,6 +603,7 @@ function SortableLifeAreaCard({
       highlights={snapshot.highlights}
       nextSuggestion={snapshot.nextSuggestion}
       calloutTaskData={snapshot.calloutTaskData}
+      taskMap={snapshot.taskMap}
       onOpen={onOpen}
       onEdit={onEdit}
       onHierarchy={onHierarchy}
@@ -409,6 +665,8 @@ export function HomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDraw
     return map;
   }, [tasks]);
 
+  const taskMap = useMemo(() => new Map(tasks.map(task => [task.id, task])), [tasks]);
+
   const areaSnapshots: AreaSnapshot[] = useMemo(() => {
     return lifeAreas.map(area => {
       const allAreaTasks: Task[] = [];
@@ -418,6 +676,7 @@ export function HomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDraw
         allAreaTasks.push(current);
         stack.push(...(tasksByParentId.get(current.id) || []));
       }
+      const leafTasks = allAreaTasks.filter(task => !parentIdsWithChildren.has(task.id));
 
       const statusCounts = COLUMNS.reduce((acc, col) => {
         acc[col.status] = allAreaTasks.filter(t => t.status === col.status).length;
@@ -455,22 +714,28 @@ export function HomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDraw
         })
         .slice(0, 2);
         
-      const suggestion = getSuggestedNextTask(allAreaTasks, area.id);
+      const suggestion = getSuggestedNextTask(
+        allAreaTasks.filter(task => task.status !== 'ON_HOLD'),
+        area.id
+      );
 
       return {
         area,
+        tasks: allAreaTasks,
+        leafTasks,
         statusCounts,
         total: allAreaTasks.length,
         activeCount,
         weekCount,
         recurringCount,
         dueSoon,
-        highlights: highlightCandidates.map(t => t.title),
-        nextSuggestion: suggestion?.title,
+        highlights: highlightCandidates,
+        nextSuggestion: suggestion || undefined,
         calloutTaskData: suggestion || highlightCandidates[0] || null,
+        taskMap,
       };
     });
-  }, [lifeAreas, tasks, tasksByParentId, parentIdsWithChildren]);
+  }, [lifeAreas, tasksByParentId, parentIdsWithChildren, taskMap]);
 
   const primaryAreaId = useMemo(() => {
     if (areaSnapshots.length === 0) return null;
@@ -483,29 +748,54 @@ export function HomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDraw
     return scored[0]?.id || null;
   }, [areaSnapshots, lifeAreas]);
 
-  const globalStats = useMemo(() => {
-    const stats = {
-      totalActive: 0,
-      inProgress: 0,
-      onHold: 0,
-      completed: 0,
-      recurring: 0,
+  const lifeAreaOrder = useMemo(
+    () => new Map(lifeAreas.map((area, index) => [area.id, index])),
+    [lifeAreas]
+  );
+
+  const dashboardAnalysis = useMemo<DashboardAnalysis>(() => {
+    const now = new Date();
+
+    const mostActiveToday = areaSnapshots
+      .map(snapshot => getAreaActivitySummary(snapshot, now))
+      .filter((summary): summary is AreaActivitySummary => Boolean(summary))
+      .sort((a, b) => {
+        if (a.score !== b.score) return b.score - a.score;
+        if (a.completedToday !== b.completedToday) return b.completedToday - a.completedToday;
+        if (a.updatedToday !== b.updatedToday) return b.updatedToday - a.updatedToday;
+        if (primaryAreaId) {
+          if (a.area.id === primaryAreaId && b.area.id !== primaryAreaId) return -1;
+          if (b.area.id === primaryAreaId && a.area.id !== primaryAreaId) return 1;
+        }
+        return (lifeAreaOrder.get(a.area.id) ?? Number.MAX_SAFE_INTEGER) - (lifeAreaOrder.get(b.area.id) ?? Number.MAX_SAFE_INTEGER);
+      })[0] || null;
+
+    const attentionPriority: Record<AreaAttentionKind, number> = {
+      overdue: 0,
+      dueSoon: 1,
+      onHold: 2,
+      neglected: 3,
     };
-    
-    areaSnapshots.forEach(snapshot => {
-      stats.totalActive += snapshot.activeCount;
-      stats.inProgress += snapshot.statusCounts['IN_PROGRESS'] || 0;
-      stats.onHold += snapshot.statusCounts['ON_HOLD'] || 0;
-      stats.completed += snapshot.statusCounts['COMPLETED'] || 0;
-      stats.recurring += snapshot.recurringCount;
-    });
-    
-    return stats;
-  }, [areaSnapshots]);
 
+    const needsAttention = areaSnapshots
+      .map(snapshot => getAreaAttentionSummary(snapshot, now))
+      .filter((summary): summary is AreaAttentionSummary => Boolean(summary))
+      .sort((a, b) => {
+        if (a.score !== b.score) return b.score - a.score;
+        if (attentionPriority[a.kind] !== attentionPriority[b.kind]) {
+          return attentionPriority[a.kind] - attentionPriority[b.kind];
+        }
+        return (lifeAreaOrder.get(a.area.id) ?? Number.MAX_SAFE_INTEGER) - (lifeAreaOrder.get(b.area.id) ?? Number.MAX_SAFE_INTEGER);
+      })[0] || null;
 
+    const suggestedFocus = getSuggestedFocusAreas(areaSnapshots, mostActiveToday?.area.id || null, lifeAreaOrder, now);
 
-
+    return {
+      mostActiveToday,
+      needsAttention,
+      suggestedFocus,
+    };
+  }, [areaSnapshots, lifeAreaOrder, primaryAreaId]);
 
   const upcomingTasks = useMemo(() => {
     const now = new Date();
@@ -596,6 +886,10 @@ export function HomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDraw
   };
 
   const activeArea = activeId ? areaSnapshots.find(a => a.area.id === activeId) : null;
+  const addTaskToPlanner = (task: Task) => {
+    const event = new CustomEvent('lifeos:planner-add', { detail: { task } });
+    window.dispatchEvent(event);
+  };
 
   const chatContext: AppContext = useMemo(
     () => ({ tasks, navigateTo, selectTask }),
@@ -651,33 +945,127 @@ export function HomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDraw
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-8">
             {/* ─── LEFT: Focus Areas ─── */}
             <div className="space-y-5">
-              
-              {/* Aggregate Statistics */}
-              <div className="rounded-2xl border border-slate-800/60 bg-slate-900/50 overflow-hidden">
-                <div className="flex flex-col lg:flex-row">
-                  <div className="px-5 py-4 lg:px-6 lg:py-5 lg:min-w-[220px] flex flex-col justify-center border-b border-slate-800/60 lg:border-b-0 lg:border-r lg:border-slate-800/60 bg-slate-950/30">
-                    <span className="text-3xl lg:text-4xl font-bold text-white leading-none">{globalStats.totalActive}</span>
-                    <span className="text-xs font-medium text-slate-500 uppercase tracking-[0.2em] mt-2">Total Active</span>
-                  </div>
+              <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+                {(() => {
+                  const summary = dashboardAnalysis.mostActiveToday;
+                  const meta = summary ? getAreaMeta(summary.area) : null;
+                  return (
+                    <button
+                      type="button"
+                      disabled={!summary}
+                      onClick={() => summary && navigateTo(summary.area.id)}
+                      className={`rounded-2xl border border-slate-800/60 bg-slate-900/55 px-5 py-4 text-left transition-colors disabled:cursor-default ${
+                        summary ? 'hover:bg-slate-900/80' : 'cursor-default'
+                      }`}
+                    >
+                      <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-500">Most Active Today</p>
+                      {summary && meta ? (
+                        <div className="mt-4 flex items-start gap-3">
+                          <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${meta.grad.iconBg} text-white/85`}>
+                            {meta.icon}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-sm font-semibold text-white">{summary.area.title}</div>
+                            <p className="mt-1 text-[13px] text-slate-400">{summary.reason}</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="mt-4">
+                          <p className="text-sm font-semibold text-white">No area has been active yet today</p>
+                          <p className="mt-1 text-[13px] text-slate-500">Your activity will show up here once you start updating tasks.</p>
+                        </div>
+                      )}
+                    </button>
+                  );
+                })()}
 
-                  <div className="grid grid-cols-2 sm:grid-cols-4 flex-1">
-                    <div className="px-4 py-4 flex flex-col justify-center sm:border-r border-slate-800/60">
-                      <span className="text-2xl font-bold text-amber-400">{globalStats.inProgress}</span>
-                      <span className="text-xs font-medium text-amber-500/70 uppercase tracking-wider mt-1">In Progress</span>
+                {(() => {
+                  const summary = dashboardAnalysis.needsAttention;
+                  const meta = summary ? getAreaMeta(summary.area) : null;
+                  return (
+                    <button
+                      type="button"
+                      disabled={!summary}
+                      onClick={() => summary && navigateTo(summary.area.id)}
+                      className={`rounded-2xl border border-slate-800/60 bg-slate-900/55 px-5 py-4 text-left transition-colors disabled:cursor-default ${
+                        summary ? 'hover:bg-slate-900/80' : 'cursor-default'
+                      }`}
+                    >
+                      <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-500">Needs Attention</p>
+                      {summary && meta ? (
+                        <div className="mt-4 flex items-start gap-3">
+                          <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${meta.grad.iconBg} text-white/85`}>
+                            {meta.icon}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-sm font-semibold text-white">{summary.area.title}</div>
+                            <p className="mt-1 text-[13px] text-slate-400">{summary.reason}</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="mt-4">
+                          <p className="text-sm font-semibold text-white">Nothing urgent right now</p>
+                          <p className="mt-1 text-[13px] text-slate-500">No life area is currently flagging an attention signal.</p>
+                        </div>
+                      )}
+                    </button>
+                  );
+                })()}
+
+                <div className="rounded-2xl border border-slate-800/60 bg-slate-900/55 px-5 py-4">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-500">Suggested Focus</p>
+                  {dashboardAnalysis.suggestedFocus.length === 0 ? (
+                    <div className="mt-4">
+                      <p className="text-sm font-semibold text-white">No focus suggestions available</p>
+                      <p className="mt-1 text-[13px] text-slate-500">You have no unresolved focus candidates right now.</p>
                     </div>
-                    <div className="px-4 py-4 flex flex-col justify-center border-l border-slate-800/60 sm:border-l-0 sm:border-r">
-                      <span className="text-2xl font-bold text-blue-400">{globalStats.onHold}</span>
-                      <span className="text-xs font-medium text-blue-500/70 uppercase tracking-wider mt-1">On Hold</span>
+                  ) : (
+                    <div className="mt-3 divide-y divide-slate-800/70">
+                      {dashboardAnalysis.suggestedFocus.map((suggestion) => {
+                        const meta = getAreaMeta(suggestion.area);
+                        const parentLabel = getImmediateParentLabel(suggestion.task, taskMap);
+
+                        return (
+                          <div key={suggestion.area.id} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigateTo(suggestion.area.id);
+                                selectTask(suggestion.task.id);
+                              }}
+                              className="flex-1 min-w-0 text-left"
+                            >
+                              <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-slate-500">
+                                <span className={`flex h-6 w-6 items-center justify-center rounded-lg ${meta.grad.iconBg} text-white/80`}>
+                                  {meta.icon}
+                                </span>
+                                <span className="truncate">{suggestion.area.title}</span>
+                              </div>
+                              <div className="mt-2 flex min-w-0 items-baseline gap-1.5 text-slate-200">
+                                <span className="truncate text-[13px]">{suggestion.task.title}</span>
+                                {parentLabel && renderParentIndicator(parentLabel, 'flex-shrink-0 text-[11px] text-slate-500')}
+                              </div>
+                              <p className="mt-1 text-[11px] text-slate-500">{suggestion.reason}</p>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                addTaskToPlanner(suggestion.task);
+                              }}
+                              className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-slate-700/70 text-slate-400 transition-colors hover:border-slate-500 hover:text-slate-200"
+                              title="Add to planner"
+                              aria-label={`Add ${suggestion.task.title} to planner`}
+                            >
+                              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
+                              </svg>
+                            </button>
+                          </div>
+                        );
+                      })}
                     </div>
-                    <div className="px-4 py-4 flex flex-col justify-center border-t sm:border-t-0 border-slate-800/60 sm:border-r">
-                      <span className="text-2xl font-bold text-emerald-400">{globalStats.completed}</span>
-                      <span className="text-xs font-medium text-emerald-500/70 uppercase tracking-wider mt-1">Completed</span>
-                    </div>
-                    <div className="px-4 py-4 flex flex-col justify-center border-l border-t sm:border-t-0 border-slate-800/60">
-                      <span className="text-2xl font-bold text-fuchsia-400">{globalStats.recurring}</span>
-                      <span className="text-xs font-medium text-fuchsia-500/70 uppercase tracking-wider mt-1">Recurring</span>
-                    </div>
-                  </div>
+                  )}
                 </div>
               </div>
               <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
@@ -691,10 +1079,7 @@ export function HomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDraw
                         onEdit={() => openEditor(snapshot.area)}
                         onHierarchy={() => setHierarchyArea(snapshot.area)}
                         isActive={primaryAreaId === snapshot.area.id}
-                        onCalloutClick={(task) => {
-                          const event = new CustomEvent('lifeos:planner-add', { detail: { task } });
-                          window.dispatchEvent(event);
-                        }}
+                        onCalloutClick={addTaskToPlanner}
                       />
                     ))}
                     {lifeAreas.length === 0 && (
@@ -710,6 +1095,7 @@ export function HomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDraw
                       statusCounts={activeArea.statusCounts}
                       total={activeArea.total}
                       dueSoon={activeArea.dueSoon}
+                      taskMap={taskMap}
                       onOpen={() => { }}
                       muted
                     />
@@ -743,6 +1129,7 @@ export function HomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDraw
                   <div className="divide-y divide-slate-800/50">
                     {upcomingTasks.map(task => {
                       const dueDate = task.dueDate ? new Date(task.dueDate) : null;
+                      const parentLabel = getImmediateParentLabel(task, taskMap);
                       const now = new Date();
                       const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 2);
                       const isTomorrow = dueDate && dueDate < tomorrow && dueDate >= new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
@@ -764,7 +1151,10 @@ export function HomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDraw
                         >
                           <div className="mt-0.5 flex-shrink-0 w-4 h-4 rounded-[4px] border-[1.5px] border-slate-600 group-hover/up:border-slate-400 transition-colors" />
                           <div className="flex-1 min-w-0">
-                            <div className="text-[13px] text-slate-200 truncate">{task.title}</div>
+                            <div className="flex min-w-0 items-baseline gap-1.5 text-slate-200">
+                              <span className="truncate text-[13px]">{task.title}</span>
+                              {parentLabel && renderParentIndicator(parentLabel, 'flex-shrink-0 text-[11px] text-slate-500')}
+                            </div>
                             <div className="flex items-center gap-2 mt-1">
                               <span className="text-[11px] text-slate-500">Due {dueLabel}</span>
                               {isTomorrow && (

@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { Task, TaskStatus, ROOT_TASK_ID, CreateTaskInput, UpdateTaskInput, COMPLETED_HIDE_DAYS } from './types';
 import { taskStore } from './store';
-import { createSeedTasks, getSubtreeIds, getNextOrder, isCompletedOlderThan } from './tasks';
+import { createSeedTasks, getSubtreeIds, getNextOrder, isCompletedOlderThan, getAncestorIds } from './tasks';
 import { AUTO_BACKUP_KEY, FILE_SYSTEM_STORAGE_KEY, LAST_BACKUP_KEY } from './storage-keys';
 import { storage, generateId } from '@/lib/utils';
 
@@ -175,12 +175,41 @@ export function TaskProvider({ children }: TaskProviderProps) {
     setSelectedTaskId(taskId);
   }, []);
 
+  const normalizeParentStatuses = useCallback(async (taskList: Task[], startingTaskIds: string[]): Promise<Task[]> => {
+    const workingMap = new Map(taskList.map(task => [task.id, task]));
+    const candidateIds = Array.from(new Set(
+      startingTaskIds.flatMap(taskId => [taskId, ...getAncestorIds(Array.from(workingMap.values()), taskId)])
+    ));
+
+    const normalizedTasks: Task[] = [];
+
+    for (const candidateId of candidateIds) {
+      const candidate = workingMap.get(candidateId);
+      if (!candidate || candidate.status !== 'ON_HOLD') continue;
+
+      const hasInProgressChild = Array.from(workingMap.values()).some(task =>
+        task.parentId === candidateId && task.status === 'IN_PROGRESS'
+      );
+
+      if (!hasInProgressChild) continue;
+
+      const updatedTask = await taskStore.updateTask(candidateId, { status: 'IN_PROGRESS' });
+      workingMap.set(candidateId, updatedTask);
+      normalizedTasks.push(updatedTask);
+    }
+
+    return normalizedTasks;
+  }, []);
+
   const createTask = useCallback(async (input: Omit<CreateTaskInput, 'order'>): Promise<Task> => {
     const order = getNextOrder(tasks, input.parentId, input.status);
     const newTask = await taskStore.createTask({ ...input, order });
-    setTasks(prev => [...prev, newTask]);
+    const nextTasks = [...tasks, newTask];
+    const normalizedTasks = await normalizeParentStatuses(nextTasks, [newTask.id]);
+    const updatedMap = new Map([newTask, ...normalizedTasks].map(task => [task.id, task]));
+    setTasks(prev => [...prev, newTask].map(task => updatedMap.get(task.id) || task));
     return newTask;
-  }, [tasks]);
+  }, [tasks, normalizeParentStatuses]);
 
   const updateTask = useCallback(async (id: string, updates: UpdateTaskInput): Promise<Task> => {
     if (updates.status === 'COMPLETED') {
@@ -190,15 +219,25 @@ export function TaskProvider({ children }: TaskProviderProps) {
         taskStore.updateTask(id, updates),
         ...descendants.map(taskId => taskStore.updateTask(taskId, { status: 'COMPLETED' })),
       ]);
+      const nextTasks = tasks.map(task => {
+        if (task.id === updatedRoot.id) return updatedRoot;
+        const updatedDescendant = updatedDescendants.find(descendant => descendant.id === task.id);
+        return updatedDescendant || task;
+      });
+      const normalizedTasks = await normalizeParentStatuses(nextTasks, [id]);
       const updatedMap = new Map([updatedRoot, ...updatedDescendants].map(task => [task.id, task]));
+      normalizedTasks.forEach(task => updatedMap.set(task.id, task));
       setTasks(prev => prev.map(task => updatedMap.get(task.id) || task));
       return updatedRoot;
     }
 
     const updated = await taskStore.updateTask(id, updates);
-    setTasks(prev => prev.map(task => task.id === id ? updated : task));
+    const nextTasks = tasks.map(task => task.id === id ? updated : task);
+    const normalizedTasks = await normalizeParentStatuses(nextTasks, [id]);
+    const updatedMap = new Map([updated, ...normalizedTasks].map(task => [task.id, task]));
+    setTasks(prev => prev.map(task => updatedMap.get(task.id) || task));
     return updated;
-  }, [tasks]);
+  }, [tasks, normalizeParentStatuses]);
 
   const deleteTask = useCallback(async (id: string): Promise<void> => {
     const idsToDelete = getSubtreeIds(tasks, id);
@@ -215,6 +254,8 @@ export function TaskProvider({ children }: TaskProviderProps) {
 
   const moveTask = useCallback(async (taskId: string, newStatus: TaskStatus, newOrder: number, newParentId?: string): Promise<void> => {
     const updates: UpdateTaskInput = { status: newStatus, order: newOrder };
+    const currentTask = tasks.find(task => task.id === taskId);
+    const previousParentId = currentTask?.parentId;
     if (newParentId) {
       updates.parentId = newParentId;
     }
@@ -226,14 +267,29 @@ export function TaskProvider({ children }: TaskProviderProps) {
         taskStore.updateTask(taskId, updates),
         ...descendants.map(id => taskStore.updateTask(id, { status: 'COMPLETED' })),
       ]);
-      const updatedMap = new Map([updatedRoot, ...updatedDescendants].map(task => [task.id, task]));
+      const nextTasks = tasks.map(task => {
+        if (task.id === updatedRoot.id) return updatedRoot;
+        const updatedDescendant = updatedDescendants.find(descendant => descendant.id === task.id);
+        return updatedDescendant || task;
+      });
+      const normalizedTasks = await normalizeParentStatuses(
+        nextTasks,
+        [taskId, ...(previousParentId ? [previousParentId] : []), ...(newParentId ? [newParentId] : [])]
+      );
+      const updatedMap = new Map([updatedRoot, ...updatedDescendants, ...normalizedTasks].map(task => [task.id, task]));
       setTasks(prev => prev.map(task => updatedMap.get(task.id) || task));
       return;
     }
 
     const updated = await taskStore.updateTask(taskId, updates);
-    setTasks(prev => prev.map(task => task.id === taskId ? updated : task));
-  }, [tasks]);
+    const nextTasks = tasks.map(task => task.id === taskId ? updated : task);
+    const normalizedTasks = await normalizeParentStatuses(
+      nextTasks,
+      [taskId, ...(previousParentId ? [previousParentId] : []), ...(newParentId ? [newParentId] : [])]
+    );
+    const updatedMap = new Map([updated, ...normalizedTasks].map(task => [task.id, task]));
+    setTasks(prev => prev.map(task => updatedMap.get(task.id) || task));
+  }, [tasks, normalizeParentStatuses]);
 
   const reorderTasks = useCallback(async (taskIds: string[], _status: TaskStatus): Promise<void> => {
     void _status;

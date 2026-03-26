@@ -93,6 +93,22 @@ export function getSubtreeIds(tasks: Task[], taskId: string): string[] {
 }
 
 /**
+ * Get all ancestor task IDs from immediate parent upward.
+ */
+export function getAncestorIds(tasks: Task[], taskId: string): string[] {
+  const taskMap = new Map(tasks.map(task => [task.id, task]));
+  const ancestorIds: string[] = [];
+
+  let currentId = taskMap.get(taskId)?.parentId;
+  while (currentId && currentId !== ROOT_TASK_ID) {
+    ancestorIds.push(currentId);
+    currentId = taskMap.get(currentId)?.parentId;
+  }
+
+  return ancestorIds;
+}
+
+/**
  * Get the next order value for a task in a given parent/status
  */
 export function getNextOrder(tasks: Task[], parentId: string, status: string): number {
@@ -213,7 +229,7 @@ export function getSuggestedNextTask(tasks: Task[], _currentParentId: string): T
   // We filter all tasks that belong to the current area hierarchy
   // (Assuming caller passes allAreaTasks correctly)
   const candidates = tasks.filter(t => 
-    (t.status === 'NOT_STARTED' || t.status === 'ON_HOLD') && 
+    t.status === 'NOT_STARTED' && 
     !t.calendarOnly
   );
 
@@ -244,4 +260,3 @@ export function getSuggestedNextTask(tasks: Task[], _currentParentId: string): T
   scoredPool.sort((a, b) => b.score - a.score);
   return scoredPool[0]?.task || null;
 }
-
