@@ -1,4 +1,12 @@
-import { ChatAdapter, ChatMessage, AppContext } from '../components/ChatPanel';
+import {
+  buildAssistantTaskSnapshot,
+  buildDailyFocusReply,
+  buildGeneralChatSystemPrompt,
+  buildStatusSummaryReply,
+  buildTaskLookupReply,
+  routeAssistantIntent,
+} from './assistant';
+import type { AppContext, AssistantReply, ChatAdapter, ChatMessage } from './assistant';
 
 const OLLAMA_URL = 'http://localhost:11434';
 const OLLAMA_MODEL = 'gemma3:1b-it-qat';
@@ -13,45 +21,35 @@ export async function checkOllamaHealth(): Promise<boolean> {
     const res = await fetch(OLLAMA_URL);
     // Ollama typically returns "Ollama is running" on the root endpoint.
     return res.ok;
-  } catch (err) {
+  } catch {
     return false;
   }
 }
 
 // ─── System Prompt ──────────────────────────────────────────────────────────
 
-const generateSystemPrompt = (context: AppContext) => {
-  // Convert tasks to a compact string to save context window space
-  const taskContext = context.tasks.map(t =>
-    `[${t.status}] ${t.title} ${t.dueDate ? `(Due: ${new Date(t.dueDate).toLocaleDateString()})` : ''}`
-  ).join('\\n');
-
-  return `You are a helpful and concise personal assistant AI for a planning application called LifeOS.
-You are chatting with the user.
-
-Here is the current state of the user's tasks and projects from their database:
-<tasks>
-${taskContext}
-</tasks>
-
-Answer the user's questions based on this data. If the answer is not in the data, state that you don't know based on the current context. Keep your answers brief and natural. Do NOT output raw JSON unless specifically asked.`;
-};
-
-// ─── Adapter Implementation ────────────────────────────────────────────────
-
-export const ollamaCommandAdapter: ChatAdapter = async (message, history, context) => {
+async function runOllamaChat(message: string, history: ChatMessage[], context: AppContext): Promise<AssistantReply> {
   const isHealthy = await checkOllamaHealth();
   if (!isHealthy) {
-    return "Error: Ollama does not appear to be running on http://localhost:11434. Please start the Ollama service.";
+    return {
+      text: "Error: Ollama does not appear to be running on http://localhost:11434. Please start the Ollama service.",
+      intent: 'general_chat',
+    };
   }
 
   // Format history for Ollama
   // The adapter's `history` contains the current user message as well, but we'll drop it here
   // and pass the latest `message` string as the final user prompt.
-  const pastMessages = history.slice(0, -1).map(m => ({
-    role: m.role,
-    content: m.content
-  }));
+  const pastMessages = history
+    .slice(0, -1)
+    .filter(messageItem => messageItem.role !== 'system')
+    .slice(-6)
+    .map(m => ({
+      role: m.role,
+      content: m.content
+    }));
+
+  const snapshot = buildAssistantTaskSnapshot(context.tasks);
 
   try {
     const res = await fetch(`${OLLAMA_URL}/api/chat`, {
@@ -63,7 +61,7 @@ export const ollamaCommandAdapter: ChatAdapter = async (message, history, contex
         model: OLLAMA_MODEL,
         stream: false,
         messages: [
-          { role: 'system', content: generateSystemPrompt(context) },
+          { role: 'system', content: buildGeneralChatSystemPrompt(snapshot) },
           ...pastMessages,
           { role: 'user', content: message },
         ],
@@ -75,12 +73,39 @@ export const ollamaCommandAdapter: ChatAdapter = async (message, history, contex
     }
 
     const data = await res.json();
-    return data.message?.content || "No response received.";
+    return {
+      text: data.message?.content || 'No response received.',
+      intent: 'general_chat',
+    };
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Ollama Request failed", error);
-    return `Error communicating with Ollama: ${error.message}`;
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return {
+      text: `Error communicating with Ollama: ${errorMessage}`,
+      intent: 'general_chat',
+    };
   }
+}
+
+// ─── Adapter Implementation ────────────────────────────────────────────────
+
+export const ollamaCommandAdapter: ChatAdapter = async (message, history, context) => {
+  const intent = routeAssistantIntent(message);
+
+  if (intent === 'daily_focus') {
+    return buildDailyFocusReply(context.tasks);
+  }
+
+  if (intent === 'status_summary') {
+    return buildStatusSummaryReply(context.tasks);
+  }
+
+  if (intent === 'task_lookup') {
+    return buildTaskLookupReply(message, context);
+  }
+
+  return runOllamaChat(message, history, context);
 };
 
 // ─── Test Suite ────────────────────────────────────────────────────────────

@@ -1,122 +1,34 @@
-import { Task, ROOT_TASK_ID, LIFE_AREAS, TaskPriority } from '../types';
+import { LifeAreaDefinition, Task, ROOT_TASK_ID, LIFE_AREAS } from '../types';
+
+export const LEGACY_SEEDED_TASK_IDS = [
+  'c1',
+  'c2',
+  'h1',
+  'h2',
+  'f1',
+  'health-workout',
+  'health-shave',
+  'health-haircut',
+  'home-laundry',
+  'home-groceries',
+] as const;
+
+export function createRootLifeAreaTask(area: LifeAreaDefinition, order: number, now = new Date()): Task {
+  return {
+    id: area.id,
+    parentId: ROOT_TASK_ID,
+    title: area.title,
+    description: area.description,
+    status: 'NOT_STARTED', // Roots don't really have status, but type requires it
+    priority: 'MEDIUM',
+    createdAt: now,
+    updatedAt: now,
+    order,
+    tags: ['root'],
+  };
+}
 
 export function createSeedTasks(): Task[] {
   const now = new Date();
-  const tasks: Task[] = [];
-
-  // Create Life Area roots
-  LIFE_AREAS.forEach((area, index) => {
-    tasks.push({
-      id: area.id,
-      parentId: ROOT_TASK_ID,
-      title: area.title,
-      description: area.description,
-      status: 'NOT_STARTED', // Roots don't really have status, but type requires it
-      priority: 'MEDIUM',
-      createdAt: now,
-      updatedAt: now,
-      order: index,
-      tags: ['root'],
-    });
-  });
-
-  // Helper to add tasks to an area
-  const addTask = (
-    id: string,
-    parentId: string,
-    title: string,
-    status: Task['status'],
-    order: number,
-    priority: TaskPriority = 'MEDIUM'
-  ) => {
-    tasks.push({
-      id,
-      parentId,
-      title,
-      status,
-      priority,
-      createdAt: now,
-      updatedAt: now,
-      order,
-    });
-  };
-
-  // Career Tasks
-  addTask('c1', 'career', 'Complete Q1 Review', 'IN_PROGRESS', 0, 'HIGH');
-  addTask('c2', 'career', 'Update Resume', 'NOT_STARTED', 1, 'MEDIUM');
-
-  // Health Tasks
-  addTask('h1', 'health', 'Morning Run', 'COMPLETED', 0, 'MEDIUM');
-  addTask('h2', 'health', 'Meal Prep', 'NOT_STARTED', 1, 'HIGH');
-
-  // Finances
-  addTask('f1', 'finances', 'Budget Review', 'ON_HOLD', 0, 'HIGH');
-
-  // Routine Calendar tasks
-  tasks.push({
-    id: 'health-workout',
-    parentId: 'health',
-    title: 'Workout',
-    status: 'NOT_STARTED',
-    priority: 'MEDIUM',
-    createdAt: now,
-    updatedAt: now,
-    order: 2,
-    calendarOnly: true,
-    recurrence: { rule: 'mwf' },
-  });
-
-  tasks.push({
-    id: 'health-shave',
-    parentId: 'health',
-    title: 'Shave',
-    status: 'NOT_STARTED',
-    priority: 'MEDIUM',
-    createdAt: now,
-    updatedAt: now,
-    order: 3,
-    calendarOnly: true,
-    recurrence: { rule: 'custom', daysOfWeek: [1, 4] }, // Mon, Thu
-  });
-
-  tasks.push({
-    id: 'health-haircut',
-    parentId: 'health',
-    title: 'Haircut',
-    status: 'NOT_STARTED',
-    priority: 'MEDIUM',
-    createdAt: now,
-    updatedAt: now,
-    order: 4,
-    calendarOnly: true,
-    // Provide a dummy recurrence here or just rely on manual creation for haircut, but we will test calendar-only ui
-  });
-
-  tasks.push({
-    id: 'home-laundry',
-    parentId: ROOT_TASK_ID, // Use root for generic routines without specific areas, or recreation
-    title: 'Laundry',
-    status: 'NOT_STARTED',
-    priority: 'MEDIUM',
-    createdAt: now,
-    updatedAt: now,
-    order: 5,
-    calendarOnly: true,
-    recurrence: { rule: 'custom', daysOfWeek: [6] }, // Saturday
-  });
-
-  tasks.push({
-    id: 'home-groceries',
-    parentId: ROOT_TASK_ID,
-    title: 'Groceries',
-    status: 'NOT_STARTED',
-    priority: 'MEDIUM',
-    createdAt: now,
-    updatedAt: now,
-    order: 6,
-    calendarOnly: true,
-    recurrence: { rule: 'custom', daysOfWeek: [0] }, // Sunday
-  });
-
-  return tasks;
+  return LIFE_AREAS.map((area, index) => createRootLifeAreaTask(area, index, now));
 }

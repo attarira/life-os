@@ -17,7 +17,7 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Task, ROOT_TASK_ID, TaskRecurrence, UpdateTaskInput } from '@/lib/types';
+import { Task, ROOT_TASK_ID, UpdateTaskInput } from '@/lib/types';
 import { PLANNER_ITEMS_STORAGE_KEY, PLANNER_DATE_STORAGE_KEY, PLANNER_DISMISSED_STORAGE_KEY } from '@/lib/storage-keys';
 import { getTaskPath } from '@/lib/tasks';
 import { resolveAreaKey } from '@/lib/utils';
@@ -77,19 +77,6 @@ function saveDismissedIds(ids: Set<string>) {
   try {
     localStorage.setItem(PLANNER_DISMISSED_STORAGE_KEY, JSON.stringify([...ids]));
   } catch { }
-}
-
-function matchesToday(recurrence: TaskRecurrence): boolean {
-  const day = new Date().getDay();
-  switch (recurrence.rule) {
-    case 'daily': return true;
-    case 'weekdays': return day >= 1 && day <= 5;
-    case 'weekends': return day === 0 || day === 6;
-    case 'mwf': return day === 1 || day === 3 || day === 5;
-    case 'tth': return day === 2 || day === 4;
-    case 'custom': return recurrence.daysOfWeek?.includes(day) ?? false;
-  }
-  return false;
 }
 
 // ─── Area Badge Styling ──────────────────────────────────────────────────────
@@ -171,6 +158,19 @@ function getImmediateParentLabel(task: Task, tasks: Task[]): string | null {
   const parent = tasks.find(candidate => candidate.id === task.parentId);
   if (!parent || parent.parentId === ROOT_TASK_ID) return null;
   return parent.title;
+}
+
+function getPlannerPillLabel(task: Task, tasks: Task[]): string | null {
+  const path = getTaskPath(tasks, task.id);
+  if (path.some(candidate => candidate.title === 'Watch Movies/Shows')) {
+    return 'Watch Movies/Shows';
+  }
+  return null;
+}
+
+function shouldRenderAsPlannerPill(task: Task | null, tasks: Task[]): boolean {
+  if (!task) return false;
+  return task.calendarOnly === true || Boolean(task.recurrence) || Boolean(getPlannerPillLabel(task, tasks));
 }
 
 function renderParentIndicator(label: string, className: string) {
@@ -332,7 +332,6 @@ function RecurrenceEditor({
 
 function SortablePlannerRow({
   entry,
-  linkedTask,
   parentLabel,
   areaKey,
   areaLabel,
@@ -342,7 +341,6 @@ function SortablePlannerRow({
   onNavigate,
 }: {
   entry: PlannerEntry;
-  linkedTask: Task | null;
   parentLabel: string | null;
   areaKey: string;
   areaLabel: string;
@@ -351,7 +349,6 @@ function SortablePlannerRow({
   onRemove: () => void;
   onNavigate: () => void;
 }) {
-  const isCalendarOnly = linkedTask?.calendarOnly === true;
   const {
     attributes,
     listeners,
@@ -490,37 +487,21 @@ export function PlannerCard({ tasks, navigateTo, selectTask, createTask, updateT
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
   );
 
-  // Auto-populate recurring tasks & handle daily rollover
+  // Clear planner state on daily rollover
   useEffect(() => {
     const d = new Date();
     const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     const storedDate = typeof window !== 'undefined' ? localStorage.getItem(PLANNER_DATE_STORAGE_KEY) : todayStr;
-    const dismissed = loadDismissedIds();
 
     setEntries(prev => {
-      let next = [...prev];
-      let changed = false;
-
-      // Handle daily rollover — clear dismissed set too
       if (storedDate !== todayStr && typeof window !== 'undefined') {
-        next = next.filter(e => !e.completed);
         localStorage.setItem(PLANNER_DATE_STORAGE_KEY, todayStr);
         saveDismissedIds(new Set());
-        dismissed.clear();
-        changed = true;
+        return [];
       }
-
-      const autoTasks = tasks.filter(t => t.recurrence && matchesToday(t.recurrence));
-      autoTasks.forEach(rt => {
-        if (!next.some(e => e.taskId === rt.id) && !dismissed.has(rt.id)) {
-          next.push({ id: buildId(), taskId: rt.id, label: rt.title, completed: false });
-          changed = true;
-        }
-      });
-
-      return changed ? next : prev;
+      return prev;
     });
-  }, [tasks]);
+  }, []);
 
   // Persist entries
   useEffect(() => {
@@ -699,7 +680,7 @@ export function PlannerCard({ tasks, navigateTo, selectTask, createTask, updateT
 
   entries.forEach(e => {
     const linkedTask = e.taskId ? tasks.find(t => t.id === e.taskId) : null;
-    if (linkedTask && (linkedTask.calendarOnly || linkedTask.recurrence)) {
+    if (shouldRenderAsPlannerPill(linkedTask, tasks)) {
       routineEntries.push(e);
     } else {
       standardEntries.push(e);
@@ -816,6 +797,8 @@ export function PlannerCard({ tasks, navigateTo, selectTask, createTask, updateT
           {routineEntries.map(entry => {
             const linkedTask = entry.taskId ? tasks.find(t => t.id === entry.taskId) : null;
             const areaKey = linkedTask ? getTaskArea(linkedTask, tasks).areaKey : 'default';
+            const pillLabel = linkedTask ? getPlannerPillLabel(linkedTask, tasks) : null;
+            const opensRecurrenceEditor = Boolean(linkedTask?.recurrence);
             return (
               <div
                 key={entry.id}
@@ -826,14 +809,19 @@ export function PlannerCard({ tasks, navigateTo, selectTask, createTask, updateT
                   type="button"
                   onClick={(e) => {
                     if (!linkedTask) return;
-                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                    setEditingRecurrence({ task: linkedTask, rect });
+                    if (opensRecurrenceEditor) {
+                      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                      setEditingRecurrence({ task: linkedTask, rect });
+                      return;
+                    }
+                    navigateTo(linkedTask.parentId);
+                    selectTask(linkedTask.id);
                   }}
-                  title="Edit recurrence"
+                  title={opensRecurrenceEditor ? 'Edit recurrence' : 'Open task'}
                   className="flex items-center gap-1.5 px-2.5 py-1.5 cursor-pointer hover:bg-blue-500/15 rounded-l-lg transition-colors"
                 >
                   <span className="text-slate-400 group-hover/chip:text-blue-400 transition-colors">
-                    {AREA_ICONS[areaKey] || AREA_ICONS.default}
+                    {pillLabel ? renderParentIndicator(pillLabel, 'flex') : (AREA_ICONS[areaKey] || AREA_ICONS.default)}
                   </span>
                   <span className="text-[11px] font-medium text-slate-300 group-hover/chip:text-blue-200 transition-colors">
                     {entry.label}
@@ -905,7 +893,6 @@ export function PlannerCard({ tasks, navigateTo, selectTask, createTask, updateT
                   <SortablePlannerRow
                     key={entry.id}
                     entry={entry}
-                    linkedTask={linkedTask}
                     parentLabel={parentLabel}
                     areaKey={areaKey}
                     areaLabel={areaLabel}

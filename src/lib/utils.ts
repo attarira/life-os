@@ -6,6 +6,7 @@ export function generateId(): string {
 
 export function resolveAreaKey(id: string): string {
   const key = id.toLowerCase();
+  if (key.includes('admin') || key.includes('errand') || key.includes('chore') || key.includes('paperwork')) return 'admin';
   if (key.includes('home')) return 'home';
   if (key.includes('health') || key.includes('well')) return 'health';
   if (key.includes('finance') || key.includes('budget')) return 'finances';

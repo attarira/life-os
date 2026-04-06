@@ -77,6 +77,11 @@ export function TaskPanel() {
 
   if (!task) return null;
 
+  const parentTask = tasks.find(t => t.id === task.parentId) || null;
+  const parentDueDateMax = parentTask?.dueDate
+    ? new Date(parentTask.dueDate).toISOString().split('T')[0]
+    : undefined;
+
   const parseDateInput = (value: string) => {
     const parts = value.split('-').map(Number);
     if (parts.length === 3) {
@@ -108,7 +113,12 @@ export function TaskPanel() {
   const handleDueDateSave = async () => {
     const newDate = dueDate ? parseDateInput(dueDate) : undefined;
     if (newDate?.toISOString() !== task.dueDate?.toISOString()) {
-      await updateTask(task.id, { dueDate: newDate });
+      try {
+        await updateTask(task.id, { dueDate: newDate });
+      } catch (error) {
+        setDueDate(task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : '');
+        alert(error instanceof Error ? error.message : 'Invalid due date.');
+      }
     }
   };
 
@@ -341,12 +351,13 @@ export function TaskPanel() {
                     onClick={(e) => {
                       try {
                         e.currentTarget.showPicker();
-                      } catch (err) {
+                      } catch {
                         // ignore
                       }
                     }}
                     value={dueDate}
                     onChange={(e) => setDueDate(e.target.value)}
+                    max={parentDueDateMax}
                     onBlur={handleDueDateSave}
                     className={`w-full rounded-xl bg-slate-800/40 border border-slate-700/50 px-9 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500/40 transition-all cursor-pointer [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-datetime-edit]:py-0 ${dueDate ? 'text-slate-100' : 'text-transparent'
                       }`}

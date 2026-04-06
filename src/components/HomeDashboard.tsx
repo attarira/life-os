@@ -17,7 +17,8 @@ import { COLUMNS, ROOT_TASK_ID, Task, TaskStatus } from '@/lib/types';
 import { getSubtreeIds, getTaskPath, computeTaskImportance, getSuggestedNextTask } from '@/lib/tasks';
 
 import { generateId, resolveAreaKey, storage } from '@/lib/utils';
-import { ChatPanel, AppContext } from './ChatPanel';
+import { ChatPanel } from './ChatPanel';
+import type { AppContext } from '@/lib/assistant';
 import { PlannerCard } from './PlannerCard';
 import { GlobalTray } from './GlobalTray';
 import { FileSystemDrawer } from './FileSystemDrawer';
@@ -125,6 +126,14 @@ const LIFE_AREA_ICONS: Record<string, React.JSX.Element> = {
       <path d="M10 6l2-2 2 2" />
     </svg>
   ),
+  admin: (
+    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="6" y="4" width="12" height="16" rx="2" />
+      <path d="M9 8h6" />
+      <path d="M9 12h6" />
+      <path d="M9 16h4" />
+    </svg>
+  ),
   recreation: (
     <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M5 19l7-14 7 14H5z" />
@@ -139,6 +148,7 @@ const AREA_GRADIENTS: Record<string, { gradient: string; iconBg: string; ringTra
   finances: { gradient: 'linear-gradient(135deg, #14532d 0%, #052e16 100%)', iconBg: 'bg-green-500/25', ringTrack: 'rgba(34,197,94,0.25)' },
   relationships: { gradient: 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)', iconBg: 'bg-red-400/25', ringTrack: 'rgba(248,113,113,0.35)' },
   growth: { gradient: 'linear-gradient(135deg, #701a75 0%, #4a044e 100%)', iconBg: 'bg-fuchsia-500/25', ringTrack: 'rgba(217,70,239,0.25)' },
+  admin: { gradient: 'linear-gradient(135deg, #ca8a04 0%, #854d0e 100%)', iconBg: 'bg-yellow-400/25', ringTrack: 'rgba(250,204,21,0.28)' },
   recreation: { gradient: 'linear-gradient(135deg, #c2410c 0%, #7c2d12 100%)', iconBg: 'bg-orange-500/25', ringTrack: 'rgba(249,115,22,0.25)' },
   home: { gradient: 'linear-gradient(135deg, #2d4a3e 0%, #162620 100%)', iconBg: 'bg-teal-500/25', ringTrack: 'rgba(20,184,166,0.25)' },
 };
@@ -149,6 +159,7 @@ const AREA_BADGES: Record<string, string> = {
   finances: 'bg-green-100/70 text-green-700 dark:bg-green-500/20 dark:text-green-200',
   relationships: 'bg-rose-100/70 text-rose-700 dark:bg-rose-500/20 dark:text-rose-200',
   growth: 'bg-fuchsia-100/70 text-fuchsia-700 dark:bg-fuchsia-500/20 dark:text-fuchsia-200',
+  admin: 'bg-slate-100/70 text-slate-700 dark:bg-slate-700/60 dark:text-slate-200',
   recreation: 'bg-amber-100/70 text-amber-700 dark:bg-amber-500/20 dark:text-amber-200',
   default: 'bg-slate-100/70 text-slate-600 dark:bg-slate-800/60 dark:text-slate-300',
 };

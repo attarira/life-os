@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { Task, TaskStatus, ROOT_TASK_ID, CreateTaskInput, UpdateTaskInput, COMPLETED_HIDE_DAYS } from './types';
 import { taskStore } from './store';
-import { createSeedTasks, getSubtreeIds, getNextOrder, isCompletedOlderThan, getAncestorIds } from './tasks';
+import { createSeedTasks, getSubtreeIds, getNextOrder, isCompletedOlderThan, getAncestorIds, LEGACY_SEEDED_TASK_IDS } from './tasks';
 import { AUTO_BACKUP_KEY, FILE_SYSTEM_STORAGE_KEY, LAST_BACKUP_KEY } from './storage-keys';
 import { storage, generateId } from '@/lib/utils';
 
@@ -59,6 +59,8 @@ interface TaskProviderProps {
   children: ReactNode;
 }
 
+type DueDateConstraintTarget = Pick<Task, 'id' | 'parentId' | 'title' | 'dueDate'>;
+
 export function TaskProvider({ children }: TaskProviderProps) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [currentParentId, setCurrentParentId] = useState<string>(ROOT_TASK_ID);
@@ -74,26 +76,21 @@ export function TaskProvider({ children }: TaskProviderProps) {
       try {
         const initialized = await taskStore.isInitialized();
         if (!initialized) {
-          // Seed with initial data
+          // Initialize only the root life areas; do not inject demo or planner tasks.
           const seedTasks = createSeedTasks();
           await taskStore.importTasks(seedTasks);
           await taskStore.setInitialized();
         }
-        
+
         let allTasks = await taskStore.getAllTasks();
-        
-        // Auto-inject missing generic routine tasks for existing test setups
-        if (initialized) {
-          const hasRoutines = allTasks.some(t => t.calendarOnly && t.recurrence);
-          if (!hasRoutines) {
-             const rt = createSeedTasks().filter(t => t.calendarOnly);
-             for (const r of rt) {
-                 await taskStore.createTask(r);
-             }
-             allTasks = await taskStore.getAllTasks();
-          }
+        const legacySeedIds = new Set<string>(LEGACY_SEEDED_TASK_IDS);
+        const legacySeededTasks = allTasks.filter(task => legacySeedIds.has(task.id));
+
+        if (legacySeededTasks.length > 0) {
+          await taskStore.deleteTasks(legacySeededTasks.map(task => task.id));
+          allTasks = allTasks.filter(task => !legacySeedIds.has(task.id));
         }
-        
+
         setTasks(allTasks);
       } catch (error) {
         console.error('Failed to initialize tasks:', error);
@@ -175,6 +172,28 @@ export function TaskProvider({ children }: TaskProviderProps) {
     setSelectedTaskId(taskId);
   }, []);
 
+  const assertDueDateHierarchy = useCallback((taskList: Task[], candidate: DueDateConstraintTarget) => {
+    if (!candidate.dueDate) return;
+
+    const candidateDueTime = new Date(candidate.dueDate).getTime();
+    const parent = taskList.find(task => task.id === candidate.parentId);
+    const parentDueTime = parent?.dueDate ? new Date(parent.dueDate).getTime() : null;
+
+    if (parent && parentDueTime !== null && candidateDueTime > parentDueTime) {
+      throw new Error(`"${candidate.title}" cannot be due after parent "${parent.title}".`);
+    }
+
+    const violatingChild = taskList.find(task => (
+      task.parentId === candidate.id &&
+      task.dueDate &&
+      new Date(task.dueDate).getTime() > candidateDueTime
+    ));
+
+    if (violatingChild) {
+      throw new Error(`"${candidate.title}" cannot be due before child "${violatingChild.title}".`);
+    }
+  }, []);
+
   const normalizeParentStatuses = useCallback(async (taskList: Task[], startingTaskIds: string[]): Promise<Task[]> => {
     const workingMap = new Map(taskList.map(task => [task.id, task]));
     const candidateIds = Array.from(new Set(
@@ -203,15 +222,33 @@ export function TaskProvider({ children }: TaskProviderProps) {
 
   const createTask = useCallback(async (input: Omit<CreateTaskInput, 'order'>): Promise<Task> => {
     const order = getNextOrder(tasks, input.parentId, input.status);
+    assertDueDateHierarchy(tasks, {
+      id: '__new__',
+      parentId: input.parentId,
+      title: input.title,
+      dueDate: input.dueDate,
+    });
     const newTask = await taskStore.createTask({ ...input, order });
     const nextTasks = [...tasks, newTask];
     const normalizedTasks = await normalizeParentStatuses(nextTasks, [newTask.id]);
     const updatedMap = new Map([newTask, ...normalizedTasks].map(task => [task.id, task]));
     setTasks(prev => [...prev, newTask].map(task => updatedMap.get(task.id) || task));
     return newTask;
-  }, [tasks, normalizeParentStatuses]);
+  }, [tasks, normalizeParentStatuses, assertDueDateHierarchy]);
 
   const updateTask = useCallback(async (id: string, updates: UpdateTaskInput): Promise<Task> => {
+    const currentTask = tasks.find(task => task.id === id);
+    if (!currentTask) {
+      throw new Error(`Task ${id} not found`);
+    }
+
+    assertDueDateHierarchy(tasks, {
+      id,
+      parentId: updates.parentId ?? currentTask.parentId,
+      title: updates.title ?? currentTask.title,
+      dueDate: updates.dueDate !== undefined ? updates.dueDate : currentTask.dueDate,
+    });
+
     if (updates.status === 'COMPLETED') {
       const subtreeIds = getSubtreeIds(tasks, id);
       const descendants = subtreeIds.filter(taskId => taskId !== id);
@@ -237,7 +274,7 @@ export function TaskProvider({ children }: TaskProviderProps) {
     const updatedMap = new Map([updated, ...normalizedTasks].map(task => [task.id, task]));
     setTasks(prev => prev.map(task => updatedMap.get(task.id) || task));
     return updated;
-  }, [tasks, normalizeParentStatuses]);
+  }, [tasks, normalizeParentStatuses, assertDueDateHierarchy]);
 
   const deleteTask = useCallback(async (id: string): Promise<void> => {
     const idsToDelete = getSubtreeIds(tasks, id);
@@ -255,10 +292,20 @@ export function TaskProvider({ children }: TaskProviderProps) {
   const moveTask = useCallback(async (taskId: string, newStatus: TaskStatus, newOrder: number, newParentId?: string): Promise<void> => {
     const updates: UpdateTaskInput = { status: newStatus, order: newOrder };
     const currentTask = tasks.find(task => task.id === taskId);
-    const previousParentId = currentTask?.parentId;
+    if (!currentTask) {
+      throw new Error(`Task ${taskId} not found`);
+    }
+    const previousParentId = currentTask.parentId;
     if (newParentId) {
       updates.parentId = newParentId;
     }
+
+    assertDueDateHierarchy(tasks, {
+      id: currentTask.id,
+      parentId: newParentId ?? currentTask.parentId,
+      title: currentTask.title,
+      dueDate: currentTask.dueDate,
+    });
 
     if (newStatus === 'COMPLETED') {
       const subtreeIds = getSubtreeIds(tasks, taskId);
@@ -289,7 +336,7 @@ export function TaskProvider({ children }: TaskProviderProps) {
     );
     const updatedMap = new Map([updated, ...normalizedTasks].map(task => [task.id, task]));
     setTasks(prev => prev.map(task => updatedMap.get(task.id) || task));
-  }, [tasks, normalizeParentStatuses]);
+  }, [tasks, normalizeParentStatuses, assertDueDateHierarchy]);
 
   const reorderTasks = useCallback(async (taskIds: string[], _status: TaskStatus): Promise<void> => {
     void _status;
