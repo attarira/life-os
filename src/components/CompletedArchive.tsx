@@ -45,7 +45,7 @@ export function ArchiveInlinePanel({ onNavigate }: { onNavigate?: () => void }) 
           <div className="space-y-1.5">
             {filteredTasks.map(task => {
               const path = getTaskPath(tasks, task.id);
-              const breadcrumb = formatBreadcrumb(path.slice(0, -1), 32);
+              const breadcrumb = formatBreadcrumb(path.slice(0, -1), 32, false);
 
               return (
                 <button
@@ -162,7 +162,7 @@ export function CompletedArchive() {
             <div className="space-y-2">
               {filteredTasks.map(task => {
                 const path = getTaskPath(tasks, task.id);
-                const breadcrumb = formatBreadcrumb(path.slice(0, -1), 40);
+                const breadcrumb = formatBreadcrumb(path.slice(0, -1), 40, false);
 
                 return (
                   <button

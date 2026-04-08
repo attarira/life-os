@@ -132,6 +132,8 @@ export function FileSystemDrawer({ isOpen, setIsOpen }: FileSystemDrawerProps) {
     <>
       {/* LEFT PANE: Directory Tree (Drawer) */}
       <aside
+        data-files-drawer
+        data-open={isOpen ? 'true' : 'false'}
         className={`hidden xl:block fixed right-0 top-[73px] bottom-0 z-30 transition-[width] duration-200 ${isOpen ? 'w-[330px]' : 'w-[56px]'
           }`}
       >

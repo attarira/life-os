@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   DndContext,
   DragEndEvent,
@@ -17,7 +18,7 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Task, ROOT_TASK_ID, UpdateTaskInput } from '@/lib/types';
+import { CreateTaskInput, Task, TaskRecurrence, ROOT_TASK_ID, UpdateTaskInput } from '@/lib/types';
 import { PLANNER_ITEMS_STORAGE_KEY, PLANNER_DATE_STORAGE_KEY, PLANNER_DISMISSED_STORAGE_KEY } from '@/lib/storage-keys';
 import { getTaskPath } from '@/lib/tasks';
 import { resolveAreaKey } from '@/lib/utils';
@@ -29,13 +30,15 @@ type PlannerEntry = {
   taskId: string | null; // linked task ID, or null for quick-created items
   label: string; // display label
   completed: boolean;
+  startTime?: string;
+  endTime?: string;
 };
 
 type PlannerCardProps = {
   tasks: Task[];
   navigateTo: (id: string) => void;
   selectTask: (id: string | null) => void;
-  createTask: (input: any) => Promise<Task>;
+  createTask: (input: Omit<CreateTaskInput, 'order'>) => Promise<Task>;
   updateTask: (id: string, updates: UpdateTaskInput) => Promise<Task>;
 };
 
@@ -47,11 +50,78 @@ function buildId() {
     : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+function normalizeTimeValue(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(value) ? value : undefined;
+}
+
+function compareTimeValues(a?: string, b?: string) {
+  if (a && b) return a.localeCompare(b);
+  if (a) return -1;
+  if (b) return 1;
+  return 0;
+}
+
+function normalizePlannerEntry(entry: unknown): PlannerEntry | null {
+  if (!entry || typeof entry !== 'object') return null;
+  const candidate = entry as Record<string, unknown>;
+  if (typeof candidate.id !== 'string' || typeof candidate.label !== 'string' || typeof candidate.completed !== 'boolean') {
+    return null;
+  }
+
+  const startTime = normalizeTimeValue(candidate.startTime);
+  const endTime = normalizeTimeValue(candidate.endTime);
+
+  return {
+    id: candidate.id,
+    taskId: typeof candidate.taskId === 'string' ? candidate.taskId : null,
+    label: candidate.label,
+    completed: candidate.completed,
+    startTime,
+    endTime: startTime && endTime && endTime > startTime ? endTime : undefined,
+  };
+}
+
+function sortPlannerEntries(entries: PlannerEntry[]) {
+  return [...entries]
+    .map((entry, index) => ({ entry, index }))
+    .sort((a, b) => {
+      const timeComparison = compareTimeValues(a.entry.startTime, b.entry.startTime);
+      if (timeComparison !== 0) return timeComparison;
+
+      const endComparison = compareTimeValues(a.entry.endTime, b.entry.endTime);
+      if (endComparison !== 0) return endComparison;
+
+      return a.index - b.index;
+    })
+    .map(({ entry }) => entry);
+}
+
+function formatDisplayTime(value?: string) {
+  if (!value) return null;
+  const [hours, minutes] = value.split(':').map(Number);
+  const suffix = hours >= 12 ? 'PM' : 'AM';
+  const displayHours = hours % 12 || 12;
+  return `${displayHours}:${String(minutes).padStart(2, '0')} ${suffix}`;
+}
+
+function formatTimeSlotLabel(startTime?: string, endTime?: string) {
+  const startLabel = formatDisplayTime(startTime);
+  const endLabel = formatDisplayTime(endTime);
+
+  if (startLabel && endLabel) return `${startLabel} - ${endLabel}`;
+  if (startLabel) return startLabel;
+  return 'Set time';
+}
+
 function loadPlannerEntries(): PlannerEntry[] {
   if (typeof window === 'undefined') return [];
   try {
     const raw = localStorage.getItem(PLANNER_ITEMS_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return sortPlannerEntries(parsed.map(normalizePlannerEntry).filter((entry): entry is PlannerEntry => Boolean(entry)));
   } catch {
     return [];
   }
@@ -77,6 +147,10 @@ function saveDismissedIds(ids: Set<string>) {
   try {
     localStorage.setItem(PLANNER_DISMISSED_STORAGE_KEY, JSON.stringify([...ids]));
   } catch { }
+}
+
+function hasScheduledTime(entry: PlannerEntry) {
+  return Boolean(entry.startTime);
 }
 
 // ─── Area Badge Styling ──────────────────────────────────────────────────────
@@ -170,7 +244,7 @@ function getPlannerPillLabel(task: Task, tasks: Task[]): string | null {
 
 function shouldRenderAsPlannerPill(task: Task | null, tasks: Task[]): boolean {
   if (!task) return false;
-  return task.calendarOnly === true || Boolean(task.recurrence) || Boolean(getPlannerPillLabel(task, tasks));
+  return Boolean(task.recurrence) || Boolean(getPlannerPillLabel(task, tasks));
 }
 
 function renderParentIndicator(label: string, className: string) {
@@ -328,6 +402,125 @@ function RecurrenceEditor({
   );
 }
 
+function TimeSlotEditor({
+  entry,
+  anchorRect,
+  onSave,
+  onClear,
+  onClose,
+}: {
+  entry: PlannerEntry;
+  anchorRect: DOMRect;
+  onSave: (startTime: string, endTime?: string) => void;
+  onClear: () => void;
+  onClose: () => void;
+}) {
+  const [startTime, setStartTime] = useState(entry.startTime || '');
+  const [endTime, setEndTime] = useState(entry.endTime || '');
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [onClose]);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [onClose]);
+
+  const hasInvalidRange = Boolean(startTime && endTime && endTime <= startTime);
+  const panelWidth = 264;
+  const filesDrawer = typeof document !== 'undefined'
+    ? document.querySelector<HTMLElement>('[data-files-drawer][data-open="true"]')
+    : null;
+  const maxRight = filesDrawer
+    ? filesDrawer.getBoundingClientRect().left - 8
+    : window.innerWidth - 8;
+  const style: React.CSSProperties = {
+    position: 'fixed',
+    top: anchorRect.bottom + 6,
+    left: Math.max(8, Math.min(anchorRect.left, maxRight - panelWidth)),
+    zIndex: 60,
+    width: panelWidth,
+  };
+
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
+    <div ref={panelRef} style={style} className="overflow-hidden rounded-xl border border-slate-700/80 bg-slate-900 shadow-2xl animate-in fade-in slide-in-from-top-1 duration-150">
+      <div className="flex items-center justify-between px-3.5 pt-3 pb-2">
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Time Slot</p>
+          <p className="mt-1 truncate text-[13px] font-medium text-slate-200">{entry.label}</p>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-md p-1 text-slate-500 transition-colors hover:bg-slate-800 hover:text-slate-300"
+        >
+          <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 px-3.5 pb-2.5">
+        <label className="text-[11px] text-slate-400">
+          <span className="mb-1 block">Start</span>
+          <input
+            type="time"
+            value={startTime}
+            onChange={(e) => setStartTime(e.target.value)}
+            className="w-full rounded-lg border border-slate-700/60 bg-slate-800/60 px-3 py-2 text-[12px] text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+          />
+        </label>
+        <label className="text-[11px] text-slate-400">
+          <span className="mb-1 block">End</span>
+          <input
+            type="time"
+            value={endTime}
+            onChange={(e) => setEndTime(e.target.value)}
+            className="w-full rounded-lg border border-slate-700/60 bg-slate-800/60 px-3 py-2 text-[12px] text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+          />
+        </label>
+      </div>
+
+      {hasInvalidRange && (
+        <p className="px-3.5 pb-2 text-[11px] text-amber-300">End time must be later than start time.</p>
+      )}
+
+      <div className="flex items-center gap-2 px-3.5 pb-3">
+        <button
+          type="button"
+          onClick={() => onSave(startTime, endTime || undefined)}
+          disabled={!startTime || hasInvalidRange}
+          className="flex-1 rounded-lg bg-blue-500/20 py-1.5 text-[12px] font-medium text-blue-300 transition-colors hover:bg-blue-500/30 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Save
+        </button>
+        <button
+          type="button"
+          onClick={onClear}
+          disabled={!entry.startTime && !entry.endTime}
+          className="rounded-lg border border-slate-700/60 px-3 py-1.5 text-[12px] font-medium text-slate-400 transition-colors hover:border-slate-600 hover:text-slate-200 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Clear
+        </button>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 // ─── Sortable Row ────────────────────────────────────────────────────────────
 
 function SortablePlannerRow({
@@ -336,18 +529,22 @@ function SortablePlannerRow({
   areaKey,
   areaLabel,
   areaBadge,
+  timeSlotLabel,
   onToggle,
   onRemove,
   onNavigate,
+  onEditTimeSlot,
 }: {
   entry: PlannerEntry;
   parentLabel: string | null;
   areaKey: string;
   areaLabel: string;
   areaBadge: string;
+  timeSlotLabel: string;
   onToggle: () => void;
   onRemove: () => void;
   onNavigate: () => void;
+  onEditTimeSlot: (event: React.MouseEvent<HTMLButtonElement>) => void;
 }) {
   const {
     attributes,
@@ -362,12 +559,13 @@ function SortablePlannerRow({
     transform: CSS.Transform.toString(transform),
     transition,
   };
+  const isTimedEntry = hasScheduledTime(entry);
 
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className={`group/row flex items-center gap-3 px-4 py-2.5 border-b border-slate-800/40 last:border-b-0 transition-all ${isDragging
+      className={`group/row flex gap-3 px-4 py-2.5 border-b border-slate-800/40 last:border-b-0 transition-all ${isTimedEntry ? 'items-start' : 'items-center'} ${isDragging
         ? 'opacity-50 bg-slate-800/40 z-10 shadow-lg rounded-lg'
         : 'hover:bg-slate-800/30'
         }`}
@@ -376,7 +574,7 @@ function SortablePlannerRow({
       <div
         {...attributes}
         {...listeners}
-        className="flex-shrink-0 cursor-grab active:cursor-grabbing opacity-0 group-hover/row:opacity-40 transition-opacity"
+        className={`flex-shrink-0 cursor-grab active:cursor-grabbing opacity-0 group-hover/row:opacity-40 transition-opacity ${isTimedEntry ? 'mt-0.5' : ''}`}
         aria-label="Drag to reorder"
       >
         <svg className="w-3.5 h-3.5 text-slate-500" viewBox="0 0 24 24" fill="currentColor">
@@ -396,7 +594,7 @@ function SortablePlannerRow({
           e.stopPropagation();
           onToggle();
         }}
-        className={`flex-shrink-0 w-4 h-4 rounded-[5px] border-[1.5px] transition-all flex items-center justify-center ${entry.completed
+        className={`flex-shrink-0 w-4 h-4 rounded-[5px] border-[1.5px] transition-all flex items-center justify-center ${isTimedEntry ? 'mt-0.5' : ''} ${entry.completed
           ? 'bg-emerald-500/80 border-emerald-500/80 text-white'
           : 'border-slate-600 hover:border-slate-400'
           }`}
@@ -413,26 +611,67 @@ function SortablePlannerRow({
         className="flex-1 min-w-0 flex items-center gap-2 cursor-pointer"
         onClick={onNavigate}
       >
-        <div className="flex min-w-0 items-baseline gap-1.5">
-          <span
-            className={`leading-snug block truncate transition-all text-[13px] ${
-              entry.completed
-                ? 'text-slate-500 line-through'
-                : 'text-slate-100'
-            }`}
-          >
-            {entry.label}
-          </span>
-          {parentLabel && (
-            renderParentIndicator(parentLabel, 'flex-shrink-0 text-[11px] text-slate-500')
-          )}
-        </div>
+        {isTimedEntry ? (
+          <div className="min-w-0 flex-1 space-y-1.5">
+            <span
+              className={`block truncate leading-snug transition-all text-[13px] ${
+                entry.completed
+                  ? 'text-slate-500 line-through'
+                  : 'text-slate-100'
+              }`}
+            >
+              {entry.label}
+            </span>
+            <div className={`flex min-w-0 items-center gap-3 ${parentLabel ? 'justify-between' : 'justify-start'}`}>
+              {parentLabel && (
+                <div className="min-w-0 flex-1">
+                  {renderParentIndicator(parentLabel, 'block truncate text-[11px] text-slate-500')}
+                </div>
+              )}
+              <span className="flex-shrink-0 rounded-md border border-blue-500/30 bg-blue-500/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-blue-200">
+                {timeSlotLabel}
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div className="flex min-w-0 items-baseline gap-1.5">
+            <span
+              className={`leading-snug block truncate transition-all text-[13px] ${
+                entry.completed
+                  ? 'text-slate-500 line-through'
+                  : 'text-slate-100'
+              }`}
+            >
+              {entry.label}
+            </span>
+            {parentLabel && (
+              renderParentIndicator(parentLabel, 'flex-shrink-0 text-[11px] text-slate-500')
+            )}
+          </div>
+        )}
       </div>
+
+      <button
+        type="button"
+        onClick={onEditTimeSlot}
+        title={timeSlotLabel}
+        aria-label={`Edit time slot for ${entry.label}: ${timeSlotLabel}`}
+        className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md border transition-colors ${isTimedEntry ? 'self-start mt-0.5' : ''} ${
+          hasScheduledTime(entry)
+            ? 'border-blue-500/30 bg-blue-500/10 text-blue-200 hover:bg-blue-500/15'
+            : 'border-slate-700/60 bg-slate-800/60 text-slate-400 hover:border-slate-600 hover:text-slate-200'
+        }`}
+      >
+        <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <circle cx="12" cy="12" r="8" />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 2" />
+        </svg>
+      </button>
 
       {/* Area badge */}
       {areaLabel && areaLabel !== 'Task' && (
         <span 
-          className={`flex-shrink-0 flex items-center justify-center p-1.5 rounded-md ${areaBadge}`}
+          className={`flex-shrink-0 flex items-center justify-center p-1.5 rounded-md ${isTimedEntry ? 'self-start mt-0.5' : ''} ${areaBadge}`}
           title={areaLabel}
         >
           {AREA_ICONS[areaKey] || AREA_ICONS.default}
@@ -446,7 +685,7 @@ function SortablePlannerRow({
           e.stopPropagation();
           onRemove();
         }}
-        className="flex-shrink-0 opacity-0 group-hover/row:opacity-100 transition-opacity text-slate-600 hover:text-red-400"
+        className={`flex-shrink-0 opacity-0 group-hover/row:opacity-100 transition-opacity text-slate-600 hover:text-red-400 ${isTimedEntry ? 'self-start mt-1.5' : ''}`}
         aria-label="Remove from planner"
       >
         <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -460,13 +699,24 @@ function SortablePlannerRow({
 // ─── Drag Overlay Preview ────────────────────────────────────────────────────
 
 function PlannerRowPreview({ entry }: { entry: PlannerEntry }) {
+  const isTimedEntry = hasScheduledTime(entry);
+
   return (
-    <div className="flex items-center gap-3 px-4 py-2.5 bg-slate-800/90 border border-slate-700 rounded-lg shadow-2xl backdrop-blur-sm">
+    <div className={`flex gap-3 px-4 py-2.5 bg-slate-800/90 border border-slate-700 rounded-lg shadow-2xl backdrop-blur-sm ${isTimedEntry ? 'items-start' : 'items-center'}`}>
       <div className={`w-4 h-4 rounded-[5px] border-[1.5px] ${entry.completed
         ? 'bg-emerald-500/80 border-emerald-500/80'
         : 'border-slate-500'
         }`} />
-      <span className="text-[13px] text-slate-200">{entry.label}</span>
+      {isTimedEntry ? (
+        <div className="min-w-0 flex flex-col gap-1">
+          <span className="truncate text-[13px] text-slate-200">{entry.label}</span>
+          <span className="w-fit rounded-md border border-blue-500/30 bg-blue-500/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-blue-200">
+            {formatTimeSlotLabel(entry.startTime, entry.endTime)}
+          </span>
+        </div>
+      ) : (
+        <span className="text-[13px] text-slate-200">{entry.label}</span>
+      )}
     </div>
   );
 }
@@ -480,6 +730,7 @@ export function PlannerCard({ tasks, navigateTo, selectTask, createTask, updateT
   const [highlightIndex, setHighlightIndex] = useState(-1);
   const [dragId, setDragId] = useState<string | null>(null);
   const [editingRecurrence, setEditingRecurrence] = useState<{ task: Task; rect: DOMRect } | null>(null);
+  const [editingTimeSlot, setEditingTimeSlot] = useState<{ entryId: string; rect: DOMRect } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -517,7 +768,7 @@ export function PlannerCard({ tasks, navigateTo, selectTask, createTask, updateT
       const t = customEvent.detail.task;
       setEntries(prev => {
         if (prev.some(entry => entry.taskId === t.id)) return prev;
-        return [...prev, { id: buildId(), taskId: t.id, label: t.title, completed: false }];
+        return sortPlannerEntries([...prev, { id: buildId(), taskId: t.id, label: t.title, completed: false }]);
       });
     };
     
@@ -565,7 +816,7 @@ export function PlannerCard({ tasks, navigateTo, selectTask, createTask, updateT
   // ─── Handlers ────────────────────────────────────────────────────────────
 
   const attachTask = useCallback((task: Task) => {
-    setEntries(prev => [
+    setEntries(prev => sortPlannerEntries([
       ...prev,
       {
         id: buildId(),
@@ -573,7 +824,7 @@ export function PlannerCard({ tasks, navigateTo, selectTask, createTask, updateT
         label: task.title,
         completed: false,
       },
-    ]);
+    ]));
     setDraft('');
     setShowDropdown(false);
     setHighlightIndex(-1);
@@ -592,7 +843,7 @@ export function PlannerCard({ tasks, navigateTo, selectTask, createTask, updateT
       calendarOnly: true,
     });
 
-    setEntries(prev => [
+    setEntries(prev => sortPlannerEntries([
       ...prev,
       {
         id: buildId(),
@@ -600,7 +851,7 @@ export function PlannerCard({ tasks, navigateTo, selectTask, createTask, updateT
         label: trimmed,
         completed: false,
       },
-    ]);
+    ]));
     setDraft('');
     setShowDropdown(false);
     setHighlightIndex(-1);
@@ -608,7 +859,7 @@ export function PlannerCard({ tasks, navigateTo, selectTask, createTask, updateT
 
   const toggleEntry = useCallback((entryId: string) => {
     setEntries(prev =>
-      prev.map(e => (e.id === entryId ? { ...e, completed: !e.completed } : e))
+      sortPlannerEntries(prev.map(e => (e.id === entryId ? { ...e, completed: !e.completed } : e)))
     );
   }, []);
 
@@ -662,11 +913,24 @@ export function PlannerCard({ tasks, navigateTo, selectTask, createTask, updateT
     setEntries(prev => {
       const oldIndex = prev.findIndex(e => e.id === active.id);
       const newIndex = prev.findIndex(e => e.id === over.id);
-      return arrayMove(prev, oldIndex, newIndex);
+      return sortPlannerEntries(arrayMove(prev, oldIndex, newIndex));
     });
   };
 
   const dragEntry = dragId ? entries.find(e => e.id === dragId) : null;
+  const editingTimeSlotEntry = editingTimeSlot ? entries.find(entry => entry.id === editingTimeSlot.entryId) || null : null;
+
+  const updateEntryTimeSlot = useCallback((entryId: string, startTime?: string, endTime?: string) => {
+    setEntries(prev => sortPlannerEntries(prev.map(entry => (
+      entry.id === entryId
+        ? {
+          ...entry,
+          startTime,
+          endTime,
+        }
+        : entry
+    ))));
+  }, []);
 
   // ─── Stats ───────────────────────────────────────────────────────────────
 
@@ -680,7 +944,7 @@ export function PlannerCard({ tasks, navigateTo, selectTask, createTask, updateT
 
   entries.forEach(e => {
     const linkedTask = e.taskId ? tasks.find(t => t.id === e.taskId) : null;
-    if (shouldRenderAsPlannerPill(linkedTask, tasks)) {
+    if (!hasScheduledTime(e) && shouldRenderAsPlannerPill(linkedTask, tasks)) {
       routineEntries.push(e);
     } else {
       standardEntries.push(e);
@@ -827,6 +1091,21 @@ export function PlannerCard({ tasks, navigateTo, selectTask, createTask, updateT
                     {entry.label}
                   </span>
                 </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                    setEditingTimeSlot({ entryId: entry.id, rect });
+                  }}
+                  title="Set time slot"
+                  className="px-2 py-1.5 text-slate-500 transition-colors hover:bg-blue-500/10 hover:text-blue-300"
+                >
+                  <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="8" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 2" />
+                  </svg>
+                </button>
                 {/* Dismiss (X) button */}
                 <button
                   type="button"
@@ -857,6 +1136,22 @@ export function PlannerCard({ tasks, navigateTo, selectTask, createTask, updateT
           onSave={async (rec) => {
             await updateTask(editingRecurrence.task.id, { recurrence: rec });
             setEditingRecurrence(null);
+          }}
+        />
+      )}
+
+      {editingTimeSlot && editingTimeSlotEntry && (
+        <TimeSlotEditor
+          entry={editingTimeSlotEntry}
+          anchorRect={editingTimeSlot.rect}
+          onClose={() => setEditingTimeSlot(null)}
+          onSave={(startTime, endTime) => {
+            updateEntryTimeSlot(editingTimeSlot.entryId, startTime, endTime);
+            setEditingTimeSlot(null);
+          }}
+          onClear={() => {
+            updateEntryTimeSlot(editingTimeSlot.entryId, undefined, undefined);
+            setEditingTimeSlot(null);
           }}
         />
       )}
@@ -897,6 +1192,7 @@ export function PlannerCard({ tasks, navigateTo, selectTask, createTask, updateT
                     areaKey={areaKey}
                     areaLabel={areaLabel}
                     areaBadge={areaBadge}
+                    timeSlotLabel={formatTimeSlotLabel(entry.startTime, entry.endTime)}
                     onToggle={() => toggleEntry(entry.id)}
                     onRemove={() => removeEntry(entry.id)}
                     onNavigate={() => {
@@ -904,6 +1200,11 @@ export function PlannerCard({ tasks, navigateTo, selectTask, createTask, updateT
                         navigateTo(linkedTask.parentId);
                         selectTask(linkedTask.id);
                       }
+                    }}
+                    onEditTimeSlot={(event) => {
+                      event.stopPropagation();
+                      const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+                      setEditingTimeSlot({ entryId: entry.id, rect });
                     }}
                   />
                 );

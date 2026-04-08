@@ -22,10 +22,10 @@ export function getTaskPath(tasks: Task[], taskId: string): Task[] {
 /**
  * Format a path as a breadcrumb string
  */
-export function formatBreadcrumb(path: Task[], maxLength = 50): string {
-  if (path.length === 0) return 'Root';
+export function formatBreadcrumb(path: Task[], maxLength = 50, includeRoot = true): string {
+  if (path.length === 0) return includeRoot ? 'Root' : '';
 
-  const titles = ['Root', ...path.map(t => t.title)];
+  const titles = includeRoot ? ['Root', ...path.map(t => t.title)] : path.map(t => t.title);
   const fullPath = titles.join(' › ');
 
   if (fullPath.length <= maxLength) return fullPath;
