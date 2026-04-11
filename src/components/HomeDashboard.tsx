@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   DndContext,
   DragEndEvent,
@@ -13,22 +13,22 @@ import {
 import { arrayMove, SortableContext, rectSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useTaskContext } from '@/lib/task-context';
+import { useTravelMode } from '@/lib/travel-mode-context';
 import { COLUMNS, ROOT_TASK_ID, Task, TaskStatus } from '@/lib/types';
-import { getSubtreeIds, getTaskPath, computeTaskImportance, getSuggestedNextTask } from '@/lib/tasks';
+import { computeTaskImportance, getSuggestedNextTask } from '@/lib/tasks';
 
-import { generateId, resolveAreaKey, storage } from '@/lib/utils';
-import { ChatPanel } from './ChatPanel';
-import type { AppContext } from '@/lib/assistant';
+import { resolveAreaKey } from '@/lib/utils';
 import { PlannerCard } from './PlannerCard';
 import { GlobalTray } from './GlobalTray';
 import { FileSystemDrawer } from './FileSystemDrawer';
 import { TaskStatusRing } from './TaskStatusRing';
 import { HierarchyModal } from './HierarchyModal';
+import { TravelModeHomeDashboard } from './TravelModeHomeDashboard';
 
 type DragHandleProps = {
   ref: (el: HTMLElement | null) => void;
-  listeners?: any;
-  attributes?: any;
+  listeners?: ReturnType<typeof useSortable>['listeners'];
+  attributes?: ReturnType<typeof useSortable>['attributes'];
 };
 
 type AreaSnapshot = {
@@ -153,16 +153,6 @@ const AREA_GRADIENTS: Record<string, { gradient: string; iconBg: string; ringTra
   home: { gradient: 'linear-gradient(135deg, #2d4a3e 0%, #162620 100%)', iconBg: 'bg-teal-500/25', ringTrack: 'rgba(20,184,166,0.25)' },
 };
 
-const AREA_BADGES: Record<string, string> = {
-  career: 'bg-blue-100/70 text-blue-700 dark:bg-blue-500/20 dark:text-blue-200',
-  health: 'bg-emerald-100/70 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200',
-  finances: 'bg-green-100/70 text-green-700 dark:bg-green-500/20 dark:text-green-200',
-  relationships: 'bg-rose-100/70 text-rose-700 dark:bg-rose-500/20 dark:text-rose-200',
-  growth: 'bg-fuchsia-100/70 text-fuchsia-700 dark:bg-fuchsia-500/20 dark:text-fuchsia-200',
-  admin: 'bg-slate-100/70 text-slate-700 dark:bg-slate-700/60 dark:text-slate-200',
-  recreation: 'bg-amber-100/70 text-amber-700 dark:bg-amber-500/20 dark:text-amber-200',
-  default: 'bg-slate-100/70 text-slate-600 dark:bg-slate-800/60 dark:text-slate-300',
-};
 import { useBirthdays } from '@/lib/birthdays';
 
 function isDueWithinThreeDays(task: Task): boolean {
@@ -631,6 +621,16 @@ function SortableLifeAreaCard({
 
 
 export function HomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawerOpen: boolean, isChatExpanded?: boolean }) {
+  const { enabled } = useTravelMode();
+
+  if (enabled) {
+    return <TravelModeHomeDashboard />;
+  }
+
+  return <StandardHomeDashboard isChatDrawerOpen={isChatDrawerOpen} isChatExpanded={isChatExpanded} />;
+}
+
+function StandardHomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawerOpen: boolean, isChatExpanded?: boolean }) {
   const { navigateTo, tasks, createTask, reorderTasks, updateTask, deleteTask } = useTaskContext();
   const { selectTask } = useTaskContext();
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -901,11 +901,6 @@ export function HomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDraw
     const event = new CustomEvent('lifeos:planner-add', { detail: { task } });
     window.dispatchEvent(event);
   };
-
-  const chatContext: AppContext = useMemo(
-    () => ({ tasks, navigateTo, selectTask }),
-    [tasks, navigateTo, selectTask]
-  );
 
   // Dynamic padding for left (chat) + right (notes/files) drawers
   const leftPad = isChatDrawerOpen ? (isChatExpanded ? 'xl:pl-[600px]' : 'xl:pl-[330px]') : 'xl:pl-[56px]';

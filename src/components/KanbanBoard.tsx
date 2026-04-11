@@ -13,6 +13,7 @@ import {
 } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
 import { useTaskContext } from '@/lib/task-context';
+import { useTravelMode } from '@/lib/travel-mode-context';
 import { COLUMNS, TaskStatus } from '@/lib/types';
 import { getTaskPath } from '@/lib/tasks';
 import { generateId, resolveAreaKey, storage } from '@/lib/utils';
@@ -22,6 +23,7 @@ import { TaskCard } from './TaskCard';
 import { GlobalTray } from './GlobalTray';
 import { LocalTray, CAREER_TRAY_ITEMS, RECREATION_TRAY_ITEMS, LocalTrayItem } from './LocalTray';
 import { BirthdayModal } from './BirthdayModal';
+import { TravelModeBoard } from './TravelModeBoard';
 import { useCurrency } from '@/lib/currency-context';
 
 type NetWorthSnapshot = {
@@ -66,7 +68,7 @@ const FINANCE_SUBSCRIPTIONS_KEY = 'lifeos:finance:subscriptions:v1';
 
 
 function loadNetWorthSnapshots(): NetWorthSnapshot[] {
-  const parsed = storage.get<any[]>(FINANCE_NET_WORTH_KEY, []);
+  const parsed = storage.get<Array<Partial<NetWorthSnapshot>>>(FINANCE_NET_WORTH_KEY, []);
   if (Array.isArray(parsed)) {
     return parsed
       .filter(Boolean)
@@ -85,7 +87,7 @@ function loadNetWorthSnapshots(): NetWorthSnapshot[] {
 }
 
 function loadSubscriptions(): SubscriptionItem[] {
-  const parsed = storage.get<any[]>(FINANCE_SUBSCRIPTIONS_KEY, []);
+  const parsed = storage.get<Array<Partial<SubscriptionItem>>>(FINANCE_SUBSCRIPTIONS_KEY, []);
   if (Array.isArray(parsed)) {
     return parsed
       .filter(Boolean)
@@ -105,6 +107,16 @@ function loadSubscriptions(): SubscriptionItem[] {
 
 
 export function KanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawerOpen?: boolean, isChatExpanded?: boolean }) {
+  const { enabled } = useTravelMode();
+
+  if (enabled) {
+    return <TravelModeBoard />;
+  }
+
+  return <StandardKanbanBoard isChatDrawerOpen={isChatDrawerOpen} isChatExpanded={isChatExpanded} />;
+}
+
+function StandardKanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawerOpen?: boolean, isChatExpanded?: boolean }) {
   const {
     tasks,
     getVisibleChildren,
@@ -463,7 +475,7 @@ export function KanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawer
                                     onClick={(e) => {
                                       try {
                                         e.currentTarget.showPicker();
-                                      } catch (err) { }
+                                      } catch { }
                                     }}
                                     value={editingSnapshot.date}
                                     onChange={(e) => setEditingSnapshot((prev) => ({ ...prev, date: e.target.value }))}
@@ -558,7 +570,7 @@ export function KanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawer
                       onClick={(e) => {
                         try {
                           e.currentTarget.showPicker();
-                        } catch (err) { }
+                        } catch { }
                       }}
                       value={snapshotDate}
                       onChange={(e) => setSnapshotDate(e.target.value)}

@@ -2,6 +2,7 @@
 
 import React, { ReactNode, useState, useRef, useEffect } from 'react';
 import { useTaskContext } from '@/lib/task-context';
+import { useTravelMode } from '@/lib/travel-mode-context';
 import { NotificationsTray } from './NotificationsTray';
 import { CurrencyToggle } from './CurrencyToggle';
 import { BackupsPanel } from './BackupsPanel';
@@ -17,10 +18,11 @@ import { ArchiveInlinePanel } from './CompletedArchive';
  */
 export function GlobalTray() {
   const { setSearchOpen, getArchivedTasks } = useTaskContext();
+  const { enabled, setEnabled } = useTravelMode();
   const archivedCount = getArchivedTasks().length;
 
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [expandedSection, setExpandedSection] = useState<'archive' | 'backups' | 'currency' | null>(null);
+  const [expandedSection, setExpandedSection] = useState<'travel' | 'archive' | 'backups' | 'currency' | null>(null);
   const settingsRef = useRef<HTMLDivElement>(null);
 
   const closeSettings = () => {
@@ -52,8 +54,14 @@ export function GlobalTray() {
         </svg>
       </button>
 
+      {enabled && (
+        <span className="hidden rounded-full bg-emerald-500/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-300 sm:inline-flex">
+          Travel
+        </span>
+      )}
+
       {/* Notifications */}
-      <NotificationsTray />
+      {!enabled && <NotificationsTray />}
 
       {/* Settings gear */}
       <div className="relative" ref={settingsRef}>
@@ -83,10 +91,51 @@ export function GlobalTray() {
             />
             <div className="absolute right-0 top-full mt-2 w-72 z-50 rounded-xl border border-slate-700/60 bg-slate-900 shadow-2xl overflow-hidden ring-1 ring-white/5">
               <div className="px-3 py-2.5 border-b border-slate-800 bg-slate-900/80">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Settings</span>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Settings</span>
+                  {enabled && (
+                    <span className="rounded-full bg-emerald-500/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-300">
+                      Travel Mode
+                    </span>
+                  )}
+                </div>
               </div>
 
               <div className="p-1.5 space-y-0.5">
+                <SettingsExpandableRow
+                  label="Travel Mode"
+                  isExpanded={expandedSection === 'travel'}
+                  onToggle={() => setExpandedSection(current => current === 'travel' ? null : 'travel')}
+                  icon={(
+                    <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.8">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 12h7m11 0h-4m-5 0 2.5-2.5M12 12 9.5 9.5M12 12l2.5 2.5M12 12l-2.5 2.5M14 5l5 5M10 19l-5-5" />
+                    </svg>
+                  )}
+                  badge={enabled ? (
+                    <span className="text-[10px] font-semibold bg-emerald-500/15 text-emerald-300 rounded-full px-1.5 py-0.5">
+                      On
+                    </span>
+                  ) : null}
+                >
+                  <div className="px-3 pb-3 pt-1">
+                    <p className="text-xs leading-5 text-slate-400">
+                      Hides heavier tools and keeps LifeOS focused on quick check-ins while you are traveling.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEnabled(!enabled);
+                        closeSettings();
+                      }}
+                      className="mt-3 w-full rounded-lg bg-white px-3 py-2 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-200"
+                    >
+                      {enabled ? 'Turn Off Travel Mode' : 'Turn On Travel Mode'}
+                    </button>
+                  </div>
+                </SettingsExpandableRow>
+
+                {!enabled && (
+                  <>
                 <SettingsExpandableRow
                   label="Archive"
                   isExpanded={expandedSection === 'archive'}
@@ -135,6 +184,8 @@ export function GlobalTray() {
                     <CurrencyToggle inline />
                   </div>
                 </SettingsExpandableRow>
+                  </>
+                )}
               </div>
             </div>
           </>

@@ -2,6 +2,7 @@
 
 import React, { useEffect } from 'react';
 import { useTaskContext } from '@/lib/task-context';
+import { useTravelMode } from '@/lib/travel-mode-context';
 import { ROOT_TASK_ID } from '@/lib/types';
 import { KanbanBoard } from './KanbanBoard';
 import { HomeDashboard } from './HomeDashboard';
@@ -17,6 +18,7 @@ export function Board() {
     isLoading,
     setSearchOpen,
   } = useTaskContext();
+  const { enabled: travelModeEnabled } = useTravelMode();
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -72,20 +74,22 @@ export function Board() {
   return (
     <div className="flex flex-col h-screen bg-slate-100 dark:bg-slate-900">
       {/* ─── Global Chat Drawer (LEFT) ─── */}
-      <aside
-        className={`hidden xl:block fixed left-0 top-[73px] bottom-0 z-40 transition-[width] duration-200 ${isChatDrawerOpen ? (isChatExpanded ? 'w-[600px]' : 'w-[330px]') : 'w-[56px]'
-          }`}
-      >
-        <div className="h-full w-full rounded-r-2xl border-r border-t border-b border-slate-800 bg-slate-950/95 shadow-2xl backdrop-blur-sm">
-          <ChatPanel
-            appContext={chatContext}
-            collapsed={!isChatDrawerOpen}
-            onToggle={() => setIsChatDrawerOpen((v) => !v)}
-            isExpanded={isChatExpanded}
-            onToggleExpand={() => setIsChatExpanded((v) => !v)}
-          />
-        </div>
-      </aside>
+      {!travelModeEnabled && (
+        <aside
+          className={`hidden xl:block fixed left-0 top-[73px] bottom-0 z-40 transition-[width] duration-200 ${isChatDrawerOpen ? (isChatExpanded ? 'w-[600px]' : 'w-[330px]') : 'w-[56px]'
+            }`}
+        >
+          <div className="h-full w-full rounded-r-2xl border-r border-t border-b border-slate-800 bg-slate-950/95 shadow-2xl backdrop-blur-sm">
+            <ChatPanel
+              appContext={chatContext}
+              collapsed={!isChatDrawerOpen}
+              onToggle={() => setIsChatDrawerOpen((v) => !v)}
+              isExpanded={isChatExpanded}
+              onToggleExpand={() => setIsChatExpanded((v) => !v)}
+            />
+          </div>
+        </aside>
+      )}
 
       {/* Main Content */}
       <main className="flex-1 overflow-hidden relative">
@@ -99,8 +103,8 @@ export function Board() {
       {/* Global Modals */}
       <TaskPanel />
       <SearchModal />
-      <CompletedArchive />
-      <BackupsPanel />
+      {!travelModeEnabled && <CompletedArchive />}
+      {!travelModeEnabled && <BackupsPanel />}
     </div>
   );
 }

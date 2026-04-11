@@ -2,10 +2,12 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTaskContext } from '@/lib/task-context';
+import { useTravelMode } from '@/lib/travel-mode-context';
 import { Task, TaskRecurrence } from '@/lib/types';
 
 export function TaskPanel() {
   const { tasks, selectedTaskId, selectTask, updateTask, deleteTask, createTask } = useTaskContext();
+  const { enabled: travelModeEnabled } = useTravelMode();
   const [description, setDescription] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [scheduledDate, setScheduledDate] = useState('');
@@ -382,96 +384,98 @@ export function TaskPanel() {
               </div>
             </div>
 
-            {/* ── Frequency & Recurrence ── */}
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <label className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-                  Recurring Task
-                </label>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    const nextVal = !isRecurring;
-                    setIsRecurring(nextVal);
-                    if (!nextVal) {
-                      setFrequency('');
-                      setRecurrence(undefined);
-                      await updateTask(task.id, { frequency: undefined, recurrence: undefined });
-                    }
-                  }}
-                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/50 ${isRecurring ? 'bg-blue-500' : 'bg-slate-700'}`}
-                >
-                  <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${isRecurring ? 'translate-x-[18px]' : 'translate-x-1'}`} />
-                </button>
-              </div>
-
-              {isRecurring && (
-                <div className="space-y-4 mt-2 bg-slate-800/20 p-4 rounded-xl border border-slate-700/30">
-                  <div>
-                    <label className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400 mb-2.5">
-                      Frequency (Label)
+            {!travelModeEnabled && (
+              <>
+                {/* ── Frequency & Recurrence ── */}
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                      Recurring Task
                     </label>
-                    <input
-                      value={frequency}
-                      onChange={(e) => setFrequency(e.target.value)}
-                      onBlur={handleFrequencySave}
-                      placeholder="Daily, 2x a week, every Friday..."
-                      className="w-full rounded-xl bg-slate-800/40 border border-slate-700/50 px-4 py-2.5 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500/40 transition-all"
-                    />
-                    <p className="mt-1.5 text-[11px] text-slate-600">Shown on the card instead of &ldquo;Ongoing&rdquo;.</p>
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400 mb-2.5">
-                      Planner Recurrence
-                    </label>
-                    <div className="flex gap-1.5 flex-wrap">
-                      {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, idx) => {
-                        let activeDays: number[] = [];
-                        if (recurrence) {
-                          if (recurrence.rule === 'custom') activeDays = recurrence.daysOfWeek || [];
-                          else if (recurrence.rule === 'daily') activeDays = [0, 1, 2, 3, 4, 5, 6];
-                          else if (recurrence.rule === 'weekdays') activeDays = [1, 2, 3, 4, 5];
-                          else if (recurrence.rule === 'weekends') activeDays = [0, 6];
-                          else if (recurrence.rule === 'mwf') activeDays = [1, 3, 5];
-                          else if (recurrence.rule === 'tth') activeDays = [2, 4];
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const nextVal = !isRecurring;
+                        setIsRecurring(nextVal);
+                        if (!nextVal) {
+                          setFrequency('');
+                          setRecurrence(undefined);
+                          await updateTask(task.id, { frequency: undefined, recurrence: undefined });
                         }
-                        const isSelected = activeDays.includes(idx);
-                        
-                        return (
-                          <button
-                            key={day}
-                            type="button"
-                            onClick={async () => {
-                              const nextDays = isSelected
-                                ? activeDays.filter(d => d !== idx)
-                                : [...activeDays, idx].sort((a, b) => a - b);
-                                
-                              if (nextDays.length === 0) {
-                                await setRecurrenceAndUpdate(undefined);
-                              } else {
-                                await setRecurrenceAndUpdate({ rule: 'custom', daysOfWeek: nextDays });
-                              }
-                            }}
-                            className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${isSelected ? 'bg-blue-500 text-white shadow-sm shadow-blue-500/20' : 'bg-slate-800 border border-slate-700/50 text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
-                              }`}
-                          >
-                            {day}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    <p className="mt-2 text-[11px] text-slate-500">Scheduled task will automatically appear on the daily planner.</p>
+                      }}
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/50 ${isRecurring ? 'bg-blue-500' : 'bg-slate-700'}`}
+                    >
+                      <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${isRecurring ? 'translate-x-[18px]' : 'translate-x-1'}`} />
+                    </button>
                   </div>
+
+                  {isRecurring && (
+                    <div className="space-y-4 mt-2 bg-slate-800/20 p-4 rounded-xl border border-slate-700/30">
+                      <div>
+                        <label className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400 mb-2.5">
+                          Frequency (Label)
+                        </label>
+                        <input
+                          value={frequency}
+                          onChange={(e) => setFrequency(e.target.value)}
+                          onBlur={handleFrequencySave}
+                          placeholder="Daily, 2x a week, every Friday..."
+                          className="w-full rounded-xl bg-slate-800/40 border border-slate-700/50 px-4 py-2.5 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500/40 transition-all"
+                        />
+                        <p className="mt-1.5 text-[11px] text-slate-600">Shown on the card instead of &ldquo;Ongoing&rdquo;.</p>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400 mb-2.5">
+                          Planner Recurrence
+                        </label>
+                        <div className="flex gap-1.5 flex-wrap">
+                          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, idx) => {
+                            let activeDays: number[] = [];
+                            if (recurrence) {
+                              if (recurrence.rule === 'custom') activeDays = recurrence.daysOfWeek || [];
+                              else if (recurrence.rule === 'daily') activeDays = [0, 1, 2, 3, 4, 5, 6];
+                              else if (recurrence.rule === 'weekdays') activeDays = [1, 2, 3, 4, 5];
+                              else if (recurrence.rule === 'weekends') activeDays = [0, 6];
+                              else if (recurrence.rule === 'mwf') activeDays = [1, 3, 5];
+                              else if (recurrence.rule === 'tth') activeDays = [2, 4];
+                            }
+                            const isSelected = activeDays.includes(idx);
+
+                            return (
+                              <button
+                                key={day}
+                                type="button"
+                                onClick={async () => {
+                                  const nextDays = isSelected
+                                    ? activeDays.filter(d => d !== idx)
+                                    : [...activeDays, idx].sort((a, b) => a - b);
+
+                                  if (nextDays.length === 0) {
+                                    await setRecurrenceAndUpdate(undefined);
+                                  } else {
+                                    await setRecurrenceAndUpdate({ rule: 'custom', daysOfWeek: nextDays });
+                                  }
+                                }}
+                                className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${isSelected ? 'bg-blue-500 text-white shadow-sm shadow-blue-500/20' : 'bg-slate-800 border border-slate-700/50 text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                                  }`}
+                              >
+                                {day}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <p className="mt-2 text-[11px] text-slate-500">Scheduled task will automatically appear on the daily planner.</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
 
-            {/* ── Divider ── */}
-            <div className="border-t border-slate-800/50" />
+                {/* ── Divider ── */}
+                <div className="border-t border-slate-800/50" />
 
-            {/* ── Subtasks Toggle ── */}
-            <div>
+                {/* ── Subtasks Toggle ── */}
+                <div>
               <div className="flex items-center justify-between mb-3">
                 <label className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
                   Leaf Task
@@ -599,22 +603,26 @@ export function TaskPanel() {
                   )}
                 </div>
               )}
-            </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
         {/* ─── Sticky Footer ─── */}
         <div className="px-6 py-4 border-t border-slate-800/50 bg-[#0a0d13] rounded-b-2xl">
           <div className="flex items-center justify-between">
-            <button
-              onClick={handleDelete}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-500 hover:text-rose-400 rounded-lg hover:bg-rose-500/10 transition-all"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-              Delete
-            </button>
+            {travelModeEnabled ? <span /> : (
+              <button
+                onClick={handleDelete}
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-500 hover:text-rose-400 rounded-lg hover:bg-rose-500/10 transition-all"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                Delete
+              </button>
+            )}
             <button
               onClick={handleSaveAll}
               className="px-5 py-2 text-xs font-semibold rounded-xl bg-blue-500 text-white hover:bg-blue-400 shadow-lg shadow-blue-500/20 transition-all hover:shadow-blue-500/30 active:scale-[0.97]"

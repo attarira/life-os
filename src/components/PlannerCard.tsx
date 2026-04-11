@@ -117,6 +117,17 @@ function formatTimeSlotLabel(startTime?: string, endTime?: string) {
 function loadPlannerEntries(): PlannerEntry[] {
   if (typeof window === 'undefined') return [];
   try {
+    const d = new Date();
+    const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const storedDate = localStorage.getItem(PLANNER_DATE_STORAGE_KEY);
+
+    if (storedDate !== todayStr) {
+      localStorage.setItem(PLANNER_DATE_STORAGE_KEY, todayStr);
+      saveDismissedIds(new Set());
+      localStorage.removeItem(PLANNER_ITEMS_STORAGE_KEY);
+      return [];
+    }
+
     const raw = localStorage.getItem(PLANNER_ITEMS_STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
@@ -574,7 +585,7 @@ function SortablePlannerRow({
       <div
         {...attributes}
         {...listeners}
-        className={`flex-shrink-0 cursor-grab active:cursor-grabbing opacity-0 group-hover/row:opacity-40 transition-opacity ${isTimedEntry ? 'mt-0.5' : ''}`}
+        className={`flex-shrink-0 cursor-grab active:cursor-grabbing opacity-0 group-hover/row:opacity-40 transition-opacity ${isTimedEntry ? 'mt-1' : ''}`}
         aria-label="Drag to reorder"
       >
         <svg className="w-3.5 h-3.5 text-slate-500" viewBox="0 0 24 24" fill="currentColor">
@@ -594,7 +605,7 @@ function SortablePlannerRow({
           e.stopPropagation();
           onToggle();
         }}
-        className={`flex-shrink-0 w-4 h-4 rounded-[5px] border-[1.5px] transition-all flex items-center justify-center ${isTimedEntry ? 'mt-0.5' : ''} ${entry.completed
+        className={`flex-shrink-0 w-4 h-4 rounded-[5px] border-[1.5px] transition-all flex items-center justify-center ${isTimedEntry ? 'mt-1' : ''} ${entry.completed
           ? 'bg-emerald-500/80 border-emerald-500/80 text-white'
           : 'border-slate-600 hover:border-slate-400'
           }`}
@@ -608,27 +619,29 @@ function SortablePlannerRow({
 
       {/* Label + area badge */}
       <div
-        className="flex-1 min-w-0 flex items-center gap-2 cursor-pointer"
+        className="flex-1 min-w-0 cursor-pointer"
         onClick={onNavigate}
       >
         {isTimedEntry ? (
-          <div className="min-w-0 flex-1 space-y-1.5">
-            <span
-              className={`block truncate leading-snug transition-all text-[13px] ${
-                entry.completed
-                  ? 'text-slate-500 line-through'
-                  : 'text-slate-100'
-              }`}
-            >
-              {entry.label}
-            </span>
-            <div className={`flex min-w-0 items-center gap-3 ${parentLabel ? 'justify-between' : 'justify-start'}`}>
-              {parentLabel && (
-                <div className="min-w-0 flex-1">
-                  {renderParentIndicator(parentLabel, 'block truncate text-[11px] text-slate-500')}
-                </div>
-              )}
-              <span className="flex-shrink-0 rounded-md border border-blue-500/30 bg-blue-500/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-blue-200">
+          <div className="min-w-0 flex flex-col gap-1.5 pt-0.5">
+            <div className="min-w-0">
+              <span
+                className={`block truncate leading-snug transition-all text-[13px] ${
+                  entry.completed
+                    ? 'text-slate-500 line-through'
+                    : 'text-slate-100'
+                }`}
+              >
+                {entry.label}
+              </span>
+            </div>
+            {parentLabel && (
+              <div className="min-w-0">
+                {renderParentIndicator(parentLabel, 'block truncate text-[11px] text-slate-500')}
+              </div>
+            )}
+            <div className="flex min-w-0 items-center">
+              <span className="inline-flex whitespace-nowrap rounded-md border border-blue-500/30 bg-blue-500/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-blue-200">
                 {timeSlotLabel}
               </span>
             </div>
@@ -651,47 +664,47 @@ function SortablePlannerRow({
         )}
       </div>
 
-      <button
-        type="button"
-        onClick={onEditTimeSlot}
-        title={timeSlotLabel}
-        aria-label={`Edit time slot for ${entry.label}: ${timeSlotLabel}`}
-        className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md border transition-colors ${isTimedEntry ? 'self-start mt-0.5' : ''} ${
-          hasScheduledTime(entry)
-            ? 'border-blue-500/30 bg-blue-500/10 text-blue-200 hover:bg-blue-500/15'
-            : 'border-slate-700/60 bg-slate-800/60 text-slate-400 hover:border-slate-600 hover:text-slate-200'
-        }`}
-      >
-        <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <circle cx="12" cy="12" r="8" />
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 2" />
-        </svg>
-      </button>
-
-      {/* Area badge */}
-      {areaLabel && areaLabel !== 'Task' && (
-        <span 
-          className={`flex-shrink-0 flex items-center justify-center p-1.5 rounded-md ${isTimedEntry ? 'self-start mt-0.5' : ''} ${areaBadge}`}
-          title={areaLabel}
+      <div className={`flex flex-shrink-0 items-center gap-3 ${isTimedEntry ? 'pt-0.5' : ''}`}>
+        <button
+          type="button"
+          onClick={onEditTimeSlot}
+          title={timeSlotLabel}
+          aria-label={`Edit time slot for ${entry.label}: ${timeSlotLabel}`}
+          className={`flex h-8 w-8 items-center justify-center rounded-xl border transition-colors ${
+            hasScheduledTime(entry)
+              ? 'border-blue-500/30 bg-blue-500/10 text-blue-200 hover:bg-blue-500/15'
+              : 'border-slate-700/60 bg-slate-800/60 text-slate-400 hover:border-slate-600 hover:text-slate-200'
+          }`}
         >
-          {AREA_ICONS[areaKey] || AREA_ICONS.default}
-        </span>
-      )}
+          <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="8" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 2" />
+          </svg>
+        </button>
 
-      {/* Remove icon */}
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          onRemove();
-        }}
-        className={`flex-shrink-0 opacity-0 group-hover/row:opacity-100 transition-opacity text-slate-600 hover:text-red-400 ${isTimedEntry ? 'self-start mt-1.5' : ''}`}
-        aria-label="Remove from planner"
-      >
-        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      </button>
+        {areaLabel && areaLabel !== 'Task' && (
+          <span
+            className={`flex h-8 w-8 items-center justify-center rounded-xl ${areaBadge}`}
+            title={areaLabel}
+          >
+            {AREA_ICONS[areaKey] || AREA_ICONS.default}
+          </span>
+        )}
+
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
+          className="flex h-8 w-4 items-center justify-center opacity-0 group-hover/row:opacity-100 transition-opacity text-slate-600 hover:text-red-400"
+          aria-label="Remove from planner"
+        >
+          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
     </div>
   );
 }
@@ -737,22 +750,6 @@ export function PlannerCard({ tasks, navigateTo, selectTask, createTask, updateT
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
   );
-
-  // Clear planner state on daily rollover
-  useEffect(() => {
-    const d = new Date();
-    const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    const storedDate = typeof window !== 'undefined' ? localStorage.getItem(PLANNER_DATE_STORAGE_KEY) : todayStr;
-
-    setEntries(prev => {
-      if (storedDate !== todayStr && typeof window !== 'undefined') {
-        localStorage.setItem(PLANNER_DATE_STORAGE_KEY, todayStr);
-        saveDismissedIds(new Set());
-        return [];
-      }
-      return prev;
-    });
-  }, []);
 
   // Persist entries
   useEffect(() => {
@@ -943,7 +940,7 @@ export function PlannerCard({ tasks, navigateTo, selectTask, createTask, updateT
   const standardEntries: PlannerEntry[] = [];
 
   entries.forEach(e => {
-    const linkedTask = e.taskId ? tasks.find(t => t.id === e.taskId) : null;
+    const linkedTask = e.taskId ? tasks.find(t => t.id === e.taskId) || null : null;
     if (!hasScheduledTime(e) && shouldRenderAsPlannerPill(linkedTask, tasks)) {
       routineEntries.push(e);
     } else {

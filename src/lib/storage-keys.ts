@@ -9,4 +9,4 @@ export const LAST_DAILY_SUMMARY_KEY = 'lifeos:lastDailySummaryDate';
 export const LAST_WEEKLY_SUMMARY_KEY = 'lifeos:lastWeeklySummaryWeek';
 export const NOTIFIED_DUE_TASKS_KEY = 'lifeos:notifiedDueTasks:v1';
 export const FILE_SYSTEM_STORAGE_KEY = 'lifeos:file-system:v1';
-
+export const TRAVEL_MODE_STORAGE_KEY = 'lifeos:travel-mode:v1';
