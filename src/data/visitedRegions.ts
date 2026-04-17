@@ -1,72 +1,149 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { storage } from '@/lib/utils';
 
 // Maps region types to a specific key in localStorage
 export type RegionType = 'world' | 'usa' | 'india';
 
 const STORAGE_KEY = 'life-os-visited-regions';
 
-// Initial default data if nothing is in localStorage
-// Using precise keys matching TopoJSON properties
-const initialVisitedRegions: Record<RegionType, string[]> = {
-  world: ['United States of America', 'India', 'United Kingdom', 'France', 'Japan'],
-  usa: ['California', 'New York', 'Texas', 'Washington', 'Illinois'],
-  india: ['Maharashtra', 'Delhi', 'Karnataka', 'Tamil Nadu', 'Gujarat'],
+type RegionState = {
+  visited: string[];
+  current: string | null;
 };
 
-export const useVisitedRegions = (type: RegionType) => {
-  const [visited, setVisited] = useState<string[]>([]);
-  const [isLoaded, setIsLoaded] = useState(false);
+type PersistedVisitedRegions = Record<RegionType, RegionState | string[]>;
 
-  // Load from localStorage on mount
-  useEffect(() => {
+// Initial default data if nothing is in localStorage.
+// Region names must match the map file properties exactly.
+const initialVisitedRegions: Record<RegionType, RegionState> = {
+  world: {
+    visited: ['United States of America', 'India', 'United Kingdom', 'France', 'Japan'],
+    current: null,
+  },
+  usa: {
+    visited: ['California', 'New York', 'Texas', 'Washington', 'Illinois'],
+    current: null,
+  },
+  india: {
+    visited: ['Maharashtra', 'Delhi', 'Karnataka', 'Tamil Nadu', 'Gujarat'],
+    current: null,
+  },
+};
+
+function normalizeRegionState(value: RegionState | string[] | undefined, fallback: RegionState): RegionState {
+  if (Array.isArray(value)) {
+    return {
+      visited: value,
+      current: null,
+    };
+  }
+
+  if (!value || typeof value !== 'object') {
+    return fallback;
+  }
+
+  return {
+    visited: Array.isArray(value.visited) ? value.visited : fallback.visited,
+    current: typeof value.current === 'string' && value.current.trim().length > 0 ? value.current : null,
+  };
+}
+
+function readAllRegions(): Record<RegionType, RegionState> {
+  const stored = storage.get<PersistedVisitedRegions | null>(STORAGE_KEY, null);
+
+  const normalized: Record<RegionType, RegionState> = {
+    world: normalizeRegionState(stored?.world, initialVisitedRegions.world),
+    usa: normalizeRegionState(stored?.usa, initialVisitedRegions.usa),
+    india: normalizeRegionState(stored?.india, initialVisitedRegions.india),
+  };
+
+  storage.set(STORAGE_KEY, normalized);
+  return normalized;
+}
+
+export const useVisitedRegions = (type: RegionType) => {
+  const [allRegions, setAllRegions] = useState<Record<RegionType, RegionState>>(() => {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (parsed[type]) {
-          setVisited(parsed[type]);
-        } else {
-          // Backward compatibility or missing key
-          setVisited(initialVisitedRegions[type]);
-        }
-      } else {
-        // First time load
-        setVisited(initialVisitedRegions[type]);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(initialVisitedRegions));
-      }
+      return readAllRegions();
     } catch (error) {
       console.error('Error loading visited regions from localStorage:', error);
-      setVisited(initialVisitedRegions[type]);
+      return initialVisitedRegions;
     }
-    setIsLoaded(true);
-  }, [type]);
+  });
 
-  // Toggle a region's visited state
-  const toggleRegion = (regionName: string) => {
-    setVisited((prev) => {
-      const isCurrentlyVisited = prev.includes(regionName);
-      const updatedRegions = isCurrentlyVisited
-        ? prev.filter((r) => r !== regionName)
-        : [...prev, regionName];
+  const regionState = allRegions[type];
 
-      // Save to localStorage
+  const updateRegionState = (updater: (current: RegionState) => RegionState) => {
+    setAllRegions((currentAllRegions) => {
+      const nextState = updater(currentAllRegions[type]);
+      const nextAllRegions = {
+        ...currentAllRegions,
+        [type]: nextState,
+      };
+
       try {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        const allRegions = stored ? JSON.parse(stored) : initialVisitedRegions;
-        allRegions[type] = updatedRegions;
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(allRegions));
+        storage.set(STORAGE_KEY, nextAllRegions);
       } catch (error) {
-        console.error('Error saving visited region to localStorage:', error);
+        console.error('Error saving visited region state:', error);
       }
 
-      return updatedRegions;
+      return nextAllRegions;
+    });
+  };
+
+  // Toggle a region's visited state.
+  const toggleRegion = (regionName: string) => {
+    updateRegionState((current) => {
+      const isCurrentlyVisited = current.visited.includes(regionName);
+      return {
+        ...current,
+        visited: isCurrentlyVisited
+          ? current.visited.filter((region) => region !== regionName)
+          : [...current.visited, regionName],
+      };
+    });
+  };
+
+  const setCurrentRegion = (regionName: string | null) => {
+    updateRegionState((current) => ({
+      ...current,
+      current: regionName && regionName.trim().length > 0 ? regionName : null,
+    }));
+  };
+
+  const cycleRegion = (regionName: string) => {
+    updateRegionState((current) => {
+      const isCurrent = current.current === regionName;
+      const isVisited = current.visited.includes(regionName);
+
+      if (isCurrent) {
+        return {
+          visited: current.visited.filter((region) => region !== regionName),
+          current: null,
+        };
+      }
+
+      if (isVisited) {
+        return {
+          ...current,
+          current: regionName,
+        };
+      }
+
+      return {
+        ...current,
+        visited: [...current.visited, regionName],
+      };
     });
   };
 
   return {
-    visited,
+    visited: regionState.visited,
+    currentRegion: regionState.current,
     toggleRegion,
-    isLoaded,
-    visitedCount: visited.length,
+    setCurrentRegion,
+    cycleRegion,
+    isLoaded: true,
+    visitedCount: regionState.visited.length,
   };
 };
