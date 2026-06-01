@@ -129,14 +129,50 @@ function StandardKanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawe
   const [activeId, setActiveId] = useState<string | null>(null);
   const [netWorthSnapshots, setNetWorthSnapshots] = useState<NetWorthSnapshot[]>(() => loadNetWorthSnapshots());
   const [subscriptions, setSubscriptions] = useState<SubscriptionItem[]>(() => loadSubscriptions());
-  const d = new Date();
-  const initialSnapshotDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  const [snapshotDate, setSnapshotDate] = useState(initialSnapshotDate);
-  const [snapshotAssets, setSnapshotAssets] = useState('');
-  const [snapshotLiabilities, setSnapshotLiabilities] = useState('');
   const [showNetWorthHistory, setShowNetWorthHistory] = useState(false);
   const [editingSnapshotId, setEditingSnapshotId] = useState<string | null>(null);
   const [editingSnapshot, setEditingSnapshot] = useState<{ date: string; assets: string; liabilities: string }>({ date: '', assets: '', liabilities: '' });
+
+  const [hdfcSavings, setHdfcSavings] = useState<number>(() => {
+    if (typeof window === 'undefined') return 0;
+    return Number(localStorage.getItem('lifeos:finance:hdfcSavings') || '0');
+  });
+  const [hdfcPpf, setHdfcPpf] = useState<number>(() => {
+    if (typeof window === 'undefined') return 0;
+    return Number(localStorage.getItem('lifeos:finance:hdfcPpf') || '0');
+  });
+  const [fidaAliInvestments, setFidaAliInvestments] = useState<number>(() => {
+    if (typeof window === 'undefined') return 0;
+    return Number(localStorage.getItem('lifeos:finance:fidaAliInvestments') || '0');
+  });
+  const [growwInvestments, setGrowwInvestments] = useState<number>(() => {
+    if (typeof window === 'undefined') return 0;
+    return Number(localStorage.getItem('lifeos:finance:growwInvestments') || '0');
+  });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('lifeos:finance:hdfcSavings', String(hdfcSavings));
+    }
+  }, [hdfcSavings]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('lifeos:finance:hdfcPpf', String(hdfcPpf));
+    }
+  }, [hdfcPpf]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('lifeos:finance:fidaAliInvestments', String(fidaAliInvestments));
+    }
+  }, [fidaAliInvestments]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('lifeos:finance:growwInvestments', String(growwInvestments));
+    }
+  }, [growwInvestments]);
   const [subscriptionName, setSubscriptionName] = useState('');
   const [subscriptionCost, setSubscriptionCost] = useState('');
   const [subscriptionBilling, setSubscriptionBilling] = useState<'monthly' | 'yearly'>('monthly');
@@ -280,20 +316,49 @@ function StandardKanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawe
     return sum + (item.cost / 12);
   }, 0);
 
-  const handleAddNetWorthSnapshot = () => {
-    const assets = Number(snapshotAssets);
-    const liabilities = Number(snapshotLiabilities);
-    if (!snapshotDate || Number.isNaN(assets) || Number.isNaN(liabilities)) return;
+  const updateAccountBalance = (account: 'savings' | 'ppf' | 'fidaAli' | 'groww', value: number) => {
+    let nextSavings = hdfcSavings;
+    let nextPpf = hdfcPpf;
+    let nextFidaAli = fidaAliInvestments;
+    let nextGroww = growwInvestments;
+    if (account === 'savings') {
+      nextSavings = value;
+      setHdfcSavings(value);
+    } else if (account === 'ppf') {
+      nextPpf = value;
+      setHdfcPpf(value);
+    } else if (account === 'fidaAli') {
+      nextFidaAli = value;
+      setFidaAliInvestments(value);
+    } else {
+      nextGroww = value;
+      setGrowwInvestments(value);
+    }
 
-    const next: NetWorthSnapshot = {
-      id: generateId(),
-      date: snapshotDate,
-      assets,
-      liabilities,
-    };
-    setNetWorthSnapshots((prev) => [next, ...prev]);
-    setSnapshotAssets('');
-    setSnapshotLiabilities('');
+    const totalAssets = nextSavings + nextPpf + nextFidaAli + nextGroww;
+    const d = new Date();
+    const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+    setNetWorthSnapshots(prev => {
+      const todayIndex = prev.findIndex(snap => snap.date === todayStr);
+      if (todayIndex !== -1) {
+        return prev.map((snap, idx) =>
+          idx === todayIndex
+            ? { ...snap, assets: totalAssets, liabilities: 0 }
+            : snap
+        );
+      } else {
+        return [
+          {
+            id: generateId(),
+            date: todayStr,
+            assets: totalAssets,
+            liabilities: 0,
+          },
+          ...prev,
+        ];
+      }
+    });
   };
 
   const handleAddSubscription = () => {
@@ -561,42 +626,123 @@ function StandardKanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawe
                   </div>
                 )}
 
-                {/* Add Snapshot Form */}
-                <div className="p-4 pt-3 flex-1 flex flex-col justify-end border-t border-slate-100 dark:border-slate-700/50">
-                  <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-2">Log Snapshot</div>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="date"
-                      onClick={(e) => {
-                        try {
-                          e.currentTarget.showPicker();
-                        } catch { }
-                      }}
-                      value={snapshotDate}
-                      onChange={(e) => setSnapshotDate(e.target.value)}
-                      className="flex-1 rounded-lg border border-transparent hover:border-slate-200 dark:hover:border-slate-600 focus:border-slate-300 dark:focus:border-slate-500 bg-slate-50 dark:bg-slate-900/50 px-2.5 py-1.5 text-sm text-slate-700 dark:text-slate-200 focus:outline-none transition-colors"
-                    />
-                    <input
-                      type="number"
-                      value={snapshotAssets}
-                      onChange={(e) => setSnapshotAssets(e.target.value)}
-                      placeholder="Assets"
-                      className="w-24 rounded-lg border border-transparent hover:border-slate-200 dark:hover:border-slate-600 focus:border-slate-300 dark:focus:border-slate-500 bg-slate-50 dark:bg-slate-900/50 px-2.5 py-1.5 text-sm text-slate-700 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none transition-colors"
-                    />
-                    <input
-                      type="number"
-                      value={snapshotLiabilities}
-                      onChange={(e) => setSnapshotLiabilities(e.target.value)}
-                      placeholder="Liabilities"
-                      className="w-24 rounded-lg border border-transparent hover:border-slate-200 dark:hover:border-slate-600 focus:border-slate-300 dark:focus:border-slate-500 bg-slate-50 dark:bg-slate-900/50 px-2.5 py-1.5 text-sm text-slate-700 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none transition-colors"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleAddNetWorthSnapshot}
-                      className="px-3 py-1.5 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-semibold hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors flex-shrink-0"
-                    >
-                      Save
-                    </button>
+                {/* Individual Accounts Section */}
+                <div className="p-4 pt-3 flex-1 flex flex-col justify-end border-t border-slate-100 dark:border-slate-700/50 bg-slate-50/30 dark:bg-slate-900/10">
+                  <div className="text-[11.5px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400 mb-3 flex items-center gap-1.5">
+                    <svg className="w-3.5 h-3.5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                    Individual Accounts
+                  </div>
+                  
+                  <div className="space-y-3">
+                    {/* HDFC Savings Account Row */}
+                    <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl border border-slate-200/60 dark:border-slate-700/50 bg-white dark:bg-slate-900/40 hover:border-blue-500/30 dark:hover:border-blue-500/30 transition-all">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center shrink-0">
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                          </svg>
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate">HDFC Savings</p>
+                          <p className="text-[10px] text-slate-400 dark:text-slate-500">Savings Account</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-medium text-slate-400 dark:text-slate-500">₹</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={hdfcSavings === 0 ? '' : +(hdfcSavings / 100000).toFixed(4)}
+                          onChange={(e) => updateAccountBalance('savings', Math.round(Number(e.target.value) * 100000))}
+                          placeholder="0.00"
+                          className="w-28 text-right rounded-lg border border-transparent hover:border-slate-200 dark:hover:border-slate-700 focus:border-blue-500 dark:focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-slate-50/80 dark:bg-slate-900/50 px-2 py-1 text-sm font-semibold text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none transition-all tabular-nums"
+                        />
+                        <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500">L</span>
+                      </div>
+                    </div>
+
+                    {/* HDFC PPF Row */}
+                    <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl border border-slate-200/60 dark:border-slate-700/50 bg-white dark:bg-slate-900/40 hover:border-emerald-500/30 dark:hover:border-emerald-500/30 transition-all">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate">HDFC PPF</p>
+                          <p className="text-[10px] text-slate-400 dark:text-slate-500">Provident Fund</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-medium text-slate-400 dark:text-slate-500">₹</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={hdfcPpf === 0 ? '' : +(hdfcPpf / 100000).toFixed(4)}
+                          onChange={(e) => updateAccountBalance('ppf', Math.round(Number(e.target.value) * 100000))}
+                          placeholder="0.00"
+                          className="w-28 text-right rounded-lg border border-transparent hover:border-slate-200 dark:hover:border-slate-700 focus:border-emerald-500 dark:focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 bg-slate-50/80 dark:bg-slate-900/50 px-2 py-1 text-sm font-semibold text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none transition-all tabular-nums"
+                        />
+                        <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500">L</span>
+                      </div>
+                    </div>
+
+                    {/* Fida Ali Investments Row */}
+                    <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl border border-slate-200/60 dark:border-slate-700/50 bg-white dark:bg-slate-900/40 hover:border-violet-500/30 dark:hover:border-violet-500/30 transition-all">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-violet-500/10 text-violet-500 flex items-center justify-center shrink-0">
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                          </svg>
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate">Fida Ali Investments</p>
+                          <p className="text-[10px] text-slate-400 dark:text-slate-500">Investment Account</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-medium text-slate-400 dark:text-slate-500">₹</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={fidaAliInvestments === 0 ? '' : +(fidaAliInvestments / 100000).toFixed(4)}
+                          onChange={(e) => updateAccountBalance('fidaAli', Math.round(Number(e.target.value) * 100000))}
+                          placeholder="0.00"
+                          className="w-28 text-right rounded-lg border border-transparent hover:border-slate-200 dark:hover:border-slate-700 focus:border-violet-500 dark:focus:border-violet-500 focus:ring-1 focus:ring-violet-500 bg-slate-50/80 dark:bg-slate-900/50 px-2 py-1 text-sm font-semibold text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none transition-all tabular-nums"
+                        />
+                        <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500">L</span>
+                      </div>
+                    </div>
+
+                    {/* Groww Investments Row */}
+                    <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl border border-slate-200/60 dark:border-slate-700/50 bg-white dark:bg-slate-900/40 hover:border-amber-500/30 dark:hover:border-amber-500/30 transition-all">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0">
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                          </svg>
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate">Groww Investments</p>
+                          <p className="text-[10px] text-slate-400 dark:text-slate-500">Investment Account</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-medium text-slate-400 dark:text-slate-500">₹</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={growwInvestments === 0 ? '' : +(growwInvestments / 100000).toFixed(4)}
+                          onChange={(e) => updateAccountBalance('groww', Math.round(Number(e.target.value) * 100000))}
+                          placeholder="0.00"
+                          className="w-28 text-right rounded-lg border border-transparent hover:border-slate-200 dark:hover:border-slate-700 focus:border-amber-500 dark:focus:border-amber-500 focus:ring-1 focus:ring-amber-500 bg-slate-50/80 dark:bg-slate-900/50 px-2 py-1 text-sm font-semibold text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none transition-all tabular-nums"
+                        />
+                        <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500">L</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </section>

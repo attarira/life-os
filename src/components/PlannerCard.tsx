@@ -450,12 +450,7 @@ function TimeSlotEditor({
 
   const hasInvalidRange = Boolean(startTime && endTime && endTime <= startTime);
   const panelWidth = 264;
-  const filesDrawer = typeof document !== 'undefined'
-    ? document.querySelector<HTMLElement>('[data-files-drawer][data-open="true"]')
-    : null;
-  const maxRight = filesDrawer
-    ? filesDrawer.getBoundingClientRect().left - 8
-    : window.innerWidth - 8;
+  const maxRight = typeof window !== 'undefined' ? window.innerWidth - 8 : 800;
   const style: React.CSSProperties = {
     position: 'fixed',
     top: anchorRect.bottom + 6,

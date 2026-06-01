@@ -7,7 +7,6 @@ export { SearchModal } from './SearchModal';
 export { CompletedArchive } from './CompletedArchive';
 export { ImportExport } from './ImportExport';
 export { NotificationsTray } from './NotificationsTray';
-export { FileSystemDrawer } from './FileSystemDrawer';
 export { TaskStatusRing } from './TaskStatusRing';
 export { TaskStatusRingExample } from './TaskStatusRingExample';
 export { GlobalTray } from './GlobalTray';

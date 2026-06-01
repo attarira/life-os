@@ -44,7 +44,8 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
     const maxDigits = options?.maximumFractionDigits ?? 2;
     const minDigits = options?.minimumFractionDigits ?? (maxDigits === 0 ? 0 : 2);
 
-    const formatted = amount.toLocaleString(undefined, {
+    const locale = currencyCode === 'INR' ? 'en-IN' : undefined;
+    const formatted = amount.toLocaleString(locale, {
       minimumFractionDigits: minDigits,
       maximumFractionDigits: maxDigits
     });

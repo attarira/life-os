@@ -20,7 +20,6 @@ import { computeTaskImportance, getSuggestedNextTask } from '@/lib/tasks';
 import { resolveAreaKey } from '@/lib/utils';
 import { PlannerCard } from './PlannerCard';
 import { GlobalTray } from './GlobalTray';
-import { FileSystemDrawer } from './FileSystemDrawer';
 import { TaskStatusRing } from './TaskStatusRing';
 import { HierarchyModal } from './HierarchyModal';
 import { TravelModeHomeDashboard } from './TravelModeHomeDashboard';
@@ -640,7 +639,7 @@ function StandardHomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDra
   const [editorTitle, setEditorTitle] = useState('');
   const [editorDescription, setEditorDescription] = useState('');
 
-  const [isFilesDrawerOpen, setIsFilesDrawerOpen] = useState(false);
+
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -902,14 +901,13 @@ function StandardHomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDra
     window.dispatchEvent(event);
   };
 
-  // Dynamic padding for left (chat) + right (notes/files) drawers
+  // Dynamic padding for left (chat) drawer
   const leftPad = isChatDrawerOpen ? (isChatExpanded ? 'xl:pl-[600px]' : 'xl:pl-[330px]') : 'xl:pl-[56px]';
-  const rightPad = isFilesDrawerOpen ? 'xl:pr-[330px]' : 'xl:pr-[56px]';
 
   return (
     <div className="flex flex-col h-full bg-slate-950">
       <header className="flex-shrink-0 bg-slate-950 border-b border-slate-800 px-6 py-4">
-        <div className={`flex items-center justify-between max-w-[1600px] mx-auto ${leftPad} ${rightPad}`}>
+        <div className={`flex items-center justify-between max-w-[1600px] mx-auto ${leftPad}`}>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 text-sm text-slate-300">
               <span className="font-semibold text-white">LifeOS</span>
@@ -931,10 +929,7 @@ function StandardHomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDra
       </header>
 
       <main className="flex-1 overflow-auto">
-        {/* ─── Files Drawer (RIGHT) ─── */}
-        <FileSystemDrawer isOpen={isFilesDrawerOpen} setIsOpen={setIsFilesDrawerOpen} />
-
-        <div className={`max-w-[1600px] mx-auto p-6 ${leftPad} ${rightPad}`}>
+        <div className={`max-w-[1600px] mx-auto p-6 ${leftPad}`}>
           {/* Greeting */}
           <div className="mb-6">
             <h1 className="text-xl font-semibold text-white tracking-tight">
@@ -948,7 +943,7 @@ function StandardHomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDra
           </div>
 
           {/* ─── Two-Panel Layout ─── */}
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_clamp(380px,30vw,440px)] gap-8">
             {/* ─── LEFT: Focus Areas ─── */}
             <div className="space-y-5">
               <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
