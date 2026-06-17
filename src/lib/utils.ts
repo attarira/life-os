@@ -17,6 +17,26 @@ export function resolveAreaKey(id: string): string {
   return id;
 }
 
+/** Local YYYY-MM-DD key for the given date (defaults to now). */
+export function dayKey(date: Date = new Date()): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+/** ISO week key like "2026-W24" for the given date (defaults to now). */
+export function weekKey(date: Date = new Date()): string {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
+}
+
+/** Local YYYY-MM key for the given date (defaults to now). */
+export function monthKey(date: Date = new Date()): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
 export const storage = {
   get<T>(key: string, fallback: T): T {
     if (typeof window === 'undefined') return fallback;

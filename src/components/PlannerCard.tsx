@@ -944,31 +944,24 @@ export function PlannerCard({ tasks, navigateTo, selectTask, createTask, updateT
   });
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
-      {/* Header */}
-      <div className="px-5 pt-5 pb-3">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-500/20 to-indigo-500/20 flex items-center justify-center">
-              <svg className="w-4 h-4 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-xs uppercase tracking-[0.18em] text-slate-400 font-medium">Planner</p>
-            </div>
-          </div>
-          {totalCount > 0 && (
-            <span className="text-[11px] text-slate-500 tabular-nums">
-              {completedCount}/{totalCount}
-            </span>
-          )}
+    <div className="relative flex flex-col overflow-hidden rounded-xl border border-[var(--op-border)] bg-[var(--op-panel)] backdrop-blur-sm">
+      <div className="flex items-center justify-between gap-3 border-b border-[var(--op-border)] px-4 py-2.5">
+        <div className="flex min-w-0 items-center gap-2 font-mono text-[10px] uppercase tracking-[0.2em]">
+          <span className="tabular-nums text-[var(--op-dim)]">10</span>
+          <span className="text-[var(--op-dim)]">{'//'}</span>
+          <span className="text-[var(--op-muted)]">Planner</span>
         </div>
+        {totalCount > 0 && (
+          <span className="font-mono text-[10px] tabular-nums text-[var(--op-muted)]">{completedCount}/{totalCount}</span>
+        )}
+      </div>
 
+      {/* Input */}
+      <div className="px-4 pt-3 pb-3">
         {/* Dual-Action Input */}
         <div className="relative">
-          <div className="flex items-center gap-2 rounded-lg border border-slate-700/60 bg-slate-800/40 pl-3 pr-1.5 py-1.5 focus-within:border-blue-500/40 focus-within:ring-1 focus-within:ring-blue-500/20 transition-all">
-            <svg className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <div className="flex items-center gap-2 rounded-lg border border-[var(--op-border)] bg-[var(--op-inset)] pl-3 pr-1.5 py-1.5 focus-within:border-[var(--op-border-strong)] transition-all">
+            <svg className="w-3.5 h-3.5 text-[var(--op-muted)] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
             </svg>
             <input
@@ -983,7 +976,7 @@ export function PlannerCard({ tasks, navigateTo, selectTask, createTask, updateT
               onFocus={() => draft.trim() && setShowDropdown(true)}
               onKeyDown={handleKeyDown}
               placeholder="Add task or search..."
-              className="flex-1 bg-transparent text-[13px] text-slate-100 placeholder:text-slate-600 focus:outline-none"
+              className="flex-1 bg-transparent text-[13px] text-[var(--op-text)] placeholder:text-[var(--op-dim)] focus:outline-none"
             />
           </div>
 
@@ -1213,9 +1206,9 @@ export function PlannerCard({ tasks, navigateTo, selectTask, createTask, updateT
       {/* Progress bar (only if entries exist) */}
       {totalCount > 0 && (
         <div className="px-5 pb-4 pt-2">
-          <div className="h-1 rounded-full bg-slate-800/80 overflow-hidden">
+          <div className="h-1 rounded-full bg-[var(--op-inset)] overflow-hidden">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-blue-500 to-emerald-500 transition-all duration-500 ease-out"
+              className="h-full rounded-full bg-[var(--op-accent)] transition-all duration-500 ease-out"
               style={{ width: `${totalCount > 0 ? (completedCount / totalCount) * 100 : 0}%` }}
             />
           </div>

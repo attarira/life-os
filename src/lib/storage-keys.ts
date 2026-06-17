@@ -10,3 +10,11 @@ export const LAST_WEEKLY_SUMMARY_KEY = 'lifeos:lastWeeklySummaryWeek';
 export const NOTIFIED_DUE_TASKS_KEY = 'lifeos:notifiedDueTasks:v1';
 export const FILE_SYSTEM_STORAGE_KEY = 'lifeos:file-system:v1';
 export const TRAVEL_MODE_STORAGE_KEY = 'lifeos:travel-mode:v1';
+
+// ─── Operator dashboard widgets ──────────────────────────────────────────────
+export const OPERATOR_PROFILE_STORAGE_KEY = 'lifeos:operator-profile:v1';
+export const HABITS_DEFS_STORAGE_KEY = 'lifeos:habits-defs:v1';
+export const HABITS_LOG_STORAGE_KEY = 'lifeos:habits-log:v1';
+export const GOALS_STORAGE_KEY = 'lifeos:goals:v1';
+export const NUTRITION_STORAGE_KEY = 'lifeos:nutrition:v1';
+export const NETWORTH_STORAGE_KEY = 'lifeos:networth:v1';
