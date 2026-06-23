@@ -1,15 +1,14 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useTaskContext } from '@/lib/task-context';
 import { useTravelMode } from '@/lib/travel-mode-context';
 import { ROOT_TASK_ID, Task } from '@/lib/types';
-import { storage } from '@/lib/utils';
-import { OPERATOR_PROFILE_STORAGE_KEY } from '@/lib/storage-keys';
+import { getOperatorProfile } from '@/lib/repos/operator';
 
 import { TravelModeHomeDashboard } from './TravelModeHomeDashboard';
 import { TopNav } from './dashboard/TopNav';
-import { OperatorCard, operatorInitials } from './dashboard/OperatorCard';
+import { OperatorCard, operatorInitials, OPERATOR_UPDATED_EVENT } from './dashboard/OperatorCard';
 import { SessionCard } from './dashboard/SessionCard';
 import { HabitsCard } from './dashboard/HabitsCard';
 import { FinancePulseCard } from './dashboard/FinancePulseCard';
@@ -19,19 +18,14 @@ import { TodayKeyCard } from './dashboard/TodayKeyCard';
 import { CalendarCard } from './dashboard/CalendarCard';
 import { CardShell } from './dashboard/CardShell';
 
-export function HomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawerOpen: boolean; isChatExpanded?: boolean }) {
+export function HomeDashboard() {
   const { enabled } = useTravelMode();
 
   if (enabled) {
     return <TravelModeHomeDashboard />;
   }
 
-  return <StandardHomeDashboard isChatDrawerOpen={isChatDrawerOpen} isChatExpanded={isChatExpanded} />;
-}
-
-function getOperatorName(): string {
-  const profile = storage.get<{ name?: string }>(OPERATOR_PROFILE_STORAGE_KEY, {});
-  return profile.name?.trim() || 'Rayaan';
+  return <StandardHomeDashboard />;
 }
 
 function UpcomingCard() {
@@ -98,7 +92,7 @@ function UpcomingCard() {
   );
 }
 
-function StandardHomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawerOpen: boolean; isChatExpanded?: boolean }) {
+function StandardHomeDashboard() {
   const { navigateTo, tasks, createTask, updateTask, deleteTask } = useTaskContext();
 
   const [editorOpen, setEditorOpen] = useState(false);
@@ -111,7 +105,15 @@ function StandardHomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDra
     [tasks]
   );
 
-  const operatorName = useMemo(() => getOperatorName(), []);
+  const [operatorName, setOperatorName] = useState('Rayaan');
+  useEffect(() => {
+    const load = () => getOperatorProfile({ name: 'Rayaan', role: '', location: '', focus: '' })
+      .then((p) => setOperatorName(p.name?.trim() || 'Rayaan'))
+      .catch(() => {});
+    load();
+    window.addEventListener(OPERATOR_UPDATED_EVENT, load);
+    return () => window.removeEventListener(OPERATOR_UPDATED_EVENT, load);
+  }, []);
 
   const handleExport = () => {
     const payload = JSON.stringify(
@@ -167,9 +169,6 @@ function StandardHomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDra
     closeEditor();
   };
 
-  // Dynamic padding for the left (chat) drawer.
-  const leftPad = isChatDrawerOpen ? (isChatExpanded ? 'xl:pl-[600px]' : 'xl:pl-[330px]') : 'xl:pl-[56px]';
-
   return (
     <div className="op flex h-full flex-col text-[var(--op-text)]">
       <TopNav
@@ -178,11 +177,10 @@ function StandardHomeDashboard({ isChatDrawerOpen, isChatExpanded }: { isChatDra
         onAddArea={openCreateArea}
         onExport={handleExport}
         initials={operatorInitials(operatorName)}
-        leftPad={leftPad}
       />
 
       <main className="flex-1 overflow-auto">
-        <div className={`mx-auto max-w-[1600px] p-5 ${leftPad}`}>
+        <div className="mx-auto max-w-[1600px] p-5">
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
             {/* Left column */}
             <div className="space-y-4 lg:col-span-3">

@@ -44,33 +44,30 @@ export function Column({ status, label, color, tasks }: ColumnProps) {
   return (
     <div
       ref={setNodeRef}
-      className={`
-        flex flex-col bg-slate-50 dark:bg-slate-900/50 rounded-xl min-h-[200px] h-full
-        ${isOver ? 'ring-2 ring-blue-400 ring-offset-2 dark:ring-offset-slate-900' : ''}
-      `}
+      className={`flex h-full min-h-[200px] flex-col rounded-xl border bg-[var(--op-panel)] transition-colors ${
+        isOver ? 'border-[var(--op-accent)]/50' : 'border-[var(--op-border)]'
+      }`}
     >
       {/* Column header */}
-      <div className="flex items-center justify-between p-3 border-b border-slate-200 dark:border-slate-700">
+      <div className="flex items-center justify-between border-b border-[var(--op-border)] px-3 py-2.5">
         <div className="flex items-center gap-2">
-          <div className={`w-3 h-3 rounded-full ${color}`} />
-          <h2 className="font-semibold text-slate-700 dark:text-slate-300">{label}</h2>
-          <span className="text-xs text-slate-500 bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 rounded-full">
-            {tasks.length}
-          </span>
+          <div className={`h-2 w-2 rounded-full ${color}`} />
+          <h2 className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--op-muted)]">{label}</h2>
+          <span className="font-mono text-[10px] tabular-nums text-[var(--op-dim)]">{tasks.length}</span>
         </div>
         <button
           onClick={() => setIsAdding(true)}
-          className="p-1 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+          className="rounded-md p-1 text-[var(--op-dim)] transition-colors hover:bg-white/[0.04] hover:text-[var(--op-text)]"
           title="Add task"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
         </button>
       </div>
 
       {/* Task list */}
-      <div className="flex-1 p-2 space-y-2 overflow-y-auto">
+      <div className="flex-1 space-y-2 overflow-y-auto p-2">
         <SortableContext items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
           {tasks.map(task => (
             <TaskCard key={task.id} task={task} />
@@ -79,7 +76,7 @@ export function Column({ status, label, color, tasks }: ColumnProps) {
 
         {/* Add task inline form */}
         {isAdding && (
-          <div className="bg-white dark:bg-slate-800 rounded-lg border border-blue-400 p-3 shadow-sm">
+          <div className="rounded-lg border border-[var(--op-accent)]/40 bg-[var(--op-inset)] p-3">
             <input
               type="text"
               value={newTitle}
@@ -92,9 +89,9 @@ export function Column({ status, label, color, tasks }: ColumnProps) {
                 }
               }}
               onBlur={handleAddTask}
-              placeholder="Task title..."
+              placeholder="Task title…"
               autoFocus
-              className="w-full text-sm bg-transparent outline-none placeholder:text-slate-400"
+              className="w-full bg-transparent text-[13px] text-[var(--op-text)] outline-none placeholder:text-[var(--op-dim)]"
             />
           </div>
         )}

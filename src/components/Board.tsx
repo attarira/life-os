@@ -10,7 +10,6 @@ import { TaskPanel } from './TaskPanel';
 import { SearchModal } from './SearchModal';
 import { CompletedArchive } from './CompletedArchive';
 import { BackupsPanel } from './BackupsPanel';
-import { ChatPanel } from './ChatPanel';
 
 export function Board() {
   const {
@@ -50,15 +49,6 @@ export function Board() {
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [setSearchOpen]);
-  // Global Chat State
-  const [isChatDrawerOpen, setIsChatDrawerOpen] = React.useState(false);
-  const [isChatExpanded, setIsChatExpanded] = React.useState(false);
-
-  const { tasks, navigateTo, selectTask } = useTaskContext();
-  const chatContext = React.useMemo(
-    () => ({ tasks, navigateTo, selectTask }),
-    [tasks, navigateTo, selectTask]
-  );
 
   if (isLoading) {
     return (
@@ -73,31 +63,9 @@ export function Board() {
 
   return (
     <div className="flex flex-col h-screen bg-slate-100 dark:bg-slate-900">
-      {/* ─── Global Chat Drawer (LEFT) ─── */}
-      {!travelModeEnabled && (
-        <aside
-          className={`hidden xl:block fixed left-0 top-[73px] bottom-0 z-40 transition-[width] duration-200 ${isChatDrawerOpen ? (isChatExpanded ? 'w-[600px]' : 'w-[330px]') : 'w-[56px]'
-            }`}
-        >
-          <div className="h-full w-full rounded-r-2xl border-r border-t border-b border-slate-800 bg-slate-950/95 shadow-2xl backdrop-blur-sm">
-            <ChatPanel
-              appContext={chatContext}
-              collapsed={!isChatDrawerOpen}
-              onToggle={() => setIsChatDrawerOpen((v) => !v)}
-              isExpanded={isChatExpanded}
-              onToggleExpand={() => setIsChatExpanded((v) => !v)}
-            />
-          </div>
-        </aside>
-      )}
-
       {/* Main Content */}
       <main className="flex-1 overflow-hidden relative">
-        {isAtRoot ? (
-          <HomeDashboard isChatDrawerOpen={isChatDrawerOpen} isChatExpanded={isChatExpanded} />
-        ) : (
-          <KanbanBoard isChatDrawerOpen={isChatDrawerOpen} isChatExpanded={isChatExpanded} />
-        )}
+        {isAtRoot ? <HomeDashboard /> : <KanbanBoard />}
       </main>
 
       {/* Global Modals */}

@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { Task } from '@/lib/types';
 import { GlobalTray } from '../GlobalTray';
+import { useAuth } from '@/lib/supabase/auth-context';
 
 export function TopNav({
   lifeAreas,
@@ -10,15 +11,14 @@ export function TopNav({
   onAddArea,
   onExport,
   initials,
-  leftPad = '',
 }: {
   lifeAreas: Task[];
   onNavigate: (id: string) => void;
   onAddArea: () => void;
   onExport: () => void;
   initials: string;
-  leftPad?: string;
 }) {
+  const { configured, session, signOut } = useAuth();
   const [now, setNow] = useState<Date>(() => new Date());
 
   useEffect(() => {
@@ -31,7 +31,7 @@ export function TopNav({
 
   return (
     <header className="sticky top-0 z-30 flex-shrink-0 border-b border-[var(--op-border)] bg-[#05080d]/85 backdrop-blur-md">
-      <div className={`mx-auto flex h-12 max-w-[1600px] items-center gap-4 px-5 ${leftPad}`}>
+      <div className="mx-auto flex h-12 max-w-[1600px] items-center gap-4 px-5">
         {/* Brand */}
         <div className="flex flex-shrink-0 items-center gap-2">
           <span className="h-1.5 w-1.5 rounded-full bg-[var(--op-accent)] shadow-[0_0_8px_var(--op-accent)]" />
@@ -90,9 +90,19 @@ export function TopNav({
           <span className="hidden font-mono text-[10px] tabular-nums tracking-wide text-[var(--op-muted)] lg:inline" suppressHydrationWarning>{dateLabel}</span>
           <span className="font-mono text-[12px] font-medium tabular-nums tracking-wide text-[var(--op-text)]" suppressHydrationWarning>{timeLabel}</span>
 
-          <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md border border-[var(--op-border-strong)] bg-white/[0.03] font-mono text-[10px] font-semibold tracking-wider text-[var(--op-sub)]">
-            {initials}
-          </span>
+          {configured && session ? (
+            <button
+              onClick={() => { if (confirm('Sign out?')) signOut(); }}
+              title="Sign out"
+              className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md border border-[var(--op-border-strong)] bg-white/[0.03] font-mono text-[10px] font-semibold tracking-wider text-[var(--op-sub)] transition-colors hover:border-rose-500/40 hover:text-rose-300"
+            >
+              {initials}
+            </button>
+          ) : (
+            <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md border border-[var(--op-border-strong)] bg-white/[0.03] font-mono text-[10px] font-semibold tracking-wider text-[var(--op-sub)]">
+              {initials}
+            </span>
+          )}
         </div>
       </div>
     </header>

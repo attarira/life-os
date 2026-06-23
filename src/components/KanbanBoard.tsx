@@ -106,17 +106,17 @@ function loadSubscriptions(): SubscriptionItem[] {
 }
 
 
-export function KanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawerOpen?: boolean, isChatExpanded?: boolean }) {
+export function KanbanBoard() {
   const { enabled } = useTravelMode();
 
   if (enabled) {
     return <TravelModeBoard />;
   }
 
-  return <StandardKanbanBoard isChatDrawerOpen={isChatDrawerOpen} isChatExpanded={isChatExpanded} />;
+  return <StandardKanbanBoard />;
 }
 
-function StandardKanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawerOpen?: boolean, isChatExpanded?: boolean }) {
+function StandardKanbanBoard() {
   const {
     tasks,
     getVisibleChildren,
@@ -428,13 +428,11 @@ function StandardKanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawe
     if (editingSnapshotId === id) setEditingSnapshotId(null);
   };
 
-  const leftPad = isChatDrawerOpen ? (isChatExpanded ? 'xl:pl-[600px]' : 'xl:pl-[330px]') : 'xl:pl-[56px]';
-
   return (
-    <div className={`flex flex-col h-full transition-[padding] duration-200 ${leftPad}`}>
+    <div className="op flex h-full flex-col text-[var(--op-text)]">
       {/* Header with Breadcrumb and Actions */}
-      <header className="flex-shrink-0 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 py-3">
-        <div className="flex items-center justify-between gap-4 max-w-7xl mx-auto">
+      <header className="flex-shrink-0 border-b border-[var(--op-border)] bg-[#05080d]/85 px-4 py-3 backdrop-blur-md">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
           <div className="flex items-center gap-4 min-w-0 flex-1">
             <Breadcrumb />
           </div>
@@ -454,16 +452,16 @@ function StandardKanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawe
           {showFinanceSections && (
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-stretch">
               {/* ─── Net Worth Card ─── */}
-              <section className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/70 flex flex-col">
-                <div className="p-4 pb-3 border-b border-slate-100 dark:border-slate-700/50">
+              <section className="flex flex-col rounded-xl border border-[var(--op-border)] bg-[var(--op-panel)]">
+                <div className="p-4 pb-3 border-b border-[var(--op-border)]">
                   <div className="flex items-center justify-between mb-1">
-                    <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Net Worth</h3>
+                    <h3 className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--op-muted)]">Net Worth</h3>
                     <div className="flex items-center gap-2">
                       {sortedSnapshots.length > 0 && (
                         <button
                           type="button"
                           onClick={() => setShowNetWorthHistory(!showNetWorthHistory)}
-                          className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                          className="rounded-md p-1 text-[var(--op-dim)] transition-colors hover:bg-white/[0.04] hover:text-[var(--op-text)]"
                           title={showNetWorthHistory ? 'Hide history' : 'Show history'}
                         >
                           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -471,13 +469,13 @@ function StandardKanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawe
                           </svg>
                         </button>
                       )}
-                      <span className="text-[11px] text-slate-400 dark:text-slate-500">
+                      <span className="font-mono text-[10px] text-[var(--op-dim)]">
                         {latestSnapshot ? latestSnapshot.date : '—'}
                       </span>
                     </div>
                   </div>
                   <div className="flex items-baseline gap-2.5">
-                    <span className="text-2xl font-bold text-slate-900 dark:text-white tabular-nums">
+                    <span className="text-2xl font-semibold text-[var(--op-text)] tabular-nums">
                       {formatAmount(latestNetWorth, { maximumFractionDigits: 0 })}
                     </span>
                     {trendPercent !== null && (
@@ -494,14 +492,14 @@ function StandardKanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawe
                   </div>
                   {/* Horizontal Quick Stats */}
                   <div className="grid grid-cols-2 gap-4 mt-3">
-                    <div className="flex items-center justify-between rounded-lg bg-slate-50 dark:bg-slate-900/50 px-3 py-2">
-                      <span className="text-[11px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">Assets</span>
+                    <div className="flex items-center justify-between rounded-lg bg-[var(--op-inset)] px-3 py-2">
+                      <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--op-dim)]">Assets</span>
                       <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
                         {formatAmount(latestSnapshot?.assets ?? 0, { maximumFractionDigits: 0 })}
                       </span>
                     </div>
-                    <div className="flex items-center justify-between rounded-lg bg-slate-50 dark:bg-slate-900/50 px-3 py-2">
-                      <span className="text-[11px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">Liabilities</span>
+                    <div className="flex items-center justify-between rounded-lg bg-[var(--op-inset)] px-3 py-2">
+                      <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--op-dim)]">Liabilities</span>
                       <span className="text-sm font-semibold text-rose-600 dark:text-rose-400 tabular-nums">
                         {formatAmount(latestSnapshot?.liabilities ?? 0, { maximumFractionDigits: 0 })}
                       </span>
@@ -511,27 +509,27 @@ function StandardKanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawe
 
                 {/* Snapshot History */}
                 {showNetWorthHistory && sortedSnapshots.length > 0 && (
-                  <div className="border-t border-slate-100 dark:border-slate-700/50">
+                  <div className="border-t border-[var(--op-border)]">
                     <div className="px-4 pt-3 pb-1">
-                      <span className="text-[11px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">History</span>
+                      <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--op-dim)]">History</span>
                     </div>
                     <div className="max-h-40 overflow-y-auto">
                       {/* Table Header */}
-                      <div className="grid grid-cols-[100px_1fr_1fr_1fr_36px] gap-2 items-center px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 sticky top-0 bg-white dark:bg-slate-800/70">
+                      <div className="grid grid-cols-[100px_1fr_1fr_1fr_36px] gap-2 items-center px-4 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--op-dim)] sticky top-0 bg-[var(--op-panel)]">
                         <span>Date</span>
                         <span className="text-right">Assets</span>
                         <span className="text-right">Liabilities</span>
                         <span className="text-right">Net</span>
                         <span />
                       </div>
-                      <div className="divide-y divide-slate-100 dark:divide-slate-700/50">
+                      <div className="divide-y divide-[var(--op-border)]">
                         {sortedSnapshots.map((snap) => {
                           const isEditing = editingSnapshotId === snap.id;
                           const net = snap.assets - snap.liabilities;
                           return (
                             <div
                               key={snap.id}
-                              className="grid grid-cols-[100px_1fr_1fr_1fr_36px] gap-2 items-center px-4 py-1.5 group hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                              className="grid grid-cols-[100px_1fr_1fr_1fr_36px] gap-2 items-center px-4 py-1.5 group hover:bg-white/[0.03] transition-colors"
                             >
                               {isEditing ? (
                                 <>
@@ -544,19 +542,19 @@ function StandardKanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawe
                                     }}
                                     value={editingSnapshot.date}
                                     onChange={(e) => setEditingSnapshot((prev) => ({ ...prev, date: e.target.value }))}
-                                    className="rounded border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 px-1.5 py-0.5 text-xs text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                    className="rounded border border-[var(--op-border)] bg-[var(--op-inset)] px-1.5 py-0.5 text-xs text-[var(--op-text)] focus:border-[var(--op-border-strong)] focus:outline-none"
                                   />
                                   <input
                                     type="number"
                                     value={editingSnapshot.assets}
                                     onChange={(e) => setEditingSnapshot((prev) => ({ ...prev, assets: e.target.value }))}
-                                    className="rounded border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 px-1.5 py-0.5 text-xs text-right text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                    className="rounded border border-[var(--op-border)] bg-[var(--op-inset)] px-1.5 py-0.5 text-xs text-right text-[var(--op-text)] focus:border-[var(--op-border-strong)] focus:outline-none"
                                   />
                                   <input
                                     type="number"
                                     value={editingSnapshot.liabilities}
                                     onChange={(e) => setEditingSnapshot((prev) => ({ ...prev, liabilities: e.target.value }))}
-                                    className="rounded border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 px-1.5 py-0.5 text-xs text-right text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                    className="rounded border border-[var(--op-border)] bg-[var(--op-inset)] px-1.5 py-0.5 text-xs text-right text-[var(--op-text)] focus:border-[var(--op-border-strong)] focus:outline-none"
                                   />
                                   <span className="text-xs text-right font-medium tabular-nums text-slate-400">—</span>
                                   <div className="flex items-center gap-0.5">
@@ -573,7 +571,7 @@ function StandardKanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawe
                                     <button
                                       type="button"
                                       onClick={cancelEditingSnapshot}
-                                      className="p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-400 transition-colors"
+                                      className="rounded p-0.5 text-[var(--op-dim)] transition-colors hover:bg-white/[0.06] hover:text-[var(--op-text)]"
                                       title="Cancel"
                                     >
                                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -584,21 +582,21 @@ function StandardKanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawe
                                 </>
                               ) : (
                                 <>
-                                  <span className="text-xs text-slate-600 dark:text-slate-300 tabular-nums">{snap.date}</span>
+                                  <span className="font-mono text-xs text-[var(--op-sub)] tabular-nums">{snap.date}</span>
                                   <span className="text-xs text-right font-medium tabular-nums text-emerald-600 dark:text-emerald-400">
                                     {formatAmount(snap.assets)}
                                   </span>
                                   <span className="text-xs text-right font-medium tabular-nums text-rose-600 dark:text-rose-400">
                                     {formatAmount(snap.liabilities)}
                                   </span>
-                                  <span className={`text-xs text-right font-semibold tabular-nums ${net >= 0 ? 'text-slate-800 dark:text-slate-100' : 'text-rose-600 dark:text-rose-400'}`}>
+                                  <span className={`text-xs text-right font-semibold tabular-nums ${net >= 0 ? 'text-[var(--op-text)]' : 'text-rose-600 dark:text-rose-400'}`}>
                                     {formatAmount(net)}
                                   </span>
                                   <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                                     <button
                                       type="button"
                                       onClick={() => startEditingSnapshot(snap)}
-                                      className="p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                                      className="p-0.5 rounded text-[var(--op-dim)] transition-colors hover:bg-white/[0.06] hover:text-[var(--op-text)]"
                                       title="Edit"
                                     >
                                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -627,9 +625,9 @@ function StandardKanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawe
                 )}
 
                 {/* Individual Accounts Section */}
-                <div className="p-4 pt-3 flex-1 flex flex-col justify-end border-t border-slate-100 dark:border-slate-700/50 bg-slate-50/30 dark:bg-slate-900/10">
-                  <div className="text-[11.5px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400 mb-3 flex items-center gap-1.5">
-                    <svg className="w-3.5 h-3.5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <div className="flex flex-1 flex-col justify-end border-t border-[var(--op-border)] bg-white/[0.01] p-4 pt-3">
+                  <div className="mb-3 flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--op-muted)]">
+                    <svg className="w-3.5 h-3.5 text-[var(--op-accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                     </svg>
                     Individual Accounts
@@ -637,7 +635,7 @@ function StandardKanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawe
                   
                   <div className="space-y-3">
                     {/* HDFC Savings Account Row */}
-                    <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl border border-slate-200/60 dark:border-slate-700/50 bg-white dark:bg-slate-900/40 hover:border-blue-500/30 dark:hover:border-blue-500/30 transition-all">
+                    <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl border border-[var(--op-border)] bg-[var(--op-inset)] hover:border-blue-500/30 dark:hover:border-blue-500/30 transition-all">
                       <div className="flex items-center gap-2 min-w-0">
                         <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center shrink-0">
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
@@ -645,26 +643,26 @@ function StandardKanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawe
                           </svg>
                         </div>
                         <div className="min-w-0">
-                          <p className="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate">HDFC Savings</p>
-                          <p className="text-[10px] text-slate-400 dark:text-slate-500">Savings Account</p>
+                          <p className="truncate text-xs font-semibold text-[var(--op-text)]">HDFC Savings</p>
+                          <p className="text-[10px] text-[var(--op-muted)]">Savings Account</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-medium text-slate-400 dark:text-slate-500">₹</span>
+                        <span className="text-xs text-[var(--op-dim)]">₹</span>
                         <input
                           type="number"
                           step="0.01"
                           value={hdfcSavings === 0 ? '' : +(hdfcSavings / 100000).toFixed(4)}
                           onChange={(e) => updateAccountBalance('savings', Math.round(Number(e.target.value) * 100000))}
                           placeholder="0.00"
-                          className="w-28 text-right rounded-lg border border-transparent hover:border-slate-200 dark:hover:border-slate-700 focus:border-blue-500 dark:focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-slate-50/80 dark:bg-slate-900/50 px-2 py-1 text-sm font-semibold text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none transition-all tabular-nums"
+                          className="w-28 text-right rounded-lg border border-transparent hover:border-[var(--op-border-strong)] focus:border-blue-500 dark:focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-[var(--op-inset)] px-2 py-1 text-sm font-semibold text-[var(--op-text)] placeholder:text-[var(--op-dim)] focus:outline-none transition-all tabular-nums"
                         />
-                        <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500">L</span>
+                        <span className="text-[10px] text-[var(--op-dim)]">L</span>
                       </div>
                     </div>
 
                     {/* HDFC PPF Row */}
-                    <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl border border-slate-200/60 dark:border-slate-700/50 bg-white dark:bg-slate-900/40 hover:border-emerald-500/30 dark:hover:border-emerald-500/30 transition-all">
+                    <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl border border-[var(--op-border)] bg-[var(--op-inset)] hover:border-emerald-500/30 dark:hover:border-emerald-500/30 transition-all">
                       <div className="flex items-center gap-2 min-w-0">
                         <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
@@ -672,26 +670,26 @@ function StandardKanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawe
                           </svg>
                         </div>
                         <div className="min-w-0">
-                          <p className="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate">HDFC PPF</p>
-                          <p className="text-[10px] text-slate-400 dark:text-slate-500">Provident Fund</p>
+                          <p className="truncate text-xs font-semibold text-[var(--op-text)]">HDFC PPF</p>
+                          <p className="text-[10px] text-[var(--op-muted)]">Provident Fund</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-medium text-slate-400 dark:text-slate-500">₹</span>
+                        <span className="text-xs text-[var(--op-dim)]">₹</span>
                         <input
                           type="number"
                           step="0.01"
                           value={hdfcPpf === 0 ? '' : +(hdfcPpf / 100000).toFixed(4)}
                           onChange={(e) => updateAccountBalance('ppf', Math.round(Number(e.target.value) * 100000))}
                           placeholder="0.00"
-                          className="w-28 text-right rounded-lg border border-transparent hover:border-slate-200 dark:hover:border-slate-700 focus:border-emerald-500 dark:focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 bg-slate-50/80 dark:bg-slate-900/50 px-2 py-1 text-sm font-semibold text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none transition-all tabular-nums"
+                          className="w-28 text-right rounded-lg border border-transparent hover:border-[var(--op-border-strong)] focus:border-emerald-500 dark:focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 bg-[var(--op-inset)] px-2 py-1 text-sm font-semibold text-[var(--op-text)] placeholder:text-[var(--op-dim)] focus:outline-none transition-all tabular-nums"
                         />
-                        <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500">L</span>
+                        <span className="text-[10px] text-[var(--op-dim)]">L</span>
                       </div>
                     </div>
 
                     {/* Fida Ali Investments Row */}
-                    <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl border border-slate-200/60 dark:border-slate-700/50 bg-white dark:bg-slate-900/40 hover:border-violet-500/30 dark:hover:border-violet-500/30 transition-all">
+                    <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl border border-[var(--op-border)] bg-[var(--op-inset)] hover:border-violet-500/30 dark:hover:border-violet-500/30 transition-all">
                       <div className="flex items-center gap-2 min-w-0">
                         <div className="w-8 h-8 rounded-lg bg-violet-500/10 text-violet-500 flex items-center justify-center shrink-0">
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
@@ -699,26 +697,26 @@ function StandardKanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawe
                           </svg>
                         </div>
                         <div className="min-w-0">
-                          <p className="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate">Fida Ali Investments</p>
-                          <p className="text-[10px] text-slate-400 dark:text-slate-500">Investment Account</p>
+                          <p className="truncate text-xs font-semibold text-[var(--op-text)]">Fida Ali Investments</p>
+                          <p className="text-[10px] text-[var(--op-muted)]">Investment Account</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-medium text-slate-400 dark:text-slate-500">₹</span>
+                        <span className="text-xs text-[var(--op-dim)]">₹</span>
                         <input
                           type="number"
                           step="0.01"
                           value={fidaAliInvestments === 0 ? '' : +(fidaAliInvestments / 100000).toFixed(4)}
                           onChange={(e) => updateAccountBalance('fidaAli', Math.round(Number(e.target.value) * 100000))}
                           placeholder="0.00"
-                          className="w-28 text-right rounded-lg border border-transparent hover:border-slate-200 dark:hover:border-slate-700 focus:border-violet-500 dark:focus:border-violet-500 focus:ring-1 focus:ring-violet-500 bg-slate-50/80 dark:bg-slate-900/50 px-2 py-1 text-sm font-semibold text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none transition-all tabular-nums"
+                          className="w-28 text-right rounded-lg border border-transparent hover:border-[var(--op-border-strong)] focus:border-violet-500 dark:focus:border-violet-500 focus:ring-1 focus:ring-violet-500 bg-[var(--op-inset)] px-2 py-1 text-sm font-semibold text-[var(--op-text)] placeholder:text-[var(--op-dim)] focus:outline-none transition-all tabular-nums"
                         />
-                        <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500">L</span>
+                        <span className="text-[10px] text-[var(--op-dim)]">L</span>
                       </div>
                     </div>
 
                     {/* Groww Investments Row */}
-                    <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl border border-slate-200/60 dark:border-slate-700/50 bg-white dark:bg-slate-900/40 hover:border-amber-500/30 dark:hover:border-amber-500/30 transition-all">
+                    <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl border border-[var(--op-border)] bg-[var(--op-inset)] hover:border-amber-500/30 dark:hover:border-amber-500/30 transition-all">
                       <div className="flex items-center gap-2 min-w-0">
                         <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0">
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
@@ -726,21 +724,21 @@ function StandardKanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawe
                           </svg>
                         </div>
                         <div className="min-w-0">
-                          <p className="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate">Groww Investments</p>
-                          <p className="text-[10px] text-slate-400 dark:text-slate-500">Investment Account</p>
+                          <p className="truncate text-xs font-semibold text-[var(--op-text)]">Groww Investments</p>
+                          <p className="text-[10px] text-[var(--op-muted)]">Investment Account</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-medium text-slate-400 dark:text-slate-500">₹</span>
+                        <span className="text-xs text-[var(--op-dim)]">₹</span>
                         <input
                           type="number"
                           step="0.01"
                           value={growwInvestments === 0 ? '' : +(growwInvestments / 100000).toFixed(4)}
                           onChange={(e) => updateAccountBalance('groww', Math.round(Number(e.target.value) * 100000))}
                           placeholder="0.00"
-                          className="w-28 text-right rounded-lg border border-transparent hover:border-slate-200 dark:hover:border-slate-700 focus:border-amber-500 dark:focus:border-amber-500 focus:ring-1 focus:ring-amber-500 bg-slate-50/80 dark:bg-slate-900/50 px-2 py-1 text-sm font-semibold text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none transition-all tabular-nums"
+                          className="w-28 text-right rounded-lg border border-transparent hover:border-[var(--op-border-strong)] focus:border-amber-500 dark:focus:border-amber-500 focus:ring-1 focus:ring-amber-500 bg-[var(--op-inset)] px-2 py-1 text-sm font-semibold text-[var(--op-text)] placeholder:text-[var(--op-dim)] focus:outline-none transition-all tabular-nums"
                         />
-                        <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500">L</span>
+                        <span className="text-[10px] text-[var(--op-dim)]">L</span>
                       </div>
                     </div>
                   </div>
@@ -748,14 +746,14 @@ function StandardKanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawe
               </section>
 
               {/* ─── Subscriptions Card ─── */}
-              <section className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/70 flex flex-col">
-                <div className="p-4 pb-3 border-b border-slate-100 dark:border-slate-700/50">
+              <section className="flex flex-col rounded-xl border border-[var(--op-border)] bg-[var(--op-panel)]">
+                <div className="p-4 pb-3 border-b border-[var(--op-border)]">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Subscriptions</h3>
+                    <h3 className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--op-muted)]">Subscriptions</h3>
                     <button
                       type="button"
                       onClick={() => setShowAddSubscription(!showAddSubscription)}
-                      className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                      className="rounded-md p-1 text-[var(--op-dim)] transition-colors hover:bg-white/[0.04] hover:text-[var(--op-text)]"
                       title="Add subscription"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -766,13 +764,13 @@ function StandardKanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawe
 
                   {/* Inline Add Form */}
                   {showAddSubscription && (
-                    <div className="mt-3 p-3 rounded-lg bg-slate-50 dark:bg-slate-900/50 space-y-2">
+                    <div className="mt-3 p-3 rounded-lg bg-[var(--op-inset)] space-y-2">
                       <div className="grid grid-cols-2 gap-2">
                         <input
                           value={subscriptionName}
                           onChange={(e) => setSubscriptionName(e.target.value)}
                           placeholder="Service name"
-                          className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-sm text-slate-700 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300 dark:focus:ring-slate-600"
+                          className="rounded-lg border border-[var(--op-border)] bg-[var(--op-inset)] px-2.5 py-1.5 text-sm text-[var(--op-text)] placeholder:text-[var(--op-dim)] focus:border-[var(--op-border-strong)] focus:outline-none"
                           autoFocus
                         />
                         <input
@@ -780,7 +778,7 @@ function StandardKanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawe
                           value={subscriptionCost}
                           onChange={(e) => setSubscriptionCost(e.target.value)}
                           placeholder="Cost"
-                          className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-sm text-slate-700 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300 dark:focus:ring-slate-600"
+                          className="rounded-lg border border-[var(--op-border)] bg-[var(--op-inset)] px-2.5 py-1.5 text-sm text-[var(--op-text)] placeholder:text-[var(--op-dim)] focus:border-[var(--op-border-strong)] focus:outline-none"
                         />
                       </div>
                       <div className="grid grid-cols-2 gap-2">
@@ -788,20 +786,20 @@ function StandardKanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawe
                           value={subscriptionPaymentMethod}
                           onChange={(e) => setSubscriptionPaymentMethod(e.target.value)}
                           placeholder="Payment (e.g. WF Card)"
-                          className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-sm text-slate-700 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300 dark:focus:ring-slate-600"
+                          className="rounded-lg border border-[var(--op-border)] bg-[var(--op-inset)] px-2.5 py-1.5 text-sm text-[var(--op-text)] placeholder:text-[var(--op-dim)] focus:border-[var(--op-border-strong)] focus:outline-none"
                         />
                         <input
                           value={subscriptionDueDate}
                           onChange={(e) => setSubscriptionDueDate(e.target.value)}
                           placeholder="Due Date (e.g. 5th)"
-                          className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-sm text-slate-700 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300 dark:focus:ring-slate-600"
+                          className="rounded-lg border border-[var(--op-border)] bg-[var(--op-inset)] px-2.5 py-1.5 text-sm text-[var(--op-text)] placeholder:text-[var(--op-dim)] focus:border-[var(--op-border-strong)] focus:outline-none"
                         />
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <select
                           value={subscriptionBilling}
                           onChange={(e) => setSubscriptionBilling(e.target.value as 'monthly' | 'yearly')}
-                          className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-slate-300 dark:focus:ring-slate-600"
+                          className="rounded-lg border border-[var(--op-border)] bg-[var(--op-inset)] px-2.5 py-1.5 text-sm text-[var(--op-text)] focus:border-[var(--op-border-strong)] focus:outline-none"
                         >
                           <option value="monthly">Monthly</option>
                           <option value="yearly">Yearly</option>
@@ -809,7 +807,7 @@ function StandardKanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawe
                         <select
                           value={subscriptionCategory}
                           onChange={(e) => setSubscriptionCategory(e.target.value as SubscriptionCategory)}
-                          className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-slate-300 dark:focus:ring-slate-600"
+                          className="rounded-lg border border-[var(--op-border)] bg-[var(--op-inset)] px-2.5 py-1.5 text-sm text-[var(--op-text)] focus:border-[var(--op-border-strong)] focus:outline-none"
                         >
                           {Object.entries(CATEGORY_LABELS).map(([val, label]) => (
                             <option key={val} value={val}>{label}</option>
@@ -820,7 +818,7 @@ function StandardKanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawe
                         <button
                           type="button"
                           onClick={() => setShowAddSubscription(false)}
-                          className="px-3 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+                          className="px-3 py-1.5 font-mono text-[11px] uppercase tracking-wider text-[var(--op-muted)] transition-colors hover:text-[var(--op-text)]"
                         >
                           Cancel
                         </button>
@@ -828,7 +826,7 @@ function StandardKanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawe
                           type="button"
                           onClick={handleAddSubscription}
                           disabled={!subscriptionName.trim() || !subscriptionCost}
-                          className="px-3 py-1.5 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-semibold hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                          className="rounded-lg bg-[var(--op-accent)] px-3 py-1.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-[#05221a] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           Add
                         </button>
@@ -841,12 +839,12 @@ function StandardKanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawe
                 <div className="flex-1 overflow-y-auto">
                   {subscriptions.length === 0 ? (
                     <div className="p-4 text-center">
-                      <p className="text-xs text-slate-400 dark:text-slate-500">No subscriptions tracked yet.</p>
+                      <p className="text-xs text-[var(--op-muted)]">No subscriptions tracked yet.</p>
                     </div>
                   ) : (
-                    <div className="divide-y divide-slate-100 dark:divide-slate-700/50">
+                    <div className="divide-y divide-[var(--op-border)]">
                       {/* Table Header */}
-                      <div className="grid grid-cols-[auto_1fr_60px_80px_60px_40px] gap-3 items-center px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 sticky top-0 bg-white dark:bg-slate-800/70 z-10">
+                      <div className="grid grid-cols-[auto_1fr_60px_80px_60px_40px] gap-3 items-center px-4 py-2 font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--op-dim)] sticky top-0 bg-[var(--op-panel)] z-10">
                         <span className="w-1" />
                         <span>Service</span>
                         <span className="text-center">Due</span>
@@ -872,38 +870,38 @@ function StandardKanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawe
                         .map((item) => (
                           <div
                             key={item.id}
-                            className={`grid grid-cols-[auto_1fr_60px_80px_60px_40px] gap-3 items-center px-4 py-2 group hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors ${!item.active ? 'opacity-50' : ''
+                            className={`grid grid-cols-[auto_1fr_60px_80px_60px_40px] gap-3 items-center px-4 py-2 group hover:bg-white/[0.03] transition-colors ${!item.active ? 'opacity-50' : ''
                               }`}
                           >
                             {/* Category Color Strip */}
                             <div className={`w-1 h-6 rounded-full ${CATEGORY_COLORS[item.category]}`} title={CATEGORY_LABELS[item.category]} />
                             {/* Name and Payment Method */}
                             <div className="flex items-center gap-2 min-w-0">
-                              <span className={`text-sm font-medium truncate ${item.active ? 'text-slate-800 dark:text-slate-100' : 'text-slate-400 line-through'}`}>
+                              <span className={`text-sm font-medium truncate ${item.active ? 'text-[var(--op-text)]' : 'text-slate-400 line-through'}`}>
                                 {item.name}
                               </span>
                               {item.paymentMethod && (
                                 <div className="relative group/info flex-shrink-0">
-                                  <svg className="w-3.5 h-3.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-help transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <svg className="w-3.5 h-3.5 cursor-help text-[var(--op-dim)] transition-colors hover:text-[var(--op-text)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                   </svg>
-                                  <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover/info:block w-max max-w-[150px] p-2 bg-slate-800 dark:bg-slate-700 text-white text-xs rounded shadow-lg z-20 whitespace-normal text-center">
+                                  <div className="absolute left-1/2 bottom-full z-20 mb-2 hidden w-max max-w-[150px] -translate-x-1/2 whitespace-normal rounded border border-[var(--op-border)] bg-[var(--op-panel-solid)] p-2 text-center text-xs text-[var(--op-text)] shadow-lg group-hover/info:block">
                                     {item.paymentMethod}
-                                    <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-slate-800 dark:border-t-slate-700"></div>
+                                    <div className="absolute left-1/2 top-full h-0 w-0 -translate-x-1/2 border-x-4 border-t-4 border-x-transparent border-t-[var(--op-border-strong)]"></div>
                                   </div>
                                 </div>
                               )}
                             </div>
                             {/* Due Date */}
-                            <span className="text-[11px] text-center text-slate-500 dark:text-slate-400">
+                            <span className="text-center font-mono text-[11px] text-[var(--op-muted)]">
                               {item.dueDate || '-'}
                             </span>
                             {/* Cost */}
-                            <span className="text-sm text-right font-medium tabular-nums text-slate-700 dark:text-slate-200">
+                            <span className="text-sm text-right font-medium tabular-nums text-[var(--op-text)]">
                               {formatAmount(item.cost, { maximumFractionDigits: 2, minimumFractionDigits: 2 })}
                             </span>
                             {/* Billing */}
-                            <span className="text-[11px] text-center text-slate-400 dark:text-slate-500">
+                            <span className="text-center font-mono text-[11px] text-[var(--op-dim)]">
                               {item.billing === 'monthly' ? '/mo' : '/yr'}
                             </span>
                             {/* Action Icons */}
@@ -911,7 +909,7 @@ function StandardKanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawe
                               <button
                                 type="button"
                                 onClick={() => toggleSubscription(item.id)}
-                                className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                                className="p-1 rounded-md text-[var(--op-dim)] transition-colors hover:bg-white/[0.06] hover:text-[var(--op-text)]"
                                 title={item.active ? 'Pause' : 'Resume'}
                               >
                                 {item.active ? (
@@ -942,11 +940,11 @@ function StandardKanbanBoard({ isChatDrawerOpen, isChatExpanded }: { isChatDrawe
                 </div>
 
                 {/* Total Monthly Burn Footer */}
-                <div className="px-4 py-3 border-t border-slate-100 dark:border-slate-700/50 bg-slate-50/50 dark:bg-slate-900/30 rounded-b-xl">
+                <div className="rounded-b-xl border-t border-[var(--op-border)] bg-[var(--op-inset)] px-4 py-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Total Monthly Burn</span>
-                    <span className="text-lg font-bold text-slate-900 dark:text-white tabular-nums">
-                      {formatAmount(monthlySubscriptionTotal)}<span className="text-xs font-normal text-slate-400 dark:text-slate-500">/mo</span>
+                    <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--op-dim)]">Total Monthly Burn</span>
+                    <span className="text-lg font-semibold text-[var(--op-text)] tabular-nums">
+                      {formatAmount(monthlySubscriptionTotal)}<span className="text-xs font-normal text-[var(--op-muted)]">/mo</span>
                     </span>
                   </div>
                 </div>

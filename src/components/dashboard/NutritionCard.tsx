@@ -1,41 +1,39 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
-import { storage, dayKey, generateId } from '@/lib/utils';
-import { NUTRITION_STORAGE_KEY } from '@/lib/storage-keys';
+import React, { useEffect, useMemo, useState } from 'react';
 import { CardShell } from './CardShell';
-
-type Meal = { id: string; name: string; kcal: number; protein: number; carbs: number; fat: number };
-type NutritionStore = { date: string; meals: Meal[] };
+import { Meal, listMeals, addMeal, removeMeal } from '@/lib/repos/nutrition';
 
 const EMPTY_DRAFT = { name: '', kcal: '', protein: '', carbs: '', fat: '' };
 
 export function NutritionCard() {
-  const [meals, setMeals] = useState<Meal[]>(() => {
-    const today = dayKey();
-    const stored = storage.get<NutritionStore>(NUTRITION_STORAGE_KEY, { date: today, meals: [] });
-    return stored.date === today ? stored.meals : [];
-  });
+  const [meals, setMeals] = useState<Meal[]>([]);
   const [draft, setDraft] = useState(EMPTY_DRAFT);
   const [expanded, setExpanded] = useState(false);
 
-  const persist = (next: Meal[]) => {
-    setMeals(next);
-    storage.set(NUTRITION_STORAGE_KEY, { date: dayKey(), meals: next });
-  };
+  useEffect(() => {
+    listMeals().then(setMeals).catch(() => {});
+  }, []);
 
-  const addMeal = () => {
+  const submitMeal = async () => {
     const name = draft.name.trim();
     if (!name) return;
-    persist([...meals, {
-      id: generateId(), name,
+    const payload = {
+      name,
       kcal: Number(draft.kcal) || 0,
       protein: Number(draft.protein) || 0,
       carbs: Number(draft.carbs) || 0,
       fat: Number(draft.fat) || 0,
-    }]);
+    };
     setDraft(EMPTY_DRAFT);
     setExpanded(false);
+    const meal = await addMeal(payload).catch(() => null);
+    if (meal) setMeals((m) => [...m, meal]);
+  };
+
+  const deleteMeal = async (id: string) => {
+    setMeals((m) => m.filter((x) => x.id !== id));
+    await removeMeal(id).catch(() => {});
   };
 
   const totals = useMemo(
@@ -63,7 +61,7 @@ export function NutritionCard() {
           <input
             value={draft.name}
             onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
-            onKeyDown={(e) => { if (e.key === 'Enter') addMeal(); }}
+            onKeyDown={(e) => { if (e.key === 'Enter') submitMeal(); }}
             onFocus={() => setExpanded(true)}
             placeholder='Log a meal — e.g. "chicken, rice, broccoli"'
             className="flex-1 bg-transparent text-[13px] text-[var(--op-text)] placeholder:text-[var(--op-dim)] focus:outline-none"
@@ -71,12 +69,12 @@ export function NutritionCard() {
           <input
             value={draft.kcal}
             onChange={(e) => setDraft((d) => ({ ...d, kcal: e.target.value }))}
-            onKeyDown={(e) => { if (e.key === 'Enter') addMeal(); }}
+            onKeyDown={(e) => { if (e.key === 'Enter') submitMeal(); }}
             inputMode="numeric"
             placeholder="kcal"
             className="w-12 bg-transparent text-right font-mono text-[12px] tabular-nums text-[var(--op-text)] placeholder:text-[var(--op-dim)] focus:outline-none"
           />
-          <button onClick={addMeal} className="flex h-7 w-7 items-center justify-center rounded-md border border-[var(--op-border-strong)] text-[var(--op-sub)] hover:text-[var(--op-text)]" aria-label="Add meal">
+          <button onClick={submitMeal} className="flex h-7 w-7 items-center justify-center rounded-md border border-[var(--op-border-strong)] text-[var(--op-sub)] hover:text-[var(--op-text)]" aria-label="Add meal">
             <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
             </svg>
@@ -90,7 +88,7 @@ export function NutritionCard() {
                 key={macro}
                 value={draft[macro]}
                 onChange={(e) => setDraft((d) => ({ ...d, [macro]: e.target.value }))}
-                onKeyDown={(e) => { if (e.key === 'Enter') addMeal(); }}
+                onKeyDown={(e) => { if (e.key === 'Enter') submitMeal(); }}
                 inputMode="numeric"
                 placeholder={`${macro[0].toUpperCase()}${macro.slice(1)} g`}
                 className="rounded-md border border-[var(--op-border)] bg-[var(--op-inset)] px-2.5 py-1.5 font-mono text-[11px] tabular-nums text-[var(--op-text)] placeholder:text-[var(--op-dim)] focus:border-[var(--op-border-strong)] focus:outline-none"
@@ -111,7 +109,7 @@ export function NutritionCard() {
                 <span className="min-w-0 flex-1 truncate text-[13px] text-[var(--op-text)]">{m.name}</span>
                 <span className="flex-shrink-0 font-mono text-[11px] tabular-nums text-[var(--op-muted)]">{m.kcal} kcal</span>
                 <button
-                  onClick={() => persist(meals.filter((x) => x.id !== m.id))}
+                  onClick={() => deleteMeal(m.id)}
                   className="flex-shrink-0 text-[var(--op-dim)] opacity-0 transition-opacity hover:text-rose-400 group-hover:opacity-100"
                   aria-label={`Remove ${m.name}`}
                 >

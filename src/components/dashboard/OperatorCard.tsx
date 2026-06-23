@@ -1,17 +1,11 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { storage, dayKey } from '@/lib/utils';
-import { OPERATOR_PROFILE_STORAGE_KEY, HABITS_LOG_STORAGE_KEY } from '@/lib/storage-keys';
+import { getOperatorProfile, saveOperatorProfile, OperatorProfile } from '@/lib/repos/operator';
+import { getStreak } from '@/lib/repos/habits';
 
 export const HABITS_UPDATED_EVENT = 'lifeos:habits-updated';
-
-type OperatorProfile = {
-  name: string;
-  role: string;
-  location: string;
-  focus: string;
-};
+export const OPERATOR_UPDATED_EVENT = 'lifeos:operator-updated';
 
 const DEFAULT_PROFILE: OperatorProfile = {
   name: 'Rayaan',
@@ -19,22 +13,6 @@ const DEFAULT_PROFILE: OperatorProfile = {
   location: '',
   focus: 'Building an empire.',
 };
-
-type HabitLog = Record<string, string[]>;
-
-function computeStreak(): number {
-  const log = storage.get<HabitLog>(HABITS_LOG_STORAGE_KEY, {});
-  let streak = 0;
-  const cursor = new Date();
-  if (!(log[dayKey(cursor)]?.length)) {
-    cursor.setDate(cursor.getDate() - 1);
-  }
-  while (log[dayKey(cursor)]?.length) {
-    streak += 1;
-    cursor.setDate(cursor.getDate() - 1);
-  }
-  return streak;
-}
 
 export function operatorInitials(name: string): string {
   return name
@@ -46,18 +24,23 @@ export function operatorInitials(name: string): string {
 }
 
 export function OperatorCard() {
-  const [profile, setProfile] = useState<OperatorProfile>(() => storage.get<OperatorProfile>(OPERATOR_PROFILE_STORAGE_KEY, DEFAULT_PROFILE));
-  const [streak, setStreak] = useState<number>(() => computeStreak());
+  const [profile, setProfile] = useState<OperatorProfile>(DEFAULT_PROFILE);
+  const [streak, setStreak] = useState(0);
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState<OperatorProfile>(profile);
+  const [draft, setDraft] = useState<OperatorProfile>(DEFAULT_PROFILE);
 
   useEffect(() => {
-    const refresh = () => setStreak(computeStreak());
+    getOperatorProfile(DEFAULT_PROFILE).then((p) => { setProfile(p); setDraft(p); }).catch(() => {});
+    getStreak().then(setStreak).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const refresh = () => getStreak().then(setStreak).catch(() => {});
     window.addEventListener(HABITS_UPDATED_EVENT, refresh);
     return () => window.removeEventListener(HABITS_UPDATED_EVENT, refresh);
   }, []);
 
-  const save = () => {
+  const save = async () => {
     const next: OperatorProfile = {
       name: draft.name.trim() || DEFAULT_PROFILE.name,
       role: draft.role.trim(),
@@ -65,9 +48,9 @@ export function OperatorCard() {
       focus: draft.focus.trim(),
     };
     setProfile(next);
-    storage.set(OPERATOR_PROFILE_STORAGE_KEY, next);
-    window.dispatchEvent(new CustomEvent('lifeos:operator-updated'));
     setEditing(false);
+    await saveOperatorProfile(next);
+    window.dispatchEvent(new CustomEvent(OPERATOR_UPDATED_EVENT));
   };
 
   const subtitle = [profile.role, profile.location].filter(Boolean).join(' · ');

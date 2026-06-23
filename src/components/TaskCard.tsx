@@ -76,7 +76,7 @@ export function TaskCard({ task, isDragging, accentColor }: TaskCardProps) {
     if (daysLeft < 32) {
       return {
         label: `${daysLeft} Day${daysLeft === 1 ? '' : 's'} Left`,
-        className: 'border-slate-600/50 bg-slate-800/60 text-slate-200',
+        className: 'border-[var(--op-border-strong)] bg-white/[0.04] text-[var(--op-sub)]',
       };
     }
     const monthsLeft = Math.round(daysLeft / 30);
@@ -95,13 +95,13 @@ export function TaskCard({ task, isDragging, accentColor }: TaskCardProps) {
       const frequencyLabel = task.frequency?.trim();
       statusTags.push({
         label: frequencyLabel || 'Ongoing',
-        className: 'text-slate-200 border-slate-500/40 bg-slate-500/15 font-semibold',
+        className: 'text-[var(--op-sub)] border-[var(--op-border-strong)] bg-white/[0.05] font-semibold',
       });
     }
     if (task.status === 'NOT_STARTED' && scheduledDateObj) {
-      statusTags.push({ label: `Scheduled ${scheduledLabel}`, className: 'text-slate-500 border-slate-500/30 bg-slate-500/10' });
+      statusTags.push({ label: `Scheduled ${scheduledLabel}`, className: 'text-[var(--op-muted)] border-[var(--op-border)] bg-white/[0.02]' });
       if (isPending) {
-        statusTags.push({ label: 'Pending', className: 'text-slate-500 border-slate-500/30 bg-slate-500/10' });
+        statusTags.push({ label: 'Pending', className: 'text-[var(--op-muted)] border-[var(--op-border)] bg-white/[0.02]' });
       }
     }
     if (task.status === 'ON_HOLD') {
@@ -192,9 +192,9 @@ export function TaskCard({ task, isDragging, accentColor }: TaskCardProps) {
       {...attributes}
       {...listeners}
       className={`
-        group relative bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 
-        p-2.5 shadow-sm transition-all cursor-grab active:cursor-grabbing hover:shadow-md hover:-translate-y-0.5 hover:border-slate-300 dark:hover:border-slate-700
-        ${isDragging ? 'opacity-50 shadow-lg cursor-grabbing' : ''}
+        group relative cursor-grab rounded-lg border border-[var(--op-border)] bg-[var(--op-inset)]
+        p-2.5 transition-all hover:-translate-y-0.5 hover:border-[var(--op-border-strong)] active:cursor-grabbing
+        ${isDragging ? 'cursor-grabbing opacity-50 shadow-lg' : ''}
       `}
       onClick={handleCardClick}
     >
@@ -213,12 +213,12 @@ export function TaskCard({ task, isDragging, accentColor }: TaskCardProps) {
                 setIsEditing(false);
               }
             }}
-            className="w-full text-sm font-medium bg-transparent border-b border-blue-500 outline-none p-0"
+            className="w-full border-b border-[var(--op-accent)] bg-transparent p-0 text-[13px] font-medium text-[var(--op-text)] outline-none"
           />
         ) : (
           <>
             <h3
-              className={`text-sm font-medium leading-snug ${task.status === 'COMPLETED' ? 'text-slate-400 line-through' : 'text-slate-800 dark:text-slate-200'}`}
+              className={`text-[13px] font-medium leading-snug ${task.status === 'COMPLETED' ? 'text-[var(--op-dim)] line-through' : 'text-[var(--op-text)]'}`}
               onDoubleClick={(e) => {
                 e.stopPropagation();
                 setIsEditing(true);
@@ -237,10 +237,10 @@ export function TaskCard({ task, isDragging, accentColor }: TaskCardProps) {
                     openMenu();
                   }
                 }}
-                className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 transition-opacity"
+                className="rounded p-1 opacity-0 transition-opacity hover:bg-white/[0.06] group-hover:opacity-100"
                 aria-label="Task actions"
               >
-                <svg className="w-3.5 h-3.5 text-slate-400" fill="currentColor" viewBox="0 0 20 20">
+                <svg className="h-3.5 w-3.5 text-[var(--op-muted)]" fill="currentColor" viewBox="0 0 20 20">
                   <path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z" />
                 </svg>
               </button>
@@ -252,7 +252,7 @@ export function TaskCard({ task, isDragging, accentColor }: TaskCardProps) {
       <div className="flex items-center gap-3 mt-2.5 flex-wrap">
         {task.status !== 'COMPLETED' && (
           <div className="flex gap-0.5">
-            <div className={`w-1 h-3 rounded-full ${task.priority === 'HIGH' ? 'bg-red-400' : task.priority === 'MEDIUM' ? 'bg-amber-400' : 'bg-slate-300'}`} />
+            <div className={`w-1 h-3 rounded-full ${task.priority === 'HIGH' ? 'bg-red-400' : task.priority === 'MEDIUM' ? 'bg-amber-400' : 'bg-[var(--op-dim)]'}`} />
             {task.priority === 'HIGH' && <div className="w-1 h-3 rounded-full bg-red-400" />}
           </div>
         )}
@@ -270,7 +270,7 @@ export function TaskCard({ task, isDragging, accentColor }: TaskCardProps) {
         )}
 
         {hasChildren && (
-          <span className="flex items-center gap-1 text-[10px] text-slate-400 font-mono">
+          <span className="flex items-center gap-1 text-[10px] text-[var(--op-muted)] font-mono">
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
             </svg>
@@ -290,42 +290,42 @@ export function TaskCard({ task, isDragging, accentColor }: TaskCardProps) {
           <div
             ref={menuRef}
             style={{ position: 'fixed', top: menuPos.top, left: menuPos.left, transform: 'translateX(-100%)' }}
-            className="bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 py-1 z-[9999] min-w-[140px]"
+            className="op z-[9999] min-w-[150px] rounded-lg border border-[var(--op-border-strong)] bg-[var(--op-panel-solid)] py-1 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <button
               onClick={() => { setShowMenu(false); setIsEditing(true); }}
-              className="w-full px-3 py-1.5 text-left text-xs hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-2"
+              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-[var(--op-sub)] hover:bg-white/[0.04] hover:text-[var(--op-text)]"
             >
-              <svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="h-3.5 w-3.5 text-[var(--op-dim)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
               </svg>
               Rename
             </button>
             <button
               onClick={handleOpenDetails}
-              className="w-full px-3 py-1.5 text-left text-xs hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-2"
+              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-[var(--op-sub)] hover:bg-white/[0.04] hover:text-[var(--op-text)]"
             >
-              <svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="h-3.5 w-3.5 text-[var(--op-dim)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
               </svg>
               Edit Details
             </button>
             <button
               onClick={handleAddSubtask}
-              className="w-full px-3 py-1.5 text-left text-xs hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-2"
+              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-[var(--op-sub)] hover:bg-white/[0.04] hover:text-[var(--op-text)]"
             >
-              <svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="h-3.5 w-3.5 text-[var(--op-dim)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
               Add Subtask
             </button>
-            <hr className="my-1 border-slate-100" />
+            <hr className="my-1 border-[var(--op-border)]" />
             <button
               onClick={handleDelete}
-              className="w-full px-3 py-1.5 text-left text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"
+              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-rose-400 hover:bg-rose-500/10"
             >
-              <svg className="w-3.5 h-3.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-3.5 h-3.5 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
               </svg>
               Delete

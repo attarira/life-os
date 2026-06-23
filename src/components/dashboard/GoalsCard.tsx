@@ -1,44 +1,48 @@
 'use client';
 
-import React, { useState } from 'react';
-import { storage, weekKey, monthKey, generateId } from '@/lib/utils';
-import { GOALS_STORAGE_KEY } from '@/lib/storage-keys';
+import React, { useEffect, useState } from 'react';
+import { weekKey, monthKey } from '@/lib/utils';
 import { CardShell } from './CardShell';
-
-type Goal = { id: string; text: string; done: boolean };
-type GoalsStore = { week: string; weekly: Goal[]; month: string; monthly: Goal[] };
+import { Goal, GoalPeriod, listGoals, addGoal, toggleGoal, removeGoal } from '@/lib/repos/goals';
 
 export function GoalsCard() {
-  const [weekly, setWeekly] = useState<Goal[]>(() => {
-    const stored = storage.get<GoalsStore>(GOALS_STORAGE_KEY, { week: '', weekly: [], month: '', monthly: [] });
-    return stored.week === weekKey() ? stored.weekly : [];
-  });
-  const [monthly, setMonthly] = useState<Goal[]>(() => {
-    const stored = storage.get<GoalsStore>(GOALS_STORAGE_KEY, { week: '', weekly: [], month: '', monthly: [] });
-    return stored.month === monthKey() ? stored.monthly : [];
-  });
+  const wk = weekKey();
+  const mk = monthKey();
+
+  const [weekly, setWeekly] = useState<Goal[]>([]);
+  const [monthly, setMonthly] = useState<Goal[]>([]);
   const [weekDraft, setWeekDraft] = useState('');
   const [monthDraft, setMonthDraft] = useState('');
 
-  const persist = (nextWeekly: Goal[], nextMonthly: Goal[]) => {
-    setWeekly(nextWeekly);
-    setMonthly(nextMonthly);
-    storage.set(GOALS_STORAGE_KEY, { week: weekKey(), weekly: nextWeekly, month: monthKey(), monthly: nextMonthly });
-  };
+  useEffect(() => {
+    listGoals('week', wk).then(setWeekly).catch(() => {});
+    listGoals('month', mk).then(setMonthly).catch(() => {});
+  }, [wk, mk]);
 
   const renderSection = (
+    period: GoalPeriod,
+    periodKey: string,
     label: string,
     placeholder: string,
     goals: Goal[],
+    setGoals: React.Dispatch<React.SetStateAction<Goal[]>>,
     draft: string,
-    setDraft: (v: string) => void,
-    update: (next: Goal[]) => void
+    setDraft: (v: string) => void
   ) => {
-    const add = () => {
+    const add = async () => {
       const text = draft.trim();
       if (!text) return;
-      update([...goals, { id: generateId(), text, done: false }]);
       setDraft('');
+      const goal = await addGoal(period, periodKey, text, goals.length).catch(() => null);
+      if (goal) setGoals((g) => [...g, goal]);
+    };
+    const toggle = async (id: string, done: boolean) => {
+      setGoals((g) => g.map((x) => (x.id === id ? { ...x, done } : x)));
+      await toggleGoal(period, periodKey, id, done).catch(() => {});
+    };
+    const remove = async (id: string) => {
+      setGoals((g) => g.filter((x) => x.id !== id));
+      await removeGoal(period, periodKey, id).catch(() => {});
     };
     return (
       <div>
@@ -47,7 +51,7 @@ export function GoalsCard() {
           {goals.map((g) => (
             <div key={g.id} className="group flex items-center gap-2.5">
               <button
-                onClick={() => update(goals.map((x) => (x.id === g.id ? { ...x, done: !x.done } : x)))}
+                onClick={() => toggle(g.id, !g.done)}
                 className={`flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-[5px] border-[1.5px] transition-all ${
                   g.done ? 'border-[var(--op-accent)] bg-[var(--op-accent)] text-[#05221a]' : 'border-[var(--op-dim)] hover:border-[var(--op-sub)]'
                 }`}
@@ -60,7 +64,7 @@ export function GoalsCard() {
               </button>
               <span className={`min-w-0 flex-1 truncate text-[13px] ${g.done ? 'text-[var(--op-dim)] line-through' : 'text-[var(--op-text)]'}`}>{g.text}</span>
               <button
-                onClick={() => update(goals.filter((x) => x.id !== g.id))}
+                onClick={() => remove(g.id)}
                 className="flex-shrink-0 text-[var(--op-dim)] opacity-0 transition-opacity hover:text-rose-400 group-hover:opacity-100"
                 aria-label="Remove goal"
               >
@@ -91,8 +95,8 @@ export function GoalsCard() {
 
   return (
     <CardShell index="09" title="Goals" bodyClassName="space-y-4">
-      {renderSection('This week', 'Add a weekly goal', weekly, weekDraft, setWeekDraft, (next) => persist(next, monthly))}
-      {renderSection('This month', 'Add a monthly goal', monthly, monthDraft, setMonthDraft, (next) => persist(weekly, next))}
+      {renderSection('week', wk, 'This week', 'Add a weekly goal', weekly, setWeekly, weekDraft, setWeekDraft)}
+      {renderSection('month', mk, 'This month', 'Add a monthly goal', monthly, setMonthly, monthDraft, setMonthDraft)}
     </CardShell>
   );
 }

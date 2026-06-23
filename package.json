@@ -18,6 +18,7 @@
     "@fullcalendar/timegrid": "^6.1.20",
     "@simplewebauthn/browser": "^13.3.0",
     "@simplewebauthn/server": "^13.3.1",
+    "@supabase/supabase-js": "^2.108.2",
     "@types/d3": "^7.4.3",
     "@types/topojson-client": "^3.1.5",
     "@visx/geo": "^3.12.0",

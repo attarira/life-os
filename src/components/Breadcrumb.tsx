@@ -15,28 +15,27 @@ export function Breadcrumb() {
   const isAtRoot = currentParentId === ROOT_TASK_ID;
 
   return (
-    <nav className="flex items-center gap-2 text-sm font-light">
+    <nav className="flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.16em]">
       <button
         onClick={() => navigateTo(ROOT_TASK_ID)}
-        className="flex items-center gap-2 px-2 py-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors group"
+        className="flex items-center gap-2 rounded-md px-2 py-1 transition-colors hover:bg-white/[0.04]"
       >
-        <span className={`text-slate-600 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white ${isAtRoot ? 'font-semibold' : 'font-medium'}`}>
-          LifeOS
+        <span className="flex items-center gap-1.5">
+          <span className="h-1.5 w-1.5 rounded-full bg-[var(--op-accent)] shadow-[0_0_8px_var(--op-accent)]" />
+          <span className={isAtRoot ? 'text-[var(--op-text)]' : 'text-[var(--op-sub)]'}>Life OS</span>
         </span>
       </button>
 
       {path.map((item, index) => (
         <React.Fragment key={item.id}>
-          <span className="text-slate-300 dark:text-slate-600 select-none">/</span>
+          <span className="select-none text-[var(--op-dim)]">/</span>
           <button
             onClick={() => navigateTo(item.id)}
-            className={`
-              px-1.5 py-1 rounded transition-colors whitespace-nowrap
-              ${index === path.length - 1
-                ? 'text-slate-900 dark:text-white font-medium'
-                : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-700'
-              }
-            `}
+            className={`whitespace-nowrap rounded-md px-1.5 py-1 transition-colors ${
+              index === path.length - 1
+                ? 'text-[var(--op-text)]'
+                : 'text-[var(--op-muted)] hover:bg-white/[0.04] hover:text-[var(--op-text)]'
+            }`}
           >
             {item.title}
           </button>

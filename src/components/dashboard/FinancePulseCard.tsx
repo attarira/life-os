@@ -1,12 +1,9 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
-import { storage, dayKey } from '@/lib/utils';
-import { NETWORTH_STORAGE_KEY } from '@/lib/storage-keys';
+import React, { useEffect, useMemo, useState } from 'react';
+import { dayKey } from '@/lib/utils';
 import { CardShell } from './CardShell';
-
-type NetWorthPoint = { date: string; value: number };
-type NetWorthStore = { history: NetWorthPoint[] };
+import { NetWorthPoint, getNetWorthSeries, setNetWorthToday } from '@/lib/repos/networth';
 
 function formatMoney(value: number): string {
   return `$${Math.round(value).toLocaleString('en-US')}`;
@@ -17,7 +14,7 @@ function formatSigned(value: number): string {
   return `${sign}$${Math.abs(Math.round(value)).toLocaleString('en-US')}`;
 }
 
-/** Deterministic sample net-worth curve used until the user enters real data. */
+/** Deterministic sample net-worth curve shown until the user enters real data. */
 function buildDemoSeries(): NetWorthPoint[] {
   const target = 2_828_350;
   const start = 2_598_000;
@@ -30,7 +27,6 @@ function buildDemoSeries(): NetWorthPoint[] {
     d.setDate(d.getDate() - (29 - i));
     pts.push({ date: dayKey(d), value: Math.round(base + (i < 28 ? wobble : 0)) });
   }
-  // Pin head + tail so the deltas read like the reference (+$810 daily, +8.87% / 30D).
   pts[0].value = start;
   pts[29].value = target;
   pts[28].value = target - 810;
@@ -63,25 +59,24 @@ function Sparkline({ points }: { points: number[] }) {
 }
 
 export function FinancePulseCard() {
-  const [store, setStore] = useState<NetWorthStore>(() => storage.get<NetWorthStore>(NETWORTH_STORAGE_KEY, { history: [] }));
+  const [history, setHistory] = useState<NetWorthPoint[]>([]);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
 
-  const isDemo = store.history.length === 0;
-  const series = useMemo(() => (isDemo ? buildDemoSeries() : store.history), [isDemo, store]);
+  useEffect(() => {
+    getNetWorthSeries().then(setHistory).catch(() => {});
+  }, []);
 
-  const save = () => {
+  const isDemo = history.length === 0;
+  const series = useMemo(() => (isDemo ? buildDemoSeries() : history), [isDemo, history]);
+
+  const save = async () => {
     const value = Number(draft.replace(/[^0-9.-]/g, ''));
-    if (!Number.isFinite(value)) { setEditing(false); return; }
-    const today = dayKey();
-    const history = store.history.filter((p) => p.date !== today);
-    history.push({ date: today, value });
-    history.sort((a, b) => a.date.localeCompare(b.date));
-    const next = { history };
-    setStore(next);
-    storage.set(NETWORTH_STORAGE_KEY, next);
     setEditing(false);
     setDraft('');
+    if (!Number.isFinite(value)) return;
+    await setNetWorthToday(value).catch(() => {});
+    getNetWorthSeries().then(setHistory).catch(() => {});
   };
 
   const { current, daily, dailyPct, monthly, monthlyPct, values } = useMemo(() => {

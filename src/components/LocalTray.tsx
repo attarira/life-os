@@ -18,7 +18,7 @@ export function LocalTray({ items }: { items: LocalTrayItem[] }) {
   if (items.length === 0) return null;
 
   return (
-    <div className="flex items-center gap-1 border-r border-slate-700/50 pr-2 mr-1">
+    <div className="mr-1 flex items-center gap-1 border-r border-[var(--op-border)] pr-2">
       {items.map((item, idx) => {
         if (item.type === 'link') {
           if (item.external) {
@@ -28,7 +28,7 @@ export function LocalTray({ items }: { items: LocalTrayItem[] }) {
                 href={item.href}
                 target="_blank"
                 rel="noreferrer"
-                className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+                className="p-2 rounded-lg hover:bg-white/[0.04] text-[var(--op-muted)] hover:text-[var(--op-text)] transition-colors"
                 title={item.label}
               >
                 {item.icon}
@@ -39,7 +39,7 @@ export function LocalTray({ items }: { items: LocalTrayItem[] }) {
             <Link
               key={idx}
               href={item.href}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-200 font-medium transition-colors"
+              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-medium text-[var(--op-muted)] transition-colors hover:bg-white/[0.04] hover:text-[var(--op-text)]"
               title={item.label}
             >
               {item.icon}
@@ -53,7 +53,7 @@ export function LocalTray({ items }: { items: LocalTrayItem[] }) {
           <button
             key={idx}
             onClick={item.onClick}
-            className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 transition-colors flex items-center gap-1.5"
+            className="p-2 rounded-lg hover:bg-white/[0.04] text-[var(--op-muted)] hover:text-[var(--op-text)] transition-colors flex items-center gap-1.5"
             title={item.label}
           >
             {item.icon}

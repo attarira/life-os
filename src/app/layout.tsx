@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Newsreader } from "next/font/google";
 import { TravelModeProvider } from "@/lib/travel-mode-context";
+import { AuthProvider } from "@/lib/supabase/auth-context";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -35,7 +36,9 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${newsreader.variable} antialiased`}
       >
-        <TravelModeProvider>{children}</TravelModeProvider>
+        <AuthProvider>
+          <TravelModeProvider>{children}</TravelModeProvider>
+        </AuthProvider>
       </body>
     </html>
   );

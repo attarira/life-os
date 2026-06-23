@@ -1,66 +1,42 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
-import { storage, dayKey, generateId } from '@/lib/utils';
-import { HABITS_DEFS_STORAGE_KEY, HABITS_LOG_STORAGE_KEY } from '@/lib/storage-keys';
+import React, { useEffect, useMemo, useState } from 'react';
 import { CardShell } from './CardShell';
 import { HABITS_UPDATED_EVENT } from './OperatorCard';
-
-type Habit = { id: string; name: string; category?: string; target?: string };
-type HabitLog = Record<string, string[]>;
-
-// Default set mirrors the operator dashboard reference (categories/targets are sample data).
-const DEFAULT_HABITS: Habit[] = [
-  { id: 'gym', name: 'Gym', category: 'Fitness' },
-  { id: 'supplements', name: 'Supplements', category: 'Health', target: '0/3' },
-  { id: 'creative', name: 'Creative session', category: 'Output', target: '0/7' },
-  { id: 'community', name: 'Community session', category: 'CRM', target: '0/4' },
-  { id: 'finance-check', name: 'Finance check', category: 'Ops · 20–30 min', target: '0/5' },
-  { id: 'wind-down', name: 'Wind-down session', category: 'Evening', target: '0/4' },
-];
+import { Habit, listHabits, getDoneIds, setHabitDone, addHabit, removeHabit } from '@/lib/repos/habits';
 
 export function HabitsCard() {
-  const today = dayKey();
-
-  const [habits, setHabits] = useState<Habit[]>(() => {
-    const defs = storage.get<Habit[]>(HABITS_DEFS_STORAGE_KEY, []);
-    return defs.length ? defs : DEFAULT_HABITS;
-  });
-  const [done, setDone] = useState<string[]>(() => {
-    const log = storage.get<HabitLog>(HABITS_LOG_STORAGE_KEY, {});
-    return log[dayKey()] || [];
-  });
+  const [habits, setHabits] = useState<Habit[]>([]);
+  const [done, setDone] = useState<string[]>([]);
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState('');
 
-  const persistDone = (next: string[]) => {
-    setDone(next);
-    const log = storage.get<HabitLog>(HABITS_LOG_STORAGE_KEY, {});
-    log[today] = next;
-    storage.set(HABITS_LOG_STORAGE_KEY, log);
+  useEffect(() => {
+    listHabits().then(setHabits).catch(() => {});
+    getDoneIds().then(setDone).catch(() => {});
+  }, []);
+
+  const toggle = async (id: string) => {
+    const wasDone = done.includes(id);
+    setDone((d) => (wasDone ? d.filter((h) => h !== id) : [...d, id]));
     window.dispatchEvent(new CustomEvent(HABITS_UPDATED_EVENT));
+    await setHabitDone(id, !wasDone).catch(() => {});
   };
 
-  const persistHabits = (next: Habit[]) => {
-    setHabits(next);
-    storage.set(HABITS_DEFS_STORAGE_KEY, next);
-  };
-
-  const toggle = (id: string) => {
-    persistDone(done.includes(id) ? done.filter((h) => h !== id) : [...done, id]);
-  };
-
-  const addHabit = () => {
+  const submitHabit = async () => {
     const name = draft.trim();
     if (!name) return;
-    persistHabits([...habits, { id: generateId(), name }]);
     setDraft('');
     setAdding(false);
+    const habit = await addHabit(name).catch(() => null);
+    if (habit) setHabits((h) => [...h, habit]);
   };
 
-  const removeHabit = (id: string) => {
-    persistHabits(habits.filter((h) => h.id !== id));
-    persistDone(done.filter((h) => h !== id));
+  const deleteHabit = async (id: string) => {
+    setHabits((h) => h.filter((x) => x.id !== id));
+    setDone((d) => d.filter((x) => x !== id));
+    window.dispatchEvent(new CustomEvent(HABITS_UPDATED_EVENT));
+    await removeHabit(id).catch(() => {});
   };
 
   const completed = useMemo(() => habits.filter((h) => done.includes(h.id)).length, [habits, done]);
@@ -123,7 +99,7 @@ export function HabitsCard() {
                 <span className="flex-shrink-0 font-mono text-[10px] tabular-nums text-[var(--op-dim)]">{habit.target}</span>
               )}
               <button
-                onClick={() => removeHabit(habit.id)}
+                onClick={() => deleteHabit(habit.id)}
                 className="flex-shrink-0 text-[var(--op-dim)] opacity-0 transition-opacity hover:text-rose-400 group-hover:opacity-100"
                 aria-label={`Remove ${habit.name}`}
               >
@@ -142,11 +118,11 @@ export function HabitsCard() {
             autoFocus
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') addHabit(); if (e.key === 'Escape') { setAdding(false); setDraft(''); } }}
+            onKeyDown={(e) => { if (e.key === 'Enter') submitHabit(); if (e.key === 'Escape') { setAdding(false); setDraft(''); } }}
             placeholder="New habit…"
             className="flex-1 rounded-md border border-[var(--op-border)] bg-[var(--op-inset)] px-3 py-2 text-[13px] text-[var(--op-text)] placeholder:text-[var(--op-dim)] focus:border-[var(--op-border-strong)] focus:outline-none"
           />
-          <button onClick={addHabit} className="rounded-md border border-[var(--op-border-strong)] px-3 py-2 font-mono text-[10px] uppercase tracking-wider text-[var(--op-sub)] hover:text-[var(--op-text)]">Add</button>
+          <button onClick={submitHabit} className="rounded-md border border-[var(--op-border-strong)] px-3 py-2 font-mono text-[10px] uppercase tracking-wider text-[var(--op-sub)] hover:text-[var(--op-text)]">Add</button>
         </div>
       ) : (
         <button
