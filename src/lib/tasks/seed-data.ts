@@ -1,6 +1,21 @@
 import { LifeAreaDefinition, Task, ROOT_TASK_ID, LIFE_AREAS } from '../types';
 
 export const LEGACY_SEEDED_TASK_IDS = [
+  'job-search',
+  'learning',
+  'home-projects',
+  'completed-area',
+  'networking',
+  'applications',
+  'resume-update',
+  'linkedin-outreach',
+  'coffee-chats',
+  'meetup-events',
+  'typescript-course',
+  'react-patterns',
+  'garage-cleanup',
+  'garden-planning',
+  'old-completed',
   'c1',
   'c2',
   'h1',

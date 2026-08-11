@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useAuth } from '@/lib/supabase/auth-context';
 
 export function LoginScreen() {
-  const { signInWithOtp } = useAuth();
+  const { authError, signInWithOtp } = useAuth();
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
   const [error, setError] = useState('');
@@ -58,6 +58,11 @@ export function LoginScreen() {
               <p className="mt-1.5 text-[13px] text-[var(--op-muted)]">
                 Enter your email and we&apos;ll send you a magic link — no password needed.
               </p>
+              {authError && status !== 'error' && (
+                <p className="mt-3 rounded-lg border border-amber-400/20 bg-amber-400/10 px-3 py-2 text-[12px] text-amber-200">
+                  {authError}
+                </p>
+              )}
               <form onSubmit={submit} className="mt-5 space-y-3">
                 <input
                   type="email"

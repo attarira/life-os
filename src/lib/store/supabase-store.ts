@@ -1,5 +1,6 @@
 import { Task, TaskStore, CreateTaskInput, UpdateTaskInput, TaskStatus, TaskPriority, TaskRecurrence } from '../types';
 import { getSupabase } from '../supabase/client';
+import { validate as isUuid, v4 as uuidv4 } from 'uuid';
 
 const TABLE = 'tasks';
 
@@ -144,7 +145,13 @@ export const supabaseTaskStore: TaskStore = {
     const { error: delErr } = await supabase.from(TABLE).delete().neq('id', '00000000-0000-0000-0000-000000000000');
     if (delErr) throw delErr;
     if (tasks.length === 0) return;
-    const { error } = await supabase.from(TABLE).insert(tasks.map((t) => taskToRow(t)));
+    const idMap = new Map(tasks.map((task) => [task.id, isUuid(task.id) ? task.id : uuidv4()]));
+    const rows = tasks.map((task) => taskToRow({
+      ...task,
+      id: idMap.get(task.id),
+      parentId: idMap.get(task.parentId) ?? task.parentId,
+    }));
+    const { error } = await supabase.from(TABLE).insert(rows);
     if (error) throw error;
   },
 

@@ -17,6 +17,7 @@ import { GoalsCard } from './dashboard/GoalsCard';
 import { TodayKeyCard } from './dashboard/TodayKeyCard';
 import { CalendarCard } from './dashboard/CalendarCard';
 import { CardShell } from './dashboard/CardShell';
+import { TaskPanel } from './TaskPanel';
 
 export function HomeDashboard() {
   const { enabled } = useTravelMode();
@@ -71,7 +72,7 @@ function UpcomingCard() {
             return (
               <button
                 key={task.id}
-                onClick={() => { navigateTo(task.parentId); selectTask(task.id); }}
+                onClick={() => selectTask(task.id)}
                 className="group flex w-full items-start gap-2.5 rounded-md px-1 py-2 text-left hover:bg-white/[0.03]"
               >
                 <span className="mt-0.5 h-4 w-4 flex-shrink-0 rounded-[5px] border-[1.5px] border-[var(--op-dim)] transition-colors group-hover:border-[var(--op-sub)]" />
@@ -254,6 +255,7 @@ function StandardHomeDashboard() {
           </div>
         </div>
       )}
+      <TaskPanel />
     </div>
   );
 }

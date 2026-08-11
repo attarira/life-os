@@ -3,12 +3,19 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { Notification } from './types';
 import { useTaskContext } from './task-context';
-import { NOTIFICATIONS_STORAGE_KEY } from './storage-keys';
 import {
   generateDailySummaryNotification,
   generateWeeklySummaryNotification,
   checkDueTasksForNotifications
 } from './notifications';
+import {
+  listNotifications,
+  addNotifications,
+  markRead as repoMarkRead,
+  markAllRead as repoMarkAllRead,
+  deleteNotification as repoDeleteNotification,
+  clearAllNotifications,
+} from './repos/notifications';
 
 interface NotificationContextValue {
   notifications: Notification[];
@@ -38,33 +45,13 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isInitialized, setIsInitialized] = useState(false);
 
-  // Load from local storage
+  // Load from the store (Supabase or local fallback)
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(NOTIFICATIONS_STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored).map((n: any) => ({
-          ...n,
-          createdAt: new Date(n.createdAt)
-        }));
-        setNotifications(parsed);
-      }
-    } catch (error) {
-      console.error('Failed to load notifications:', error);
-    } finally {
-      setIsInitialized(true);
-    }
+    listNotifications()
+      .then(setNotifications)
+      .catch((error) => console.error('Failed to load notifications:', error))
+      .finally(() => setIsInitialized(true));
   }, []);
-
-  // Save to local storage
-  useEffect(() => {
-    if (!isInitialized) return;
-    try {
-      localStorage.setItem(NOTIFICATIONS_STORAGE_KEY, JSON.stringify(notifications));
-    } catch (error) {
-      console.error('Failed to save notifications:', error);
-    }
-  }, [notifications, isInitialized]);
 
   // Triggers check
   useEffect(() => {
@@ -72,7 +59,7 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
 
     const checkTriggers = () => {
       if (tasks.length === 0) return;
-      let newNotifications: Notification[] = [];
+      const newNotifications: Notification[] = [];
 
       const daily = generateDailySummaryNotification(tasks);
       if (daily) newNotifications.push(daily);
@@ -85,6 +72,7 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
 
       if (newNotifications.length > 0) {
         setNotifications(prev => [...newNotifications, ...prev]);
+        addNotifications(newNotifications).catch((error) => console.error('Failed to persist notifications:', error));
       }
     };
 
@@ -96,36 +84,26 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
     return () => clearInterval(interval);
   }, [isInitialized, tasksLoading, tasks]);
 
-  // Auto clean-up old notifications over 7 days old
-  useEffect(() => {
-    if (!isInitialized || notifications.length === 0) return;
-
-    const now = new Date();
-    const cutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-
-    setNotifications(prev => {
-      const filtered = prev.filter(n => n.createdAt > cutoff);
-      if (filtered.length !== prev.length) {
-        return filtered;
-      }
-      return prev;
-    });
-  }, [notifications.length, isInitialized]);
+  // Notifications older than the retention window are pruned by the store on load.
 
   const markAsRead = useCallback((id: string) => {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+    repoMarkRead(id).catch((error) => console.error('Failed to mark notification read:', error));
   }, []);
 
   const markAllAsRead = useCallback(() => {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    repoMarkAllRead().catch((error) => console.error('Failed to mark all read:', error));
   }, []);
 
   const clearNotifications = useCallback(() => {
     setNotifications([]);
+    clearAllNotifications().catch((error) => console.error('Failed to clear notifications:', error));
   }, []);
 
   const deleteNotification = useCallback((id: string) => {
     setNotifications(prev => prev.filter(n => n.id !== id));
+    repoDeleteNotification(id).catch((error) => console.error('Failed to delete notification:', error));
   }, []);
 
   const unreadCount = notifications.filter(n => !n.read).length;

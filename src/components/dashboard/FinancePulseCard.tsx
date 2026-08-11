@@ -1,17 +1,19 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { dayKey } from '@/lib/utils';
 import { CardShell } from './CardShell';
-import { NetWorthPoint, getNetWorthSeries, setNetWorthToday } from '@/lib/repos/networth';
+import { NetWorthPoint, getNetWorthSeries } from '@/lib/repos/networth';
+import { Account, listAccounts } from '@/lib/repos/accounts';
 
 function formatMoney(value: number): string {
-  return `$${Math.round(value).toLocaleString('en-US')}`;
+  return `₹${Math.round(value).toLocaleString('en-IN')}`;
 }
 
 function formatSigned(value: number): string {
   const sign = value > 0 ? '+' : value < 0 ? '−' : '';
-  return `${sign}$${Math.abs(Math.round(value)).toLocaleString('en-US')}`;
+  return `${sign}₹${Math.abs(Math.round(value)).toLocaleString('en-IN')}`;
 }
 
 /** Deterministic sample net-worth curve shown until the user enters real data. */
@@ -60,24 +62,39 @@ function Sparkline({ points }: { points: number[] }) {
 
 export function FinancePulseCard() {
   const [history, setHistory] = useState<NetWorthPoint[]>([]);
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState('');
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    getNetWorthSeries().then(setHistory).catch(() => {});
+    Promise.all([getNetWorthSeries(), listAccounts()])
+      .then(([nextHistory, nextAccounts]) => {
+        setHistory(nextHistory);
+        setAccounts(nextAccounts);
+        setError(null);
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : 'Could not load finance data.');
+      });
   }, []);
 
-  const isDemo = history.length === 0;
-  const series = useMemo(() => (isDemo ? buildDemoSeries() : history), [isDemo, history]);
+  const accountNetWorth = useMemo(() => {
+    if (accounts.length === 0) return null;
+    const assets = accounts.filter((account) => account.kind === 'asset').reduce((sum, account) => sum + account.balance, 0);
+    const liabilities = accounts.filter((account) => account.kind === 'liability').reduce((sum, account) => sum + account.balance, 0);
+    return assets - liabilities;
+  }, [accounts]);
 
-  const save = async () => {
-    const value = Number(draft.replace(/[^0-9.-]/g, ''));
-    setEditing(false);
-    setDraft('');
-    if (!Number.isFinite(value)) return;
-    await setNetWorthToday(value).catch(() => {});
-    getNetWorthSeries().then(setHistory).catch(() => {});
-  };
+  const isDemo = history.length === 0 && accountNetWorth === null;
+  const series = useMemo(() => {
+    if (history.length > 0) {
+      if (accountNetWorth === null) return history;
+      const today = dayKey();
+      const withoutToday = history.filter((point) => point.date !== today);
+      return [...withoutToday, { date: today, value: accountNetWorth }];
+    }
+    if (accountNetWorth !== null) return [{ date: dayKey(), value: accountNetWorth }];
+    return buildDemoSeries();
+  }, [accountNetWorth, history]);
 
   const { current, daily, dailyPct, monthly, monthlyPct, values } = useMemo(() => {
     const values = series.map((p) => p.value);
@@ -95,47 +112,29 @@ export function FinancePulseCard() {
   }, [series]);
 
   return (
-    <CardShell
-      index="07"
-      title="Finance Pulse"
-      right={
-        <div className="flex items-center gap-2">
-          {isDemo && <span className="font-mono text-[8px] uppercase tracking-[0.16em] text-[var(--op-dim)]">sample</span>}
-          <button
-            onClick={() => { setDraft(String(Math.round(current) || '')); setEditing(true); }}
-            className="rounded-md p-1.5 text-[var(--op-dim)] transition-colors hover:bg-white/[0.04] hover:text-[var(--op-text)]"
-            title="Update net worth"
-          >
-            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2" fill="none" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-            </svg>
-          </button>
-        </div>
-      }
-    >
+    <Link href="/finance" className="group block focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--op-accent)]/50">
+      <CardShell
+        index="07"
+        title="Finance Pulse"
+        className="transition-colors group-hover:border-[var(--op-border-strong)]"
+        right={(
+          <span className="font-mono text-[8px] uppercase tracking-[0.16em] text-[var(--op-dim)]">
+            {isDemo ? 'sample' : 'open'}
+          </span>
+        )}
+      >
+      {error ? (
+        <p className="rounded-lg border border-rose-400/20 bg-rose-400/10 px-3 py-2 text-xs text-rose-200">{error}</p>
+      ) : null}
       <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-[var(--op-dim)]">Net worth</p>
-      {editing ? (
-        <div className="mt-1 flex items-center gap-2">
-          <input
-            autoFocus
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false); }}
-            placeholder="Enter net worth"
-            className="w-full rounded-md border border-[var(--op-border)] bg-[var(--op-inset)] px-3 py-2 text-[15px] text-[var(--op-text)] placeholder:text-[var(--op-dim)] focus:border-[var(--op-border-strong)] focus:outline-none"
-          />
-          <button onClick={save} className="rounded-md border border-[var(--op-border-strong)] px-3 py-2 font-mono text-[10px] uppercase tracking-wider text-[var(--op-sub)] hover:text-[var(--op-text)]">Save</button>
-        </div>
-      ) : (
-        <div className="mt-0.5 flex items-end justify-between gap-2">
-          <span className="text-[26px] font-semibold tabular-nums tracking-tight text-[var(--op-text)]">{formatMoney(current)}</span>
-          {values.length > 1 && (
-            <span className={`mb-1 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-mono text-[10px] tabular-nums ${monthly >= 0 ? 'border-[var(--op-accent)]/30 text-[var(--op-accent)]' : 'border-rose-500/30 text-rose-300'}`}>
-              {monthly >= 0 ? '▲' : '▼'} {Math.abs(monthlyPct).toFixed(2)}% · 30D
-            </span>
-          )}
-        </div>
-      )}
+      <div className="mt-0.5 flex items-end justify-between gap-2">
+        <span className="text-[26px] font-semibold tabular-nums tracking-tight text-[var(--op-text)]">{formatMoney(current)}</span>
+        {values.length > 1 && (
+          <span className={`mb-1 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-mono text-[10px] tabular-nums ${monthly >= 0 ? 'border-[var(--op-accent)]/30 text-[var(--op-accent)]' : 'border-rose-500/30 text-rose-300'}`}>
+            {monthly >= 0 ? '▲' : '▼'} {Math.abs(monthlyPct).toFixed(2)}% · 30D
+          </span>
+        )}
+      </div>
 
       <div className="mt-3"><Sparkline points={values} /></div>
 
@@ -151,6 +150,7 @@ export function FinancePulseCard() {
           <p className="font-mono text-[10px] tabular-nums text-[var(--op-muted)]">{monthly >= 0 ? '+' : ''}{monthlyPct.toFixed(2)}%</p>
         </div>
       </div>
-    </CardShell>
+      </CardShell>
+    </Link>
   );
 }
