@@ -4,8 +4,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, Rea
 import { Task, TaskStatus, ROOT_TASK_ID, CreateTaskInput, UpdateTaskInput, COMPLETED_HIDE_DAYS } from './types';
 import { taskStore } from './store';
 import { createSeedTasks, getSubtreeIds, getNextOrder, isCompletedOlderThan, getAncestorIds, LEGACY_SEEDED_TASK_IDS } from './tasks';
-import { AUTO_BACKUP_KEY, FILE_SYSTEM_STORAGE_KEY, LAST_BACKUP_KEY } from './storage-keys';
-import { storage, generateId } from '@/lib/utils';
+import { storage } from '@/lib/utils';
 
 interface TaskContextValue {
   // State
@@ -103,65 +102,7 @@ export function TaskProvider({ children }: TaskProviderProps) {
 
   useEffect(() => {
     if (isLoading) return;
-    try {
-      const todayKey = new Date().toISOString().split('T')[0];
-      const lastBackup = storage.get(LAST_BACKUP_KEY, '');
-      const existing = storage.get<any[]>(AUTO_BACKUP_KEY, []);
-      const hasTodayBackupWithFiles = Array.isArray(existing) && existing.some((entry: { createdAt?: string; fileSystemNodes?: unknown }) => (
-        typeof entry?.createdAt === 'string' &&
-        entry.createdAt.split('T')[0] === todayKey &&
-        Array.isArray(entry.fileSystemNodes)
-      ));
-      if (lastBackup === todayKey && hasTodayBackupWithFiles) return;
-
-      const now = new Date();
-      const cutoff = new Date(now);
-      cutoff.setDate(cutoff.getDate() - BACKUP_RETENTION_DAYS);
-      const retained = Array.isArray(existing)
-        ? existing.filter((entry: { createdAt?: string }) => {
-          if (!entry?.createdAt) return false;
-          return new Date(entry.createdAt) >= cutoff && entry.createdAt.split('T')[0] !== todayKey;
-        })
-        : [];
-
-      const filesParsed = storage.get<any[]>(FILE_SYSTEM_STORAGE_KEY, []);
-      const fileSystemNodes = Array.isArray(filesParsed) ? filesParsed : [];
-
-      const plannerItemsParsed = storage.get<any[]>('lifeos:planner-items:v1', []);
-      const plannerItems = Array.isArray(plannerItemsParsed) ? plannerItemsParsed : [];
-
-      const netWorthParsed = storage.get<any[]>('lifeos:finance:netWorth:v1', []);
-      const netWorthSnapshots = Array.isArray(netWorthParsed) ? netWorthParsed : [];
-
-      const subsParsed = storage.get<any[]>('lifeos:finance:subscriptions:v1', []);
-      const subscriptions = Array.isArray(subsParsed) ? subsParsed : [];
-
-      const notificationsParsed = storage.get<any[]>('lifeos:notifications:v1', []);
-      const notifications = Array.isArray(notificationsParsed) ? notificationsParsed : [];
-
-      const currency = storage.get<string>('lifeos:currency', 'USD');
-
-      const id = generateId();
-
-      const next = [
-        ...retained,
-        {
-          id,
-          createdAt: now.toISOString(),
-          tasks,
-          fileSystemNodes,
-          plannerItems,
-          netWorthSnapshots,
-          notifications,
-          currency,
-        },
-      ];
-      storage.set(AUTO_BACKUP_KEY, next);
-      storage.set(LAST_BACKUP_KEY, todayKey);
-    } catch (error) {
-      console.warn('Auto-backup failed:', error);
-    }
-  }, [tasks, isLoading]);
+  }, [isLoading]);
 
   const navigateTo = useCallback((taskId: string) => {
     setCurrentParentId(taskId);

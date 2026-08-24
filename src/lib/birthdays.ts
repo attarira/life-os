@@ -1,17 +1,35 @@
 import { useState, useEffect } from 'react';
-import { BirthdayItem, DEFAULT_BIRTHDAYS, listBirthdays, replaceBirthdays } from './repos/birthdays';
+import { BirthdayItem, DEFAULT_BIRTHDAYS, listBirthdays, replaceBirthdays, migrateBirthdaysToSupabase } from './repos/birthdays';
 
 export type { BirthdayItem };
-export { DEFAULT_BIRTHDAYS };
+export { DEFAULT_BIRTHDAYS, migrateBirthdaysToSupabase };
 
 export function useBirthdays() {
   const [birthdays, setBirthdaysState] = useState<BirthdayItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const load = () => listBirthdays().then(setBirthdaysState).catch(() => {});
+    let mounted = true;
+    const load = () => {
+      setIsLoading(true);
+      listBirthdays()
+        .then((items) => {
+          if (mounted) {
+            setBirthdaysState(items);
+            setIsLoading(false);
+          }
+        })
+        .catch(() => {
+          if (mounted) setIsLoading(false);
+        });
+    };
+
     load();
     window.addEventListener('lifeos:birthdays-updated', load);
-    return () => window.removeEventListener('lifeos:birthdays-updated', load);
+    return () => {
+      mounted = false;
+      window.removeEventListener('lifeos:birthdays-updated', load);
+    };
   }, []);
 
   const setBirthdays = (newBirthdays: BirthdayItem[]) => {
@@ -43,5 +61,5 @@ export function useBirthdays() {
     return null;
   };
 
-  return { birthdays, setBirthdays, getUpcomingBirthday };
+  return { birthdays, setBirthdays, getUpcomingBirthday, isLoading };
 }

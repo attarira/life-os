@@ -3,8 +3,6 @@
 import React, { useEffect } from 'react';
 import { useTaskContext } from '@/lib/task-context';
 import { useTravelMode } from '@/lib/travel-mode-context';
-import { ROOT_TASK_ID } from '@/lib/types';
-import { KanbanBoard } from './KanbanBoard';
 import { HomeDashboard } from './HomeDashboard';
 import { TaskPanel } from './TaskPanel';
 import { SearchModal } from './SearchModal';
@@ -13,7 +11,6 @@ import { BackupsPanel } from './BackupsPanel';
 
 export function Board() {
   const {
-    currentParentId,
     isLoading,
     setSearchOpen,
   } = useTaskContext();
@@ -58,14 +55,11 @@ export function Board() {
     );
   }
 
-  // Routing Logic
-  const isAtRoot = currentParentId === ROOT_TASK_ID;
-
   return (
     <div className="flex flex-col h-screen bg-slate-100 dark:bg-slate-900">
       {/* Main Content */}
       <main className="flex-1 overflow-hidden relative">
-        {isAtRoot ? <HomeDashboard /> : <KanbanBoard />}
+        <HomeDashboard />
       </main>
 
       {/* Global Modals */}

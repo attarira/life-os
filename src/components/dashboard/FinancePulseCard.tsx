@@ -35,15 +35,36 @@ function buildDemoSeries(): NetWorthPoint[] {
   return pts;
 }
 
+function smoothSeries(values: number[], windowSize = 5): number[] {
+  if (values.length <= 2) return [...values];
+  const size = Math.min(windowSize, Math.max(3, Math.ceil(values.length / 8)));
+  const half = Math.floor(size / 2);
+
+  return values.map((_, index) => {
+    const start = Math.max(0, index - half);
+    const end = Math.min(values.length - 1, index + half);
+    let sum = 0;
+    let count = 0;
+
+    for (let i = start; i <= end; i += 1) {
+      sum += values[i];
+      count += 1;
+    }
+
+    return sum / count;
+  });
+}
+
 function Sparkline({ points }: { points: number[] }) {
   if (points.length < 2) return <div className="h-14 w-full rounded-md bg-[var(--op-inset)]" />;
+  const smoothed = smoothSeries(points);
   const w = 320;
   const h = 56;
-  const min = Math.min(...points);
-  const max = Math.max(...points);
+  const min = Math.min(...smoothed);
+  const max = Math.max(...smoothed);
   const span = max - min || 1;
-  const step = w / (points.length - 1);
-  const coords = points.map((p, i) => [i * step, h - ((p - min) / span) * (h - 8) - 4]);
+  const step = w / (smoothed.length - 1);
+  const coords = smoothed.map((p, i) => [i * step, h - ((p - min) / span) * (h - 8) - 4]);
   const line = coords.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
   const area = `${line} L${w},${h} L0,${h} Z`;
   return (

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { useTaskContext } from '@/lib/task-context';
 import { ROOT_TASK_ID, Task } from '@/lib/types';
 import { dayKey } from '@/lib/utils';
@@ -34,6 +34,14 @@ function fmt(date: Date): string {
   return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
+function applyTime(date: Date, time: string): Date {
+  const next = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
+  if (!time) return next;
+  const [hours, minutes] = time.split(':').map(Number);
+  next.setHours(hours || 0, minutes || 0, 0, 0);
+  return next;
+}
+
 const ACCENT: Record<AgendaItem['kind'], string> = {
   scheduled: 'bg-[var(--op-accent)]',
   due: 'bg-orange-400',
@@ -42,12 +50,16 @@ const ACCENT: Record<AgendaItem['kind'], string> = {
 
 export function CalendarCard() {
   const { tasks, selectTask, updateTask, deleteTask, createTask } = useTaskContext();
+  const addFormRef = useRef<HTMLDivElement | null>(null);
   const [selected, setSelected] = useState<Date>(() => new Date());
   const [weekStart, setWeekStart] = useState<Date>(() => startOfWeek(new Date()));
   const [newTitle, setNewTitle] = useState('');
+  const [newTime, setNewTime] = useState('');
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
+  const [editingTime, setEditingTime] = useState('');
+  const [editingDateField, setEditingDateField] = useState<'scheduledDate' | 'dueDate'>('scheduledDate');
 
   const taskMap = useMemo(() => new Map(tasks.map((t) => [t.id, t])), [tasks]);
   const parentIds = useMemo(() => new Set(tasks.map((t) => t.parentId)), [tasks]);
@@ -116,10 +128,22 @@ export function CalendarCard() {
     setWeekStart(next);
   };
 
+  const snapToToday = () => {
+    const today = new Date();
+    setSelected(today);
+    setWeekStart(startOfWeek(today));
+  };
+
+  const closeAddForm = () => {
+    setNewTitle('');
+    setNewTime('');
+    setIsAdding(false);
+  };
+
   const handleCreateEvent = async () => {
     const title = newTitle.trim();
     if (!title) return;
-    const schedDate = new Date(selected.getFullYear(), selected.getMonth(), selected.getDate(), 12, 0, 0, 0);
+    const schedDate = applyTime(selected, newTime);
     const rootAreas = tasks.filter((t) => t.parentId === ROOT_TASK_ID);
     const parentId = rootAreas.length > 0 ? rootAreas[0].id : ROOT_TASK_ID;
 
@@ -130,20 +154,34 @@ export function CalendarCard() {
       priority: 'MEDIUM',
       scheduledDate: schedDate,
     });
-    setNewTitle('');
-    setIsAdding(false);
+    closeAddForm();
   };
 
   const handleStartInlineEdit = (ev: AgendaItem) => {
     setEditingId(ev.taskId);
     setEditingTitle(ev.title);
+    setEditingTime(ev.time || '');
+    setEditingDateField(ev.kind === 'due' ? 'dueDate' : 'scheduledDate');
   };
 
   const handleSaveInlineEdit = async (taskId: string) => {
+    const task = taskMap.get(taskId);
     const trimmedTitle = editingTitle.trim();
-    if (trimmedTitle && trimmedTitle !== taskMap.get(taskId)?.title) {
-      await updateTask(taskId, { title: trimmedTitle });
+    if (!task) {
+      setEditingId(null);
+      return;
     }
+
+    const updates: Partial<Pick<Task, 'title' | 'scheduledDate' | 'dueDate'>> = {};
+    if (trimmedTitle && trimmedTitle !== task.title) updates.title = trimmedTitle;
+
+    const currentDate = editingDateField === 'dueDate' ? task.dueDate : task.scheduledDate;
+    const nextDate = applyTime(currentDate ? new Date(currentDate) : selected, editingTime);
+    if (!currentDate || nextDate.getTime() !== new Date(currentDate).getTime()) {
+      updates[editingDateField] = nextDate;
+    }
+
+    if (Object.keys(updates).length > 0) await updateTask(taskId, updates);
     setEditingId(null);
   };
 
@@ -164,7 +202,17 @@ export function CalendarCard() {
           <span className="font-mono text-[10px] tracking-wide text-[var(--op-muted)]">{monthLabel}</span>
           <span className="font-mono text-[9px] uppercase tracking-[0.16em] text-[var(--op-dim)]">{agenda.length} {agenda.length === 1 ? 'event' : 'events'}</span>
           <button
-            onClick={() => setIsAdding(!isAdding)}
+            onClick={snapToToday}
+            className="rounded border border-[var(--op-border)] px-2 py-1 font-mono text-[9px] uppercase tracking-[0.14em] text-[var(--op-muted)] transition-colors hover:border-[var(--op-border-strong)] hover:bg-white/[0.04] hover:text-[var(--op-text)]"
+            title="Jump to today"
+          >
+            Today
+          </button>
+          <button
+            onClick={() => {
+              if (isAdding) closeAddForm();
+              else setIsAdding(true);
+            }}
             className="rounded p-1 text-[var(--op-dim)] hover:bg-white/[0.06] hover:text-[var(--op-text)] transition-colors"
             title="Add Event for selected date"
           >
@@ -185,13 +233,31 @@ export function CalendarCard() {
     >
       {/* Quick Add Form */}
       {isAdding && (
-        <div className="mb-3 flex items-center gap-2 rounded-lg border border-[var(--op-accent)]/50 bg-[var(--op-inset)] px-3 py-1.5">
+        <div
+          ref={addFormRef}
+          onBlur={(e) => {
+            if (addFormRef.current?.contains(e.relatedTarget as Node | null)) return;
+            if (!newTitle.trim()) closeAddForm();
+          }}
+          className="mb-3 flex items-center gap-2 rounded-lg border border-[var(--op-accent)]/50 bg-[var(--op-inset)] px-3 py-1.5"
+        >
+          <input
+            type="time"
+            value={newTime}
+            onChange={(e) => setNewTime(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleCreateEvent();
+              if (e.key === 'Escape') closeAddForm();
+            }}
+            className="w-20 bg-transparent font-mono text-[12px] tabular-nums text-[var(--op-muted)] focus:outline-none"
+            aria-label="Scheduled time"
+          />
           <input
             value={newTitle}
             onChange={(e) => setNewTitle(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') handleCreateEvent();
-              if (e.key === 'Escape') setIsAdding(false);
+              if (e.key === 'Escape') closeAddForm();
             }}
             placeholder={`Schedule for ${selected.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}…`}
             className="flex-1 bg-transparent text-[13px] text-[var(--op-text)] placeholder:text-[var(--op-dim)] focus:outline-none"
@@ -275,20 +341,38 @@ export function CalendarCard() {
                     />
                     <span className="w-10 flex-shrink-0 text-right font-mono text-[10px] tabular-nums text-[var(--op-muted)]">{ev.time || '—'}</span>
                     <span className={`h-6 w-0.5 flex-shrink-0 rounded-full ${ACCENT[ev.kind]}`} />
-                    
+
                     <div className="min-w-0 flex-1">
                       {isEditingThis ? (
-                        <input
-                          value={editingTitle}
-                          onChange={(e) => setEditingTitle(e.target.value)}
-                          onBlur={() => handleSaveInlineEdit(ev.taskId)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') handleSaveInlineEdit(ev.taskId);
-                            if (e.key === 'Escape') setEditingId(null);
+                        <div
+                          className="flex items-center gap-2"
+                          onBlur={(e) => {
+                            if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+                            handleSaveInlineEdit(ev.taskId);
                           }}
-                          className="w-full border-b border-[var(--op-accent)] bg-transparent text-[13px] text-[var(--op-text)] focus:outline-none"
-                          autoFocus
-                        />
+                        >
+                          <input
+                            type="time"
+                            value={editingTime}
+                            onChange={(e) => setEditingTime(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleSaveInlineEdit(ev.taskId);
+                              if (e.key === 'Escape') setEditingId(null);
+                            }}
+                            className="w-20 border-b border-[var(--op-border-strong)] bg-transparent font-mono text-[12px] tabular-nums text-[var(--op-muted)] focus:outline-none"
+                            aria-label="Event time"
+                          />
+                          <input
+                            value={editingTitle}
+                            onChange={(e) => setEditingTitle(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleSaveInlineEdit(ev.taskId);
+                              if (e.key === 'Escape') setEditingId(null);
+                            }}
+                            className="min-w-0 flex-1 border-b border-[var(--op-accent)] bg-transparent text-[13px] text-[var(--op-text)] focus:outline-none"
+                            autoFocus
+                          />
+                        </div>
                       ) : (
                         <div
                           onClick={() => selectTask(ev.taskId)}

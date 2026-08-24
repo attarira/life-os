@@ -10,14 +10,15 @@ export function ArchiveInlinePanel({ onNavigate }: { onNavigate?: () => void }) 
   const archivedTasks = getArchivedTasks();
 
   const filteredTasks = searchQuery.trim()
-    ? archivedTasks.filter(task =>
-      task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (task.description && task.description.toLowerCase().includes(searchQuery.toLowerCase()))
-    )
+    ? archivedTasks.filter(
+        (task) =>
+          task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (task.description && task.description.toLowerCase().includes(searchQuery.toLowerCase()))
+      )
     : archivedTasks;
 
   const handleNavigate = (taskId: string) => {
-    const task = tasks.find(t => t.id === taskId);
+    const task = tasks.find((t) => t.id === taskId);
     if (!task) return;
 
     navigateTo(task.parentId);
@@ -25,51 +26,52 @@ export function ArchiveInlinePanel({ onNavigate }: { onNavigate?: () => void }) 
   };
 
   return (
-    <div className="rounded-lg bg-slate-800/50 overflow-hidden">
-      <div className="p-2 border-b border-slate-700/60">
+    <div className="overflow-hidden rounded-lg border border-[var(--op-border)] bg-[var(--op-inset)]">
+      <div className="border-b border-[var(--op-border)] p-2">
         <input
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Search archived tasks..."
-          className="w-full px-3 py-2 rounded-lg border border-slate-700 bg-slate-900 text-[12px] text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-600"
+          className="w-full rounded-md border border-[var(--op-border)] bg-black/40 px-2.5 py-1.5 text-[12px] text-[var(--op-text)] placeholder:text-[var(--op-dim)] focus:border-[var(--op-accent)] focus:outline-none"
         />
       </div>
 
-      <div className="max-h-56 overflow-y-auto p-2">
+      <div className="max-h-56 overflow-y-auto p-1.5 space-y-1">
         {filteredTasks.length === 0 ? (
-          <p className="py-6 text-center text-[11px] text-slate-500">
+          <p className="py-6 text-center font-mono text-[10px] text-[var(--op-dim)]">
             {searchQuery ? 'No matching archived tasks' : 'No archived tasks (older than 7 days)'}
           </p>
         ) : (
-          <div className="space-y-1.5">
-            {filteredTasks.map(task => {
-              const path = getTaskPath(tasks, task.id);
-              const breadcrumb = formatBreadcrumb(path.slice(0, -1), 32, false);
+          filteredTasks.map((task) => {
+            const path = getTaskPath(tasks, task.id);
+            const breadcrumb = formatBreadcrumb(path.slice(0, -1), 32, false);
 
-              return (
-                <button
-                  key={task.id}
-                  onClick={() => handleNavigate(task.id)}
-                  className="w-full text-left rounded-lg bg-slate-900/80 px-3 py-2 transition-colors hover:bg-slate-900"
-                >
-                  <div className="text-[10px] text-slate-500">{breadcrumb}</div>
-                  <div className="mt-1 text-[12px] font-medium text-slate-100">{task.title}</div>
-                  <div className="mt-1 flex items-center gap-1 text-[10px] text-green-400">
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    {getCompletedAgoText(task)}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+            return (
+              <button
+                key={task.id}
+                type="button"
+                onClick={() => handleNavigate(task.id)}
+                className="group flex w-full flex-col rounded-md p-2 text-left transition-colors hover:bg-white/[0.03]"
+              >
+                <div className="font-mono text-[9px] uppercase text-[var(--op-dim)]">{breadcrumb}</div>
+                <div className="text-[12.5px] font-medium text-[var(--op-text)] group-hover:text-[var(--op-accent)] transition-colors">
+                  {task.title}
+                </div>
+                <div className="mt-1 flex items-center gap-1 font-mono text-[10px] text-emerald-400">
+                  <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span>{getCompletedAgoText(task)}</span>
+                </div>
+              </button>
+            );
+          })
         )}
       </div>
 
-      <div className="border-t border-slate-700/60 px-3 py-2 text-[10px] text-slate-500">
-        {archivedTasks.length} task{archivedTasks.length !== 1 ? 's' : ''} completed more than 7 days ago
+      <div className="border-t border-[var(--op-border)] px-2.5 py-1.5 font-mono text-[9px] text-[var(--op-dim)]">
+        {archivedTasks.length} task{archivedTasks.length !== 1 ? 's' : ''} completed &gt;7d ago
       </div>
     </div>
   );
@@ -83,10 +85,11 @@ export function CompletedArchive() {
   const archivedTasks = getArchivedTasks();
 
   const filteredTasks = searchQuery.trim()
-    ? archivedTasks.filter(t =>
-      t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (t.description && t.description.toLowerCase().includes(searchQuery.toLowerCase()))
-    )
+    ? archivedTasks.filter(
+        (t) =>
+          t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (t.description && t.description.toLowerCase().includes(searchQuery.toLowerCase()))
+      )
     : archivedTasks;
 
   useEffect(() => {
@@ -108,7 +111,7 @@ export function CompletedArchive() {
   if (!archiveOpen) return null;
 
   const handleNavigate = (taskId: string) => {
-    const task = tasks.find(t => t.id === taskId);
+    const task = tasks.find((t) => t.id === taskId);
     if (task) {
       navigateTo(task.parentId);
       setArchiveOpen(false);
@@ -119,74 +122,76 @@ export function CompletedArchive() {
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/50 z-50"
+        className="fixed inset-0 z-50 bg-[#05080d]/80 backdrop-blur-md"
         onClick={() => setArchiveOpen(false)}
       />
 
-      {/* Modal */}
-      <div className="fixed inset-4 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-full md:max-w-lg md:max-h-[80vh] bg-white dark:bg-slate-800 rounded-xl shadow-2xl z-50 flex flex-col">
+      {/* Modal Dialog */}
+      <div className="fixed inset-4 z-50 flex max-h-[80vh] flex-col overflow-hidden rounded-2xl border border-[var(--op-border-strong)] bg-[#0a0e15] shadow-2xl md:inset-auto md:left-1/2 md:top-1/2 md:w-full md:max-w-lg md:-translate-x-1/2 md:-translate-y-1/2">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
-            Completed Archive
-          </h2>
+        <div className="flex items-center justify-between border-b border-[var(--op-border)] bg-black/40 p-4">
+          <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--op-muted)]">
+            COMPLETED ARCHIVE
+          </div>
           <button
+            type="button"
             onClick={() => setArchiveOpen(false)}
-            className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
+            className="rounded p-1 text-[var(--op-dim)] transition-colors hover:text-[var(--op-text)]"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
         {/* Search */}
-        <div className="p-4 border-b border-slate-200 dark:border-slate-700">
+        <div className="border-b border-[var(--op-border)] p-3">
           <input
             ref={inputRef}
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search archived tasks..."
-            className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400"
+            className="w-full rounded-lg border border-[var(--op-border)] bg-[var(--op-inset)] px-3 py-2 text-[13px] text-[var(--op-text)] placeholder:text-[var(--op-dim)] focus:border-[var(--op-accent)] focus:outline-none"
           />
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-4">
+        <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
           {filteredTasks.length === 0 ? (
-            <p className="text-center text-slate-500 dark:text-slate-400 py-8">
+            <p className="py-8 text-center font-mono text-[11px] text-[var(--op-dim)]">
               {searchQuery ? 'No matching archived tasks' : 'No archived tasks (older than 7 days)'}
             </p>
           ) : (
-            <div className="space-y-2">
-              {filteredTasks.map(task => {
-                const path = getTaskPath(tasks, task.id);
-                const breadcrumb = formatBreadcrumb(path.slice(0, -1), 40, false);
+            filteredTasks.map((task) => {
+              const path = getTaskPath(tasks, task.id);
+              const breadcrumb = formatBreadcrumb(path.slice(0, -1), 40, false);
 
-                return (
-                  <button
-                    key={task.id}
-                    onClick={() => handleNavigate(task.id)}
-                    className="w-full text-left p-3 rounded-lg bg-slate-50 dark:bg-slate-700/50 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-                  >
-                    <div className="text-xs text-slate-400 mb-1">{breadcrumb}</div>
-                    <div className="font-medium text-slate-900 dark:text-white">{task.title}</div>
-                    <div className="text-xs text-green-600 dark:text-green-400 mt-1 flex items-center gap-1">
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      {getCompletedAgoText(task)}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+              return (
+                <button
+                  key={task.id}
+                  type="button"
+                  onClick={() => handleNavigate(task.id)}
+                  className="group flex w-full flex-col rounded-xl border border-[var(--op-border)] bg-[var(--op-inset)] p-3 text-left transition-colors hover:border-[var(--op-border-strong)] hover:bg-white/[0.02]"
+                >
+                  <div className="font-mono text-[10px] uppercase text-[var(--op-dim)]">{breadcrumb}</div>
+                  <div className="text-[13.5px] font-medium text-[var(--op-text)] group-hover:text-[var(--op-accent)] transition-colors">
+                    {task.title}
+                  </div>
+                  <div className="mt-1 flex items-center gap-1 font-mono text-[10px] text-emerald-400">
+                    <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>{getCompletedAgoText(task)}</span>
+                  </div>
+                </button>
+              );
+            })
           )}
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-slate-200 dark:border-slate-700 text-center text-sm text-slate-500">
+        <div className="border-t border-[var(--op-border)] p-3 text-center font-mono text-[10px] text-[var(--op-dim)]">
           {archivedTasks.length} task{archivedTasks.length !== 1 ? 's' : ''} completed more than 7 days ago
         </div>
       </div>

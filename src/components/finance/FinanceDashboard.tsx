@@ -36,12 +36,14 @@ const EMPTY_DRAFT: AccountDraft = {
 };
 
 const ACCOUNT_TYPE_OPTIONS: { value: AccountType; label: string }[] = [
-  { value: 'bank', label: 'Bank account' },
+  { value: 'bank', label: 'Bank' },
+  { value: 'credit_card', label: 'Credit Card' },
   { value: 'investment', label: 'Investment' },
-  { value: 'ppf', label: 'PPF' },
+  { value: 'retirement', label: 'Retirement' },
+  { value: 'loan', label: 'Loan' },
+  { value: 'mortgage', label: 'Mortgage' },
   { value: 'cash', label: 'Cash' },
-  { value: 'liability', label: 'Liability' },
-  { value: 'other', label: 'Other' },
+  { value: 'other_asset', label: 'Other Asset' },
 ];
 
 function formatINR(value: number, fractionDigits = 0): string {
@@ -80,7 +82,7 @@ function draftToInput(draft: AccountDraft, sortOrder?: number): AccountInput {
   return {
     name: draft.name.trim(),
     accountType,
-    kind: accountType === 'liability' ? 'liability' : draft.kind,
+    kind: draft.kind,
     balance: Number(draft.balance.replace(/,/g, '')) || 0,
     institution: draft.institution.trim() || undefined,
     metadata: {
@@ -95,14 +97,18 @@ function accountTypeTone(type: AccountType): string {
   switch (type) {
     case 'bank':
       return 'bg-sky-400/10 text-sky-200 border-sky-300/20';
+    case 'credit_card':
+      return 'bg-rose-400/10 text-rose-200 border-rose-300/20';
     case 'investment':
       return 'bg-[var(--op-accent-dim)] text-[var(--op-accent)] border-[var(--op-accent)]/20';
-    case 'ppf':
+    case 'retirement':
       return 'bg-violet-400/10 text-violet-200 border-violet-300/20';
+    case 'loan':
+      return 'bg-orange-400/10 text-orange-200 border-orange-300/20';
+    case 'mortgage':
+      return 'bg-fuchsia-400/10 text-fuchsia-200 border-fuchsia-300/20';
     case 'cash':
       return 'bg-amber-400/10 text-amber-200 border-amber-300/20';
-    case 'liability':
-      return 'bg-rose-400/10 text-rose-200 border-rose-300/20';
     default:
       return 'bg-slate-400/10 text-slate-200 border-slate-300/20';
   }
@@ -367,13 +373,13 @@ export function FinanceDashboard({ embedded = false }: { embedded?: boolean }) {
               </label>
               <label className="space-y-1.5">
                 <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--op-dim)]">Type</span>
-                <select value={draft.accountType} onChange={(e) => setDraft((d) => ({ ...d, accountType: e.target.value as AccountType, kind: e.target.value === 'liability' ? 'liability' : d.kind }))} className={inputCls}>
+                <select value={draft.accountType} onChange={(e) => setDraft((d) => ({ ...d, accountType: e.target.value as AccountType }))} className={inputCls}>
                   {ACCOUNT_TYPE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>
               </label>
               <label className="space-y-1.5">
                 <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--op-dim)]">Asset class</span>
-                <select value={draft.kind} onChange={(e) => setDraft((d) => ({ ...d, kind: e.target.value as AccountKind }))} className={inputCls} disabled={draft.accountType === 'liability'}>
+                <select value={draft.kind} onChange={(e) => setDraft((d) => ({ ...d, kind: e.target.value as AccountKind }))} className={inputCls}>
                   <option value="asset">Asset</option>
                   <option value="liability">Liability</option>
                 </select>

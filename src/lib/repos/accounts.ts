@@ -2,7 +2,7 @@ import { isSupabaseConfigured, getSupabase } from '../supabase/client';
 import { storage, generateId } from '../utils';
 
 export type AccountKind = 'asset' | 'liability';
-export type AccountType = 'bank' | 'investment' | 'ppf' | 'cash' | 'liability' | 'other';
+export type AccountType = 'bank' | 'credit_card' | 'investment' | 'retirement' | 'loan' | 'mortgage' | 'cash' | 'other_asset';
 
 export type AccountMetadata = {
   accountNumberLast4?: string;
@@ -35,26 +35,28 @@ export type AccountInput = {
 
 const LOCAL_KEY = 'lifeos:accounts:v2';
 const LEGACY_LOCAL_KEY = 'lifeos:accounts:v1';
-const RICH_SELECT = 'id, name, type, account_type, kind, balance, institution, metadata, sort_order, created_at, updated_at, last_updated_at';
+const RICH_SELECT = 'id, name, type, kind, balance, institution, metadata, sort_order, created_at, updated_at, last_updated_at';
 const LEGACY_SELECT = 'id, name, type, kind, balance, sort_order, created_at, updated_at';
 
 export const ACCOUNT_TYPE_LABELS: Record<AccountType, string> = {
-  bank: 'Bank Accounts',
-  investment: 'Investments',
-  ppf: 'PPF',
+  bank: 'Bank',
+  credit_card: 'Credit Card',
+  investment: 'Investment',
+  retirement: 'Retirement',
+  loan: 'Loan',
+  mortgage: 'Mortgage',
   cash: 'Cash',
-  liability: 'Liabilities',
-  other: 'Other Accounts',
+  other_asset: 'Other Asset',
 };
 
-export const ACCOUNT_TYPE_ORDER: AccountType[] = ['bank', 'investment', 'ppf', 'cash', 'liability', 'other'];
+export const ACCOUNT_TYPE_ORDER: AccountType[] = ['bank', 'credit_card', 'investment', 'retirement', 'loan', 'mortgage', 'cash', 'other_asset'];
 
 export const DEFAULT_ACCOUNTS: AccountInput[] = [
   { name: 'HDFC Bank Savings', institution: 'HDFC Bank', accountType: 'bank', kind: 'asset', balance: 0, sortOrder: 0 },
   { name: 'ICICI Bank Savings', institution: 'ICICI Bank', accountType: 'bank', kind: 'asset', balance: 0, sortOrder: 1 },
   { name: 'Feedaally Investments', institution: 'Feedaally', accountType: 'investment', kind: 'asset', balance: 0, sortOrder: 2 },
   { name: 'Groww Investments', institution: 'Groww', accountType: 'investment', kind: 'asset', balance: 0, sortOrder: 3 },
-  { name: 'HDFC PPF', institution: 'HDFC Bank', accountType: 'ppf', kind: 'asset', balance: 0, sortOrder: 4 },
+  { name: 'HDFC Retirement', institution: 'HDFC Bank', accountType: 'retirement', kind: 'asset', balance: 0, sortOrder: 4 },
 ];
 
 type LegacyAccount = {
@@ -69,7 +71,6 @@ type AccountRow = {
   id: string;
   name: string;
   type?: string | null;
-  account_type?: AccountType | null;
   kind: AccountKind;
   balance: number;
   institution?: string | null;
@@ -82,11 +83,14 @@ type AccountRow = {
 
 function inferAccountType(account: { type?: string | null; kind: AccountKind; name: string }): AccountType {
   const text = `${account.type ?? ''} ${account.name}`.toLowerCase();
-  if (account.kind === 'liability') return 'liability';
-  if (text.includes('ppf') || text.includes('provident')) return 'ppf';
+  if (text.includes('credit card') || text.includes('credit-card')) return 'credit_card';
+  if (text.includes('mortgage')) return 'mortgage';
+  if (text.includes('loan')) return 'loan';
+  if (text.includes('retirement') || text.includes('nps') || text.includes('pension')) return 'retirement';
   if (text.includes('invest') || text.includes('broker') || text.includes('groww') || text.includes('feedaally')) return 'investment';
   if (text.includes('saving') || text.includes('bank') || text.includes('hdfc') || text.includes('icici')) return 'bank';
-  return 'other';
+  if (text.includes('cash')) return 'cash';
+  return 'other_asset';
 }
 
 function normalizeMetadata(metadata?: AccountMetadata | null): AccountMetadata {
@@ -100,7 +104,7 @@ function rowToAccount(r: AccountRow): Account {
   return {
     id: r.id,
     name: r.name,
-    accountType: r.account_type ?? inferAccountType({ type: r.type, kind: r.kind, name: r.name }),
+    accountType: (r.type as AccountType | null) ?? inferAccountType({ type: r.type, kind: r.kind, name: r.name }),
     kind: r.kind,
     balance: Number(r.balance),
     institution: r.institution ?? undefined,
@@ -115,7 +119,6 @@ function rowToAccount(r: AccountRow): Account {
 function inputToRow(input: AccountInput): Record<string, unknown> {
   return {
     name: input.name,
-    account_type: input.accountType,
     type: input.accountType,
     kind: input.kind,
     balance: input.balance,
@@ -326,10 +329,7 @@ export async function updateAccount(id: string, patch: Partial<AccountInput>): P
 
   const row: Record<string, unknown> = { last_updated_at: new Date().toISOString() };
   if (patch.name !== undefined) row.name = patch.name;
-  if (patch.accountType !== undefined) {
-    row.account_type = patch.accountType;
-    row.type = patch.accountType;
-  }
+  if (patch.accountType !== undefined) row.type = patch.accountType;
   if (patch.kind !== undefined) row.kind = patch.kind;
   if (patch.balance !== undefined) row.balance = patch.balance;
   if (patch.institution !== undefined) row.institution = patch.institution || null;

@@ -82,11 +82,6 @@ export function TopNav({
             Export
           </button>
 
-          <span className="hidden items-center gap-1.5 rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-1 font-mono text-[9px] uppercase tracking-[0.16em] text-rose-300 lg:inline-flex">
-            <span className="h-1.5 w-1.5 rounded-full bg-rose-400" />
-            Demo On
-          </span>
-
           <span className="hidden font-mono text-[10px] tabular-nums tracking-wide text-[var(--op-muted)] lg:inline" suppressHydrationWarning>{dateLabel}</span>
           <span className="font-mono text-[12px] font-medium tabular-nums tracking-wide text-[var(--op-text)]" suppressHydrationWarning>{timeLabel}</span>
 

@@ -1,13 +1,50 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useBirthdays, BirthdayItem } from '@/lib/birthdays';
+import { useBirthdays, BirthdayItem, migrateBirthdaysToSupabase } from '@/lib/birthdays';
+import { generateId } from '@/lib/utils';
+import { isSupabaseConfigured } from '@/lib/supabase/client';
+
+function toDatePickerValue(monthDay: string): string {
+  if (!monthDay) return '';
+  const currentYear = new Date().getFullYear();
+  const parts = monthDay.split('-');
+  if (parts.length === 2) {
+    return `${currentYear}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
+  }
+  if (parts.length === 3) {
+    return monthDay;
+  }
+  return '';
+}
+
+function fromDatePickerValue(fullDate: string): string {
+  if (!fullDate) return '';
+  const parts = fullDate.split('-');
+  if (parts.length >= 3) {
+    return `${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+  }
+  return fullDate;
+}
+
+function formatMonthDayDisplay(monthDay: string): string {
+  if (!monthDay) return '';
+  const parts = monthDay.split('-');
+  if (parts.length !== 2) return monthDay;
+  const monthIndex = parseInt(parts[0], 10) - 1;
+  const day = parseInt(parts[1], 10);
+  if (isNaN(monthIndex) || isNaN(day)) return monthDay;
+  const date = new Date(2026, monthIndex, day);
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
 
 export function BirthdayModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const { birthdays, setBirthdays } = useBirthdays();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editDate, setEditDate] = useState('');
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<string | null>(null);
   
   if (!isOpen) return null;
 
@@ -20,22 +57,14 @@ export function BirthdayModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
   const handleSave = () => {
     if (!editName.trim() || !editDate.trim()) return;
     
-    // Validate format MM-DD loosely
-    const dateMatch = editDate.match(/^(\d{2})-(\d{2})$/);
-    let finalDate = editDate.trim();
-    if (!dateMatch) {
-        // basic attempt to format e.g. 3-11 -> 03-11
-        const parts = editDate.split('-');
-        if (parts.length === 2) {
-            finalDate = `${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
-        }
-    }
+    // Normalize date format to MM-DD
+    const finalDate = fromDatePickerValue(editDate.trim());
 
     if (editingId === 'new') {
       const newItem: BirthdayItem = {
-        id: Math.random().toString(36).substring(2, 9),
+        id: generateId(),
         name: editName.trim(),
-        date: finalDate
+        date: finalDate,
       };
       setBirthdays([...birthdays, newItem]);
     } else {
@@ -48,6 +77,26 @@ export function BirthdayModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
     if (confirm('Are you sure you want to delete this birthday?')) {
       setBirthdays(birthdays.filter(b => b.id !== id));
       if (editingId === id) setEditingId(null);
+    }
+  };
+
+  const handleManualMigrate = async () => {
+    if (!isSupabaseConfigured) {
+      alert('Supabase is not configured in .env.local');
+      return;
+    }
+
+    setIsSyncing(true);
+    setSyncStatus(null);
+    try {
+      const result = await migrateBirthdaysToSupabase();
+      setSyncStatus(`Synced to Supabase! (${result.total} birthdays total)`);
+      window.dispatchEvent(new Event('lifeos:birthdays-updated'));
+      setTimeout(() => setSyncStatus(null), 3000);
+    } catch (err: unknown) {
+      setSyncStatus(err instanceof Error ? err.message : 'Migration failed.');
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -71,26 +120,47 @@ export function BirthdayModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
-          <div className="flex justify-between items-end pb-2">
+          <div className="flex justify-between items-center pb-2">
             <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">Tracked Dates</p>
-            <button
-              onClick={() => {
-                setEditingId('new');
-                setEditName('');
-                setEditDate('');
-              }}
-              className="text-xs font-semibold text-rose-500 hover:text-rose-600 flex items-center gap-1"
-            >
-              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-              </svg>
-              Add New
-            </button>
+            <div className="flex items-center gap-3">
+              {isSupabaseConfigured && (
+                <button
+                  onClick={handleManualMigrate}
+                  disabled={isSyncing}
+                  className="text-xs font-medium text-slate-500 hover:text-rose-500 dark:text-slate-400 dark:hover:text-rose-400 flex items-center gap-1 transition-colors disabled:opacity-50"
+                  title="Sync local birthdays to Supabase"
+                >
+                  <svg className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  <span>{isSyncing ? 'Syncing...' : 'Sync to Cloud'}</span>
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  setEditingId('new');
+                  setEditName('');
+                  setEditDate('');
+                }}
+                className="text-xs font-semibold text-rose-500 hover:text-rose-600 flex items-center gap-1"
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                </svg>
+                Add New
+              </button>
+            </div>
           </div>
+
+          {syncStatus && (
+            <div className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/50 text-[11.5px] text-emerald-700 dark:text-emerald-300">
+              {syncStatus}
+            </div>
+          )}
 
           {editingId === 'new' && (
             <div className="bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/20 rounded-xl p-3 flex flex-col gap-3">
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <input
                   type="text"
                   placeholder="Name"
@@ -100,11 +170,15 @@ export function BirthdayModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
                   autoFocus
                 />
                 <input
-                  type="text"
-                  placeholder="MM-DD"
-                  value={editDate}
-                  onChange={e => setEditDate(e.target.value)}
-                  className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-2.5 py-1.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-rose-400"
+                  type="date"
+                  value={toDatePickerValue(editDate)}
+                  onChange={e => setEditDate(fromDatePickerValue(e.target.value))}
+                  onClick={e => {
+                    try {
+                      (e.target as HTMLInputElement).showPicker?.();
+                    } catch {}
+                  }}
+                  className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-2.5 py-1.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-rose-400 cursor-pointer"
                 />
               </div>
               <div className="flex justify-end gap-2">
@@ -128,7 +202,7 @@ export function BirthdayModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
              const isEditing = editingId === b.id;
              return isEditing ? (
               <div key={b.id} className="bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/20 rounded-xl p-3 flex flex-col gap-3">
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <input
                     type="text"
                     placeholder="Name"
@@ -138,11 +212,15 @@ export function BirthdayModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
                     autoFocus
                   />
                   <input
-                    type="text"
-                    placeholder="MM-DD"
-                    value={editDate}
-                    onChange={e => setEditDate(e.target.value)}
-                    className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-2.5 py-1.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-rose-400"
+                    type="date"
+                    value={toDatePickerValue(editDate)}
+                    onChange={e => setEditDate(fromDatePickerValue(e.target.value))}
+                    onClick={e => {
+                      try {
+                        (e.target as HTMLInputElement).showPicker?.();
+                      } catch {}
+                    }}
+                    className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-2.5 py-1.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-rose-400 cursor-pointer"
                   />
                 </div>
                 <div className="flex justify-end gap-2">
@@ -171,7 +249,9 @@ export function BirthdayModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
                     </div>
                     <div>
                       <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{b.name}</p>
-                      <p className="text-xs text-slate-500">{b.date}</p>
+                      <p className="text-xs text-slate-500">
+                        {formatMonthDayDisplay(b.date)} <span className="text-[11px] opacity-70">({b.date})</span>
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
