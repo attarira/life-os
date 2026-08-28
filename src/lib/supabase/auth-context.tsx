@@ -16,7 +16,7 @@ type AuthValue = {
 };
 
 const AuthContext = createContext<AuthValue | null>(null);
-const AUTH_CHECK_TIMEOUT_MS = 4000;
+const AUTH_CHECK_TIMEOUT_MS = 15000;
 
 function getAuthFetchErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message) {
@@ -27,16 +27,15 @@ function getAuthFetchErrorMessage(error: unknown): string {
   return 'Could not reach Supabase. Check your connection and try again.';
 }
 
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const timeout = window.setTimeout(() => {
-      reject(new Error('Supabase is taking too long to respond. It may still be resuming.'));
-    }, timeoutMs);
-
-    promise
-      .then(resolve, reject)
-      .finally(() => window.clearTimeout(timeout));
-  });
+function withSessionTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T | { data: { session: Session | null } }> {
+  return Promise.race([
+    promise,
+    new Promise<{ data: { session: Session | null } }>((resolve) => {
+      window.setTimeout(() => {
+        resolve({ data: { session: null } });
+      }, timeoutMs);
+    }),
+  ]);
 }
 
 export function useAuth(): AuthValue {
@@ -55,10 +54,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!isSupabaseConfigured) return;
     const supabase = getSupabase();
 
-    withTimeout(supabase.auth.getSession(), AUTH_CHECK_TIMEOUT_MS)
-      .then(({ data }) => {
-        setSession(data.session);
-        setAuthError(null);
+    withSessionTimeout(supabase.auth.getSession(), AUTH_CHECK_TIMEOUT_MS)
+      .then((result) => {
+        const sessionData = 'data' in result ? result.data : null;
+        setSession(sessionData?.session ?? null);
+        if (!sessionData?.session) {
+          setAuthError('Supabase is taking too long to respond. You can still continue with the magic link flow.');
+        } else {
+          setAuthError(null);
+        }
       })
       .catch((error) => {
         setAuthError(getAuthFetchErrorMessage(error));
