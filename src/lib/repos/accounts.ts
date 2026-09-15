@@ -2,7 +2,7 @@ import { isSupabaseConfigured, getSupabase } from '../supabase/client';
 import { storage, generateId } from '../utils';
 
 export type AccountKind = 'asset' | 'liability';
-export type AccountType = 'bank' | 'credit_card' | 'investment' | 'retirement' | 'loan' | 'mortgage' | 'cash' | 'other_asset';
+export type AccountType = 'bank' | 'credit_card' | 'investment' | 'retirement' | 'loan' | 'mortgage' | 'cash' | 'other' | 'other_asset';
 
 export type AccountMetadata = {
   accountNumberLast4?: string;
@@ -46,10 +46,11 @@ export const ACCOUNT_TYPE_LABELS: Record<AccountType, string> = {
   loan: 'Loan',
   mortgage: 'Mortgage',
   cash: 'Cash',
-  other_asset: 'Other Asset',
+  other: 'Other',
+  other_asset: 'Other',
 };
 
-export const ACCOUNT_TYPE_ORDER: AccountType[] = ['bank', 'credit_card', 'investment', 'retirement', 'loan', 'mortgage', 'cash', 'other_asset'];
+export const ACCOUNT_TYPE_ORDER: AccountType[] = ['bank', 'credit_card', 'investment', 'retirement', 'loan', 'mortgage', 'cash', 'other', 'other_asset'];
 
 export const DEFAULT_ACCOUNTS: AccountInput[] = [
   { name: 'HDFC Bank Savings', institution: 'HDFC Bank', accountType: 'bank', kind: 'asset', balance: 0, sortOrder: 0 },
@@ -81,6 +82,12 @@ type AccountRow = {
   last_updated_at?: string | null;
 };
 
+function normalizeAccountType(value?: string | null): AccountType {
+  if (value === 'other') return 'other_asset';
+  if (value === 'other_asset') return 'other_asset';
+  return (value as AccountType | undefined) ?? 'other_asset';
+}
+
 function inferAccountType(account: { type?: string | null; kind: AccountKind; name: string }): AccountType {
   const text = `${account.type ?? ''} ${account.name}`.toLowerCase();
   if (text.includes('credit card') || text.includes('credit-card')) return 'credit_card';
@@ -90,6 +97,7 @@ function inferAccountType(account: { type?: string | null; kind: AccountKind; na
   if (text.includes('invest') || text.includes('broker') || text.includes('groww') || text.includes('feedaally')) return 'investment';
   if (text.includes('saving') || text.includes('bank') || text.includes('hdfc') || text.includes('icici')) return 'bank';
   if (text.includes('cash')) return 'cash';
+  if (text.includes('other')) return 'other_asset';
   return 'other_asset';
 }
 
@@ -101,10 +109,11 @@ function normalizeMetadata(metadata?: AccountMetadata | null): AccountMetadata {
 }
 
 function rowToAccount(r: AccountRow): Account {
+  const accountType = normalizeAccountType(r.type ?? undefined) ?? inferAccountType({ type: r.type, kind: r.kind, name: r.name });
   return {
     id: r.id,
     name: r.name,
-    accountType: (r.type as AccountType | null) ?? inferAccountType({ type: r.type, kind: r.kind, name: r.name }),
+    accountType,
     kind: r.kind,
     balance: Number(r.balance),
     institution: r.institution ?? undefined,

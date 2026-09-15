@@ -17,6 +17,7 @@ type AuthValue = {
 
 const AuthContext = createContext<AuthValue | null>(null);
 const AUTH_CHECK_TIMEOUT_MS = 15000;
+const AUTH_REQUEST_TIMEOUT_MS = 15000;
 
 function getAuthFetchErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message) {
@@ -36,6 +37,19 @@ function withSessionTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<
       }, timeoutMs);
     }),
   ]);
+}
+
+function withRequestTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeout = window.setTimeout(() => {
+      reject(new Error('Supabase is taking too long to respond while sending the magic link.'));
+    }, timeoutMs);
+
+    promise
+      .then(resolve)
+      .catch(reject)
+      .finally(() => window.clearTimeout(timeout));
+  });
 }
 
 export function useAuth(): AuthValue {
@@ -81,12 +95,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithOtp = useCallback(async (email: string) => {
     if (!isSupabaseConfigured) return { error: 'Supabase is not configured.' };
     try {
-      const { error } = await getSupabase().auth.signInWithOtp({
-        email: email.trim(),
-        options: {
-          emailRedirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
-        },
-      });
+      const { error } = await withRequestTimeout(
+        getSupabase().auth.signInWithOtp({
+          email: email.trim(),
+          options: {
+            emailRedirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
+          },
+        }),
+        AUTH_REQUEST_TIMEOUT_MS
+      );
       const message = error?.message ?? null;
       setAuthError(message);
       return { error: message };
